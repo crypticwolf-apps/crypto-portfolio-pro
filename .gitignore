@@ -1,0 +1,8 @@
+# Copias sincronizadas y builds locales (la raiz es la fuente que se despliega)
+android-build/
+APK/
+crypto-portfolio-pwa/
+.claude/
+node_modules/
+Thumbs.db
+desktop.ini

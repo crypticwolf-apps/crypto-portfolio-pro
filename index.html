@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#050d14" />
+    <meta
+      name="description"
+      content="Gestiona tu portafolio de criptomonedas: precios en tiempo real, objetivos de TP, graficos y exportacion CSV/PDF."
+    />
+    <title>Inversion Crypto Pro</title>
+
+    <link rel="icon" type="image/png" href="./icon-192.png" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
+
+    <!-- PWA en iOS: pantalla completa al añadir a inicio desde Safari -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Crypto Pro" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://api.coingecko.com" crossorigin />
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
+
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      />
+    </noscript>
+
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+
+    <script src="./i18n.js" defer></script>
+    <script src="./app.js" defer></script>
+
+    <script>
+      // PWA registration (skipped on file:// where SW is unsupported)
+      if ("serviceWorker" in navigator && location.protocol !== "file:") {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./sw.js").catch(() => {});
+        });
+      }
+    </script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <div id="appLoader" class="app-loader" role="status" aria-live="polite" aria-hidden="true">
+        <span class="loader-ring"></span>
+        <span id="loaderText" data-i18n="loader.syncPrices">Sincronizando precios...</span>
+      </div>
+
+      <div id="stickyBar" class="sticky-bar" aria-hidden="true">
+        <span class="sticky-bar-title" id="stickyBarName">Mi Portafolio</span>
+        <span class="sticky-bar-sep" aria-hidden="true"></span>
+        <span class="sticky-bar-value" id="stickyBarValue">--</span>
+        <span class="sticky-bar-pnl neutral" id="stickyBarPnl">--</span>
+        <div class="sticky-bar-right">
+          <div class="nav-status-badges">
+            <span class="nav-badge" id="navApiBadge">
+              <span class="nav-badge-dot" aria-hidden="true"></span>
+              <span id="navApiText" data-i18n="status.ready">Listo</span>
+            </span>
+            <span class="nav-badge" id="navSaveBadge">
+              <span class="nav-badge-dot" aria-hidden="true"></span>
+              <span id="navSaveText" data-i18n="status.noPendingChanges">Sin cambios pendientes</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <header class="hero-panel">
+        <div class="hero-copy">
+          <p class="eyebrow" data-i18n="hero.eyebrow">Portfolio intelligence</p>
+          <h1 data-i18n="hero.title">Crypto Portfolio Pro</h1>
+          <p id="portfolioNameDisplay" class="portfolio-name-display">Mi Portafolio</p>
+        </div>
+
+        <div class="hero-side">
+          <div class="top-actions">
+            <label class="inline-field inline-field-wide" for="portfolioNameInput">
+              <span data-i18n="portfolio.label">Nombre del portafolio</span>
+              <input
+                id="portfolioNameInput"
+                class="inline-input"
+                type="text"
+                maxlength="60"
+                placeholder="Ej: Portafolio de Carlos"
+                data-i18n-placeholder="portfolio.placeholder"
+              />
+            </label>
+
+            <label class="inline-field" for="currencySelect">
+              <span data-i18n="controls.baseCurrency">Moneda base</span>
+              <select id="currencySelect">
+                <option value="usd">USD</option>
+                <option value="eur">EUR</option>
+              </select>
+            </label>
+
+            <label class="inline-field" for="autoRefreshSelect">
+              <span data-i18n="controls.autoRefresh">Auto refresh</span>
+              <select id="autoRefreshSelect">
+                <option value="15">15s</option>
+                <option value="60">1m</option>
+                <option value="1800">30m</option>
+                <option value="3600">1h</option>
+                <option value="86400">24h</option>
+              </select>
+            </label>
+
+            <button id="themeToggle" class="ghost-btn" type="button" data-i18n="theme.light">Modo claro</button>
+          </div>
+
+          <div class="status-strip">
+            <article class="status-card">
+              <span class="status-label" data-i18n="status.api">API</span>
+              <strong id="apiStatus" data-i18n="status.ready">Listo</strong>
+              <small id="apiStatusMeta" data-i18n="status.syncManual">Sincroniza manualmente para cargar precios.</small>
+            </article>
+            <article class="status-card">
+              <span class="status-label" data-i18n="status.saved">Guardado</span>
+              <strong id="saveStatus" data-i18n="status.noPendingChanges">Sin cambios pendientes</strong>
+              <small id="lastSyncLabel" data-i18n="status.noSyncYet">Sin sincronizacion todavia</small>
+            </article>
+          </div>
+        </div>
+      </header>
+
+      <section class="summary-grid" id="summaryGrid" aria-label="Resumen del portafolio" data-i18n-aria-label="summary.ariaLabel"></section>
+
+      <section class="panel insights-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow" data-i18n="insights.eyebrow">Insights</p>
+            <h2 data-i18n="insights.title">Insights del Portafolio</h2>
+          </div>
+          <p class="panel-copy" data-i18n="insights.subtitle">
+            Analisis en tiempo real de rendimiento y comportamiento.
+          </p>
+        </div>
+
+        <div id="insightsRankingsGrid" class="insights-rankings-grid"></div>
+      </section>
+
+      <section class="panel controls-panel">
+        <div class="toolbar" id="actionsToolbar">
+          <div class="toolbar-group toolbar-primary">
+            <button id="addRowBtn" class="primary-btn" type="button" data-i18n="buttons.newPosition">Nueva posicion</button>
+            <button id="refreshPricesBtn" class="ghost-btn" type="button" data-i18n="buttons.refreshPrices">Actualizar precios</button>
+            <button id="saveBtn" class="ghost-btn" type="button" data-i18n="buttons.save">Guardar</button>
+            <button
+              id="moreActionsBtn"
+              class="ghost-btn more-actions-btn"
+              type="button"
+              aria-expanded="false"
+              aria-controls="secondaryActions"
+              data-i18n="buttons.more"
+            >Mas opciones</button>
+          </div>
+
+          <div class="toolbar-group toolbar-group-end toolbar-secondary" id="secondaryActions">
+            <button id="toggleChartsBtn" class="ghost-btn" type="button" data-i18n="buttons.hideCharts">Ocultar graficos</button>
+            <button id="downloadPdfBtn" class="ghost-btn" type="button" data-i18n="buttons.downloadPdf">Descargar PDF</button>
+            <button id="exportBtn" class="ghost-btn" type="button" data-i18n="buttons.exportCsv">Exportar CSV</button>
+            <button id="importBtn" class="ghost-btn" type="button" data-i18n="buttons.importCsv">Importar CSV</button>
+            <button id="clearBtn" class="danger-btn" type="button" data-i18n="buttons.resetData">Resetear datos</button>
+            <input id="importFileInput" type="file" accept=".csv,text/csv" hidden />
+          </div>
+        </div>
+      </section>
+
+      <section class="panel charts-panel" id="chartsPanel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow" data-i18n="charts.eyebrow">Visualizacion</p>
+            <h2 data-i18n="charts.title">Distribucion y evolucion</h2>
+          </div>
+          <p class="panel-copy" data-i18n="charts.copy">
+            La dona resume el peso actual de cada posicion y la linea guarda la evolucion
+            reciente del valor total del portafolio.
+          </p>
+        </div>
+
+        <div class="chart-grid">
+          <article class="chart-card">
+            <div class="chart-head">
+              <h3 data-i18n="charts.portfolioDistribution">Distribucion del portafolio</h3>
+              <span class="chart-chip" data-i18n="charts.pie">Pie</span>
+            </div>
+            <div class="chart-stage">
+              <canvas id="portfolioPieChart" height="280"></canvas>
+            </div>
+          </article>
+
+          <article class="chart-card">
+            <div class="chart-head">
+              <h3 data-i18n="charts.totalEvolution">Evolucion del valor total</h3>
+              <div class="chart-head-tools">
+                <div id="lineRangeControl" class="chart-range-control" role="group" aria-label="Rango temporal" data-i18n-aria-label="charts.rangeAriaLabel">
+                  <button class="range-chip" type="button" data-range="1h" data-i18n="charts.range1h">1h</button>
+                  <button class="range-chip" type="button" data-range="1d" data-i18n="charts.range1d">1d</button>
+                  <button class="range-chip" type="button" data-range="1w" data-i18n="charts.range1w">1s</button>
+                  <button class="range-chip" type="button" data-range="1mo" data-i18n="charts.range1mo">1m</button>
+                  <button class="range-chip" type="button" data-range="6mo" data-i18n="charts.range6mo">6m</button>
+                  <button class="range-chip" type="button" data-range="1y" data-i18n="charts.range1y">1a</button>
+                  <button class="range-chip" type="button" data-range="total" data-i18n="charts.rangeTotal">Total</button>
+                </div>
+                <span class="chart-chip" data-i18n="charts.line">Linea</span>
+              </div>
+            </div>
+            <div class="chart-stage">
+              <canvas id="portfolioLineChart" height="280"></canvas>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel table-panel table-panel-full">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow" data-i18n="table.eyebrow">Posiciones</p>
+            <h2 data-i18n="table.title">Tabla avanzada del portafolio</h2>
+          </div>
+          <p class="panel-copy" data-i18n="table.copy">
+            Ordena por cualquier columna, marca favoritos, accede a la web del activo y usa
+            busqueda asistida contra CoinGecko.
+          </p>
+        </div>
+
+        <div class="column-toggles" id="columnToggles">
+          <span class="column-toggles-label" data-i18n="table.showColumns">Columnas:</span>
+          <button class="col-toggle-btn is-active" type="button" data-col-toggle="targets" id="toggleTargetsBtn" data-i18n="table.columns.targets">Objetivos</button>
+          <button class="col-toggle-btn is-active" type="button" data-col-toggle="tpSignal" id="toggleSignalBtn" data-i18n="table.columns.tpSignal">Senal TP</button>
+          <button class="col-toggle-btn is-active" type="button" data-col-toggle="priority" id="togglePriorityBtn" data-i18n="table.columns.priority">Prioridad</button>
+        </div>
+
+        <div class="table-wrap">
+          <table aria-label="Tabla de inversion crypto" data-i18n-aria-label="table.ariaLabel">
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+            <tfoot id="totalsFoot"></tfoot>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel info-panel">
+        <div class="info-grid">
+          <article>
+            <h3 data-i18n="info.dataEngineTitle">Motor de datos</h3>
+            <p data-i18n="info.dataEngineText">
+              La app usa cache temporal para precios y resultados de busqueda, debounce en los
+              campos y autosave optimizado para evitar llamadas y escrituras innecesarias.
+            </p>
+          </article>
+          <article>
+            <h3 data-i18n="info.tpSignalsTitle">Senales de TP</h3>
+            <p data-i18n="info.tpSignalsText">
+              Cada fila muestra una senal visual segun la distancia al siguiente objetivo y la
+              app lanza notificaciones locales cuando se alcanza un take profit registrado.
+            </p>
+          </article>
+          <article>
+            <h3 data-i18n="info.dailyWorkflowTitle">Trabajo diario</h3>
+            <p data-i18n="info.dailyWorkflowText">
+              Importa o exporta CSV, cambia entre USD y EUR, oculta graficos cuando quieras y
+              sigue usando el dashboard desde movil con scroll horizontal controlado.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel activity-panel">
+        <div class="panel-heading side-heading">
+          <div>
+            <p class="eyebrow" data-i18n="activity.eyebrow">Actividad</p>
+            <h2 data-i18n="activity.title">Historial simple</h2>
+          </div>
+          <p class="panel-copy" data-i18n="activity.copy">
+            Registro secundario de acciones, alertas e importaciones recientes.
+          </p>
+        </div>
+
+        <div id="activityList" class="activity-list"></div>
+      </section>
+
+      <footer class="panel app-footer">
+        <div class="footer-grid">
+          <div class="footer-copy">
+            <p class="eyebrow" data-i18n="footer.eyebrow">Soporte Al Proyecto</p>
+            <h2>Desarrollado por CrypticWolf 🐺</h2>
+            <p data-i18n="footer.text1">
+              Gracias por utilizar nuestra aplicacion. Este proyecto es desarrollado de forma
+              independiente con el compromiso de seguir innovando dentro del ecosistema
+              blockchain.
+            </p>
+            <p data-i18n="footer.text2">Tu apoyo impulsa futuras mejoras.</p>
+          </div>
+
+          <div class="footer-wallets">
+            <p class="eyebrow" data-i18n="footer.contributions">Contribuciones</p>
+            <div class="wallet-card">
+              <span>ETH</span>
+              <code>0x6Cb6eEC878C4bBF3eb464A597596cD6e8cF11B92</code>
+            </div>
+            <div class="wallet-card">
+              <span>SOL</span>
+              <code>P1ZjaZzTMSDHWaCeLdp55DhJLsEupNYhNgKJDW1p77w</code>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+    </div>
+
+    <div id="toastStack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
+  </body>
+</html>
