@@ -3301,6 +3301,393 @@ select {
     radial-gradient(ellipse 45% 35% at 12% 90%, rgba(240, 150, 40, 0.08), transparent 65%);
 }
 
+/* ═══════════════════════════════════════════════════════
+   MOBILE UX v7 — gráfico de evolución primero y táctil,
+   tarjetas compactas con resumen 2 columnas, barra de
+   acciones reubicada y barra rápida inferior fija
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Cabecera del gráfico de evolución (valor + variación del rango) ── */
+
+.chart-head-copy {
+  min-width: 0;
+}
+
+.chart-current {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chart-current strong {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Estado vacío elegante del gráfico */
+.chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  background: var(--glass-card);
+  border-radius: 14px;
+}
+
+/* ── Filtro de posiciones ── */
+
+.table-filter {
+  margin-bottom: 12px;
+}
+
+.table-filter .inline-input {
+  max-width: 340px;
+}
+
+/* ── Números tabulares para columnas alineadas ── */
+
+.money,
+.numeric,
+.card-summary-grid strong,
+.totals-inline-cell {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Resumen de tarjeta (solo móvil; en escritorio no existe) ── */
+
+.card-summary-cell {
+  display: none;
+  padding: 0;
+  border: none;
+}
+
+/* ── Layout móvil v7 ── */
+
+@media (max-width: 768px) {
+
+  /* Gráficos: la evolución primero, a todo el ancho y con altura real */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .chart-grid .chart-card:nth-child(2) {
+    order: -1;
+  }
+
+  .chart-grid .chart-card:nth-child(2) .chart-stage {
+    height: clamp(260px, 72vw, 320px);
+  }
+
+  .chart-grid .chart-card:first-child .chart-stage {
+    height: clamp(200px, 60vw, 240px);
+  }
+
+  /* Chips de rango: una sola fila con scroll suave y sin barra visible */
+  .chart-range-control {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: 100%;
+    padding-bottom: 2px;
+  }
+
+  .chart-range-control::-webkit-scrollbar {
+    display: none;
+  }
+
+  .range-chip {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    min-height: 40px;
+    padding: 0 14px;
+  }
+
+  /* Barra de acciones: rejilla de 2 columnas, táctil y sin overflow */
+  .toolbar-primary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .toolbar.is-open .toolbar-secondary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .toolbar-secondary .danger-btn {
+    grid-column: 1 / -1;
+  }
+
+  /* ── Tarjeta de posición v7 ──
+     Cabecera: activo + favorito/web. Resumen 2 columnas siempre visible.
+     Acordeón: edición (inv/tokens/entrada), TP escalera, señal y acciones. */
+
+  .table-wrap .portfolio-row .asset-cell {
+    order: 1;
+    flex: 1 1 0%;
+    min-width: 0;
+  }
+
+  .table-wrap .portfolio-row .priority-cell {
+    order: 2;
+    flex: 0 0 auto;
+    display: block;
+    padding-top: 0;
+  }
+
+  .table-wrap .portfolio-row:not(.is-expanded) .priority-cell {
+    display: block;
+  }
+
+  .table-wrap .portfolio-row .priority-cell::before {
+    display: none;
+    content: none;
+  }
+
+  .table-wrap .portfolio-row .priority-cell .flag-stack {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .table-wrap .portfolio-row .priority-cell .flag-btn {
+    width: auto;
+    min-height: 40px;
+    padding: 0 10px;
+    white-space: nowrap;
+  }
+
+  /* Los datos de mercado/rendimiento viven en el resumen: las celdas
+     originales se ocultan en móvil (siguen actualizándose por data-role) */
+  .table-wrap .portfolio-row .market-cell,
+  .table-wrap .portfolio-row .performance-cell {
+    display: none;
+  }
+
+  .card-summary-cell {
+    display: block;
+    order: 3;
+    flex: 1 1 100%;
+  }
+
+  .card-summary-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 12px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  :root[data-theme="light"] .card-summary-grid {
+    background: rgba(255, 255, 255, 0.55);
+    border-color: rgba(30, 70, 110, 0.08);
+  }
+
+  .cs-item {
+    min-width: 0;
+  }
+
+  .cs-item span {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+
+  .cs-item strong {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cs-right {
+    text-align: right;
+  }
+
+  .cs-tp {
+    grid-column: 1 / -1;
+  }
+
+  .card-summary-grid strong.good  { color: var(--positive); }
+  .card-summary-grid strong.warn  { color: var(--warning); }
+  .card-summary-grid strong.error { color: var(--negative); }
+
+  .card-summary-cell::before {
+    display: none;
+    content: none;
+  }
+
+  /* Toggle debajo del resumen, ancho completo con flecha indicadora */
+  .table-wrap .portfolio-row .card-toggle-cell {
+    order: 4;
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .table-wrap .portfolio-row .details-toggle-btn {
+    width: 100%;
+  }
+
+  .details-toggle-btn::after {
+    content: "\25BE";
+    margin-left: 8px;
+    display: inline-block;
+    transition: transform 0.2s;
+  }
+
+  .portfolio-row.is-expanded .details-toggle-btn::after {
+    transform: rotate(180deg);
+  }
+
+  /* Acordeón */
+  .table-wrap .portfolio-row .position-cell { order: 5; }
+  .table-wrap .portfolio-row .targets-cell  { order: 6; }
+  .table-wrap .portfolio-row .signal-cell   { order: 7; flex: 1 1 100%; }
+  .table-wrap .portfolio-row .actions-cell  { order: 8; }
+
+  .table-wrap .portfolio-row:not(.is-expanded) .signal-cell {
+    display: none;
+  }
+
+  /* Borde lateral según beneficio/pérdida (sistema visual actual) */
+  .table-wrap .portfolio-row.row-profit {
+    border-left: 3px solid rgba(62, 255, 168, 0.55);
+  }
+
+  .table-wrap .portfolio-row.row-loss {
+    border-left: 3px solid rgba(255, 85, 85, 0.5);
+  }
+
+  /* Objetivos TP como escalera: TP1 → TP2 → TP3 en filas */
+  .table-wrap .portfolio-row .tp-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .table-wrap .portfolio-row .tp-grid .mini-field {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .table-wrap .portfolio-row .tp-grid .mini-field span {
+    flex-shrink: 0;
+  }
+
+  .table-wrap .portfolio-row .tp-grid .mini-field input {
+    max-width: 58%;
+  }
+
+  /* Filtro a todo el ancho en móvil */
+  .table-filter .inline-input {
+    max-width: 100%;
+  }
+
+  /* ── Barra rápida inferior fija (solo móvil) ── */
+
+  .mobile-quick-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 55;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 8px 10px max(8px, env(safe-area-inset-bottom));
+    background: var(--glass-inner), var(--glass-bg-strong);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border-top: 1px solid var(--glass-border);
+    box-shadow: 0 -6px 24px rgba(1, 6, 14, 0.3);
+  }
+
+  :root[data-theme="light"] .mobile-quick-bar {
+    box-shadow: 0 -6px 24px rgba(14, 40, 70, 0.12);
+  }
+
+  .quick-bar-btn {
+    min-height: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: none;
+    border-radius: 14px;
+    background: transparent;
+    color: var(--text-2);
+    font-family: var(--font-body);
+    font-size: 0.68rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.12s;
+  }
+
+  .quick-bar-btn:active {
+    transform: scale(0.94);
+    background: var(--panel-hover);
+  }
+
+  .quick-bar-btn:disabled {
+    opacity: 0.5;
+  }
+
+  .quick-bar-icon {
+    font-size: 1.2rem;
+    line-height: 1;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .quick-bar-btn.is-loading .quick-refresh-icon {
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* Hueco inferior para que la barra fija no tape la última posición */
+  .app-shell {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+
+  .toast-stack {
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+}
+
+/* En escritorio y tablet grande la barra rápida no existe */
+@media (min-width: 769px) {
+  .mobile-quick-bar {
+    display: none;
+  }
+}
+
 /* ── Accesibilidad: iOS "reducir transparencia" ── */
 
 @media (prefers-reduced-transparency: reduce) {
@@ -3310,7 +3697,8 @@ select {
   .toast,
   .app-loader,
   .suggestions,
-  th {
+  th,
+  .mobile-quick-bar {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     background: var(--panel-strong);

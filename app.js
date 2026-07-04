@@ -233,7 +233,8 @@ const state = {
   pendingFetches: new Map(),
   fxRateCache: new Map(),
   refreshRequestId: 0,
-  currencySwitchId: 0
+  currencySwitchId: 0,
+  filterQuery: ""
 };
 
 const dom = {
@@ -275,7 +276,11 @@ const dom = {
   lastSyncLabel: document.getElementById("lastSyncLabel"),
   appLoader: document.getElementById("appLoader"),
   loaderText: document.getElementById("loaderText"),
-  toastStack: document.getElementById("toastStack")
+  toastStack: document.getElementById("toastStack"),
+  positionFilterInput: document.getElementById("positionFilterInput"),
+  quickAddBtn: document.getElementById("quickAddBtn"),
+  quickRefreshBtn: document.getElementById("quickRefreshBtn"),
+  quickSearchBtn: document.getElementById("quickSearchBtn")
 };
 
 init();
@@ -591,6 +596,30 @@ function bindEvents() {
     button.addEventListener("click", () => copyWalletAddress(button));
   });
 
+  if (dom.positionFilterInput) {
+    dom.positionFilterInput.addEventListener("input", (event) => {
+      state.filterQuery = event.target.value;
+      applyPositionFilter();
+    });
+  }
+
+  // Barra rápida móvil: reutiliza los botones existentes (misma lógica,
+  // mismos listeners) en lugar de duplicar handlers.
+  if (dom.quickAddBtn) {
+    dom.quickAddBtn.addEventListener("click", () => dom.addRowBtn.click());
+  }
+  if (dom.quickRefreshBtn) {
+    dom.quickRefreshBtn.addEventListener("click", () => dom.refreshPricesBtn.click());
+  }
+  if (dom.quickSearchBtn) {
+    dom.quickSearchBtn.addEventListener("click", () => {
+      document.querySelector(".table-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.setTimeout(() => {
+        dom.positionFilterInput?.focus({ preventScroll: true });
+      }, 350);
+    });
+  }
+
   const moreActionsBtn = document.getElementById("moreActionsBtn");
   const actionsToolbar = document.getElementById("actionsToolbar");
   if (moreActionsBtn && actionsToolbar) {
@@ -867,6 +896,19 @@ function renderTableBody() {
     `;
   }
   applyColumnVisibility();
+  applyPositionFilter();
+}
+
+// Filtro de posiciones por nombre, símbolo o coinId. Solo oculta/muestra
+// filas ya renderizadas: no re-renderiza ni toca el estado de los datos.
+function applyPositionFilter() {
+  const query = normalizeSearchText(state.filterQuery || "");
+  dom.tableBody.querySelectorAll("tr[data-row-id]").forEach((tr) => {
+    const row = getRowById(tr.dataset.rowId);
+    const match = !query || [row?.crypto, row?.resolvedName, row?.symbol, row?.coinId]
+      .some((value) => normalizeSearchText(String(value || "")).includes(query));
+    tr.style.display = match ? "" : "none";
+  });
 }
 
 function renderRow(row) {
@@ -1041,6 +1083,31 @@ function renderRow(row) {
           <button class="icon-btn" type="button" data-action="delete-row" data-row-id="${row.id}">
             ${escapeHtml(t("buttons.delete"))}
           </button>
+        </div>
+      </td>
+
+      <td class="card-summary-cell">
+        <div class="card-summary-grid">
+          <div class="cs-item">
+            <span>${escapeHtml(t("card.value"))}</span>
+            <strong class="money" data-role="csValue">${formatCurrency(metrics.currentValue)}</strong>
+          </div>
+          <div class="cs-item cs-right">
+            <span>${escapeHtml(t("card.pnl"))}</span>
+            <strong class="money ${toneClass(metrics.pnlUsd)}" data-role="csPnl">${formatSignedCurrency(metrics.pnlUsd)} (${formatPercent(metrics.pnlPct)})</strong>
+          </div>
+          <div class="cs-item">
+            <span>${escapeHtml(t("card.price"))}</span>
+            <strong class="money" data-role="csPrice">${metrics.currentPrice > 0 ? formatCurrency(metrics.currentPrice, getPriceDigits(metrics.currentPrice)) : "--"}</strong>
+          </div>
+          <div class="cs-item cs-right">
+            <span>${escapeHtml(t("card.invested"))}</span>
+            <strong class="money" data-role="csInvestment">${formatCurrency(metrics.investment)}</strong>
+          </div>
+          <div class="cs-item cs-tp">
+            <span>${escapeHtml(t("card.nextTp"))}</span>
+            <strong class="${tpStatus.tone}" data-role="csTp">${escapeHtml(getNextTpSummary(metrics, tpStatus))}</strong>
+          </div>
         </div>
       </td>
 
@@ -1503,6 +1570,21 @@ function updateLiveRowUi(rowId) {
     node.className = `numeric ${toneClass(metrics.roiPct)}`;
   });
   setRole("tpSignal", (node) => { node.innerHTML = renderTpSignal(tpStatus); });
+  setRole("csValue", (node) => { node.textContent = formatCurrency(metrics.currentValue); });
+  setRole("csPrice", (node) => {
+    node.textContent = metrics.currentPrice > 0
+      ? formatCurrency(metrics.currentPrice, getPriceDigits(metrics.currentPrice))
+      : "--";
+  });
+  setRole("csInvestment", (node) => { node.textContent = formatCurrency(metrics.investment); });
+  setRole("csPnl", (node) => {
+    node.textContent = `${formatSignedCurrency(metrics.pnlUsd)} (${formatPercent(metrics.pnlPct)})`;
+    node.className = `money ${toneClass(metrics.pnlUsd)}`;
+  });
+  setRole("csTp", (node) => {
+    node.textContent = getNextTpSummary(metrics, tpStatus);
+    node.className = tpStatus.tone;
+  });
   setRole("suggestions", (node) => {
     node.innerHTML = renderSuggestions(row);
     node.classList.toggle("hidden", !(row.suggestionsOpen && row.suggestions.length));
@@ -3437,6 +3519,32 @@ function getTpStatus(metrics) {
   return { tone: "error", label: t("row.farTarget", { target: nextTarget.label }), score: ratio };
 }
 
+// Resumen corto del siguiente objetivo para la tarjeta móvil:
+// "TP1 a +18.0%", "TP3 alcanzado" o "Sin objetivo".
+function getNextTpSummary(metrics, tpStatus = getTpStatus(metrics)) {
+  const targets = [
+    { label: "TP1", value: metrics.tp1 },
+    { label: "TP2", value: metrics.tp2 },
+    { label: "TP3", value: metrics.tp3 }
+  ].filter((target) => target.value > 0);
+
+  if (!targets.length) {
+    return t("row.noTarget");
+  }
+
+  if (!(metrics.currentPrice > 0)) {
+    return tpStatus.label;
+  }
+
+  const next = targets.find((target) => metrics.currentPrice < target.value);
+  if (!next) {
+    return t("row.targetReached", { target: targets[targets.length - 1].label });
+  }
+
+  const pct = (next.value / metrics.currentPrice - 1) * 100;
+  return t("row.nextTpAway", { target: next.label, pct: pct.toFixed(1) });
+}
+
 function renderTpSignal(tpStatus) {
   return `
     <span class="signal-badge ${tpStatus.tone}">
@@ -3848,19 +3956,55 @@ function buildLineTickLabels(points) {
 function getLineTickLimit() {
   const range = resolveChartRange(state.prefs.chartRange);
 
-  if (range === "1m") {
-    return 6;
+  let limit = 8;
+  if (range === "1m" || range === "1d") {
+    limit = 6;
+  } else if (range === "1w" || range === "1mo") {
+    limit = 7;
   }
-  if (range === "1h") {
-    return 8;
+
+  // En pantallas estrechas caben menos etiquetas sin amontonarse.
+  if (typeof window !== "undefined" && window.innerWidth <= 480) {
+    limit = Math.max(4, limit - 2);
   }
-  if (range === "1d") {
-    return 6;
+
+  return limit;
+}
+
+// Cabecera del gráfico de evolución: valor actual + variación del rango
+// elegido, y estado vacío elegante mientras no haya historial suficiente.
+function renderLineChartSummary(points) {
+  const summary = document.getElementById("lineChartSummary");
+  const valueNode = document.getElementById("lineChartValue");
+  const deltaNode = document.getElementById("lineChartDelta");
+  const emptyNode = document.getElementById("lineChartEmpty");
+
+  if (emptyNode) {
+    emptyNode.classList.toggle("hidden", points.length >= 2);
   }
-  if (range === "1w" || range === "1mo") {
-    return 7;
+
+  if (!summary || !valueNode || !deltaNode) {
+    return;
   }
-  return 8;
+
+  if (!points.length) {
+    summary.hidden = true;
+    return;
+  }
+
+  summary.hidden = false;
+  const last = Number(points[points.length - 1].total || 0);
+  valueNode.textContent = formatCurrency(last);
+
+  if (points.length >= 2) {
+    const first = Number(points[0].total || 0);
+    const pct = first > 0 ? ((last - first) / first) * 100 : 0;
+    deltaNode.textContent = formatSignedPercent(pct);
+    deltaNode.className = `delta-chip ${pct > 0 ? "good" : pct < 0 ? "error" : "warn"}`;
+    deltaNode.hidden = false;
+  } else {
+    deltaNode.hidden = true;
+  }
 }
 
 function appendPortfolioHistory() {
@@ -4037,6 +4181,7 @@ async function updateCharts(snapshot) {
   const lineLabels = buildLineTickLabels(historyPoints);
   const lineValues = historyPoints.map((point) => point.total);
   lineTooltipTitles = historyPoints.map((point) => formatDateTime(new Date(point.at)));
+  renderLineChartSummary(historyPoints);
   const textColor = getCssVar("--muted");
   const borderColor = getCssVar("--line");
   const accent = getCssVar("--accent");
@@ -4105,11 +4250,15 @@ async function updateCharts(snapshot) {
           {
             data: lineValues,
             borderColor: accent2,
-            backgroundColor: "rgba(78, 160, 255, 0.16)",
+            backgroundColor: "rgba(78, 160, 255, 0.14)",
             fill: true,
             tension: 0.34,
-            pointRadius: 3,
+            borderWidth: 2.5,
+            // Sin puntos dibujados: con interacción "index" el tooltip salta
+            // al punto más cercano sin tener que acertar con el dedo.
+            pointRadius: 0,
             pointHoverRadius: 5,
+            pointHitRadius: 24,
             pointBackgroundColor: accent
           }
         ]
@@ -4117,16 +4266,18 @@ async function updateCharts(snapshot) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
         scales: {
           x: {
             // Las etiquetas ya vienen repartidas desde buildLineTickLabels
             // (el resto son ""); autoSkip las descartaría a su criterio.
-            ticks: { color: textColor, autoSkip: false, maxRotation: 30 },
+            ticks: { color: textColor, autoSkip: false, maxRotation: 30, font: { size: 10 } },
             grid: { display: false }
           },
           y: {
             ticks: {
               color: textColor,
+              maxTicksLimit: 5,
               callback(value) {
                 return formatCompactCurrency(value);
               }
@@ -4137,6 +4288,11 @@ async function updateCharts(snapshot) {
         plugins: {
           legend: { display: false },
           tooltip: {
+            padding: 12,
+            displayColors: false,
+            caretSize: 7,
+            titleFont: { size: 12 },
+            bodyFont: { size: 14, weight: "bold" },
             callbacks: {
               title(items) {
                 return lineTooltipTitles[items[0]?.dataIndex] ?? "";
@@ -4262,6 +4418,13 @@ function setLoader(visible, label = t("loader.syncMarket")) {
   dom.appLoader.classList.toggle("is-visible", visible);
   dom.appLoader.setAttribute("aria-hidden", visible ? "false" : "true");
   dom.loaderText.textContent = label;
+
+  // El botón de actualizar de la barra rápida móvil refleja la carga y se
+  // deshabilita para evitar dobles toques.
+  if (dom.quickRefreshBtn) {
+    dom.quickRefreshBtn.disabled = visible;
+    dom.quickRefreshBtn.classList.toggle("is-loading", visible);
+  }
 }
 
 function updateSaveMessage(message) {

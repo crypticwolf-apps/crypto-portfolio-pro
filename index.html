@@ -152,6 +152,61 @@
         <div id="insightsRankingsGrid" class="insights-rankings-grid"></div>
       </section>
 
+      <section class="panel charts-panel" id="chartsPanel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow" data-i18n="charts.eyebrow">Visualizacion</p>
+            <h2 data-i18n="charts.title">Distribucion y evolucion</h2>
+          </div>
+          <p class="panel-copy" data-i18n="charts.copy">
+            La dona resume el peso actual de cada posicion y la linea guarda la evolucion
+            reciente del valor total del portafolio.
+          </p>
+        </div>
+
+        <div class="chart-grid">
+          <article class="chart-card">
+            <div class="chart-head">
+              <h3 data-i18n="charts.portfolioDistribution">Distribucion del portafolio</h3>
+              <span class="chart-chip" data-i18n="charts.pie">Pie</span>
+            </div>
+            <div class="chart-stage">
+              <canvas id="portfolioPieChart" height="280"></canvas>
+            </div>
+          </article>
+
+          <article class="chart-card">
+            <div class="chart-head">
+              <div class="chart-head-copy">
+                <h3 data-i18n="charts.totalEvolution">Evolucion del valor total</h3>
+                <p class="chart-current" id="lineChartSummary" hidden>
+                  <strong id="lineChartValue">--</strong>
+                  <span id="lineChartDelta" class="delta-chip" hidden></span>
+                </p>
+              </div>
+              <div class="chart-head-tools">
+                <div id="lineRangeControl" class="chart-range-control" role="group" aria-label="Rango temporal" data-i18n-aria-label="charts.rangeAriaLabel">
+                  <button class="range-chip" type="button" data-range="1h" data-i18n="charts.range1h">1h</button>
+                  <button class="range-chip" type="button" data-range="1d" data-i18n="charts.range1d">1d</button>
+                  <button class="range-chip" type="button" data-range="1w" data-i18n="charts.range1w">1s</button>
+                  <button class="range-chip" type="button" data-range="1mo" data-i18n="charts.range1mo">1m</button>
+                  <button class="range-chip" type="button" data-range="6mo" data-i18n="charts.range6mo">6m</button>
+                  <button class="range-chip" type="button" data-range="1y" data-i18n="charts.range1y">1a</button>
+                  <button class="range-chip" type="button" data-range="total" data-i18n="charts.rangeTotal">Total</button>
+                </div>
+                <span class="chart-chip" data-i18n="charts.line">Linea</span>
+              </div>
+            </div>
+            <div class="chart-stage">
+              <canvas id="portfolioLineChart" height="280"></canvas>
+              <div id="lineChartEmpty" class="chart-empty hidden" data-i18n="charts.emptyHistory">
+                Todavia no hay suficiente historial. Cada actualizacion de precios crea un punto nuevo.
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section class="panel controls-panel">
         <div class="toolbar" id="actionsToolbar">
           <div class="toolbar-group toolbar-primary">
@@ -179,52 +234,6 @@
         </div>
       </section>
 
-      <section class="panel charts-panel" id="chartsPanel">
-        <div class="panel-heading">
-          <div>
-            <p class="eyebrow" data-i18n="charts.eyebrow">Visualizacion</p>
-            <h2 data-i18n="charts.title">Distribucion y evolucion</h2>
-          </div>
-          <p class="panel-copy" data-i18n="charts.copy">
-            La dona resume el peso actual de cada posicion y la linea guarda la evolucion
-            reciente del valor total del portafolio.
-          </p>
-        </div>
-
-        <div class="chart-grid">
-          <article class="chart-card">
-            <div class="chart-head">
-              <h3 data-i18n="charts.portfolioDistribution">Distribucion del portafolio</h3>
-              <span class="chart-chip" data-i18n="charts.pie">Pie</span>
-            </div>
-            <div class="chart-stage">
-              <canvas id="portfolioPieChart" height="280"></canvas>
-            </div>
-          </article>
-
-          <article class="chart-card">
-            <div class="chart-head">
-              <h3 data-i18n="charts.totalEvolution">Evolucion del valor total</h3>
-              <div class="chart-head-tools">
-                <div id="lineRangeControl" class="chart-range-control" role="group" aria-label="Rango temporal" data-i18n-aria-label="charts.rangeAriaLabel">
-                  <button class="range-chip" type="button" data-range="1h" data-i18n="charts.range1h">1h</button>
-                  <button class="range-chip" type="button" data-range="1d" data-i18n="charts.range1d">1d</button>
-                  <button class="range-chip" type="button" data-range="1w" data-i18n="charts.range1w">1s</button>
-                  <button class="range-chip" type="button" data-range="1mo" data-i18n="charts.range1mo">1m</button>
-                  <button class="range-chip" type="button" data-range="6mo" data-i18n="charts.range6mo">6m</button>
-                  <button class="range-chip" type="button" data-range="1y" data-i18n="charts.range1y">1a</button>
-                  <button class="range-chip" type="button" data-range="total" data-i18n="charts.rangeTotal">Total</button>
-                </div>
-                <span class="chart-chip" data-i18n="charts.line">Linea</span>
-              </div>
-            </div>
-            <div class="chart-stage">
-              <canvas id="portfolioLineChart" height="280"></canvas>
-            </div>
-          </article>
-        </div>
-      </section>
-
       <section class="panel table-panel table-panel-full">
         <div class="panel-heading">
           <div>
@@ -235,6 +244,19 @@
             Ordena por cualquier columna, marca favoritos, accede a la web del activo y usa
             busqueda asistida contra CoinGecko.
           </p>
+        </div>
+
+        <div class="table-filter">
+          <input
+            id="positionFilterInput"
+            class="inline-input"
+            type="search"
+            autocomplete="off"
+            placeholder="Filtrar por nombre, simbolo o id..."
+            data-i18n-placeholder="table.filterPlaceholder"
+            aria-label="Filtrar posiciones"
+            data-i18n-aria-label="table.filterAria"
+          />
         </div>
 
         <div class="column-toggles" id="columnToggles">
@@ -339,6 +361,21 @@
       </footer>
 
     </div>
+
+    <nav id="mobileQuickBar" class="mobile-quick-bar" aria-label="Acciones rapidas" data-i18n-aria-label="quick.ariaLabel">
+      <button id="quickAddBtn" class="quick-bar-btn" type="button">
+        <span class="quick-bar-icon" aria-hidden="true">+</span>
+        <span data-i18n="quick.new">Nuevo</span>
+      </button>
+      <button id="quickRefreshBtn" class="quick-bar-btn" type="button">
+        <span class="quick-bar-icon quick-refresh-icon" aria-hidden="true">&#8635;</span>
+        <span data-i18n="quick.refresh">Precios</span>
+      </button>
+      <button id="quickSearchBtn" class="quick-bar-btn" type="button">
+        <span class="quick-bar-icon" aria-hidden="true">&#8981;</span>
+        <span data-i18n="quick.search">Filtrar</span>
+      </button>
+    </nav>
 
     <div id="toastStack" class="toast-stack" aria-live="polite" aria-atomic="false"></div>
   </body>
