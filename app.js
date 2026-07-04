@@ -102,6 +102,8 @@ const DEFAULT_PREFS = {
 };
 
 const TOGGLEABLE_COLUMNS = ["priority", "targets", "tpSignal"];
+// Trío inversión/tokens/entrada: con dos datos se deriva el tercero.
+const TRIAD_FIELDS = ["investment", "tokens", "entryPrice"];
 const THEME_COLORS = { dark: "#050d14", light: "#f0f4f8" };
 
 // Portafolio de demostración genérico (la app es pública): cifras redondas
@@ -339,6 +341,21 @@ function getAutoRefreshLabel(seconds) {
     return "24h";
   }
   return `${seconds}s`;
+}
+
+// Etiqueta bajo la celda de posición: indica qué campo del trío se está
+// calculando automáticamente (o el origen de la entrada si no hay ninguno).
+function getAutoFieldLabel(row, metrics) {
+  if (row.derivedField === "investment") {
+    return t("table.fields.autoInvestment");
+  }
+  if (row.derivedField === "tokens") {
+    return t("table.fields.autoTokens");
+  }
+  if (row.derivedField === "entryPrice") {
+    return t("table.fields.entryDerived");
+  }
+  return getEntrySourceLabel(metrics.entrySource);
 }
 
 function getEntrySourceLabel(source) {
@@ -742,6 +759,7 @@ function createRow(partial = {}) {
     priceHistory: compactRowPriceHistory(Array.isArray(partial.priceHistory) ? partial.priceHistory : []),
     favorite: Boolean(partial.favorite),
     pinned: Boolean(partial.pinned),
+    derivedField: TRIAD_FIELDS.includes(partial.derivedField) ? partial.derivedField : "",
     detailsOpen: false,
     suggestions: [],
     suggestionsOpen: false,
@@ -953,7 +971,7 @@ function renderRow(row) {
           </label>
         </div>
         <div class="validation-meta info" data-role="entryMeta">
-          ${escapeHtml(getEntrySourceLabel(metrics.entrySource))}
+          ${escapeHtml(getAutoFieldLabel(row, metrics))}
         </div>
       </td>
 
@@ -1465,7 +1483,7 @@ function updateLiveRowUi(rowId) {
     node.className = `validation-meta ${validation.tone}`;
     node.textContent = validation.text;
   });
-  setRole("entryMeta", (node) => { node.textContent = getEntrySourceLabel(metrics.entrySource); });
+  setRole("entryMeta", (node) => { node.textContent = getAutoFieldLabel(row, metrics); });
   const entryInput = rowElement.querySelector("input[data-field='entryPrice']");
   if (entryInput && document.activeElement !== entryInput) {
     entryInput.value = getEntryDisplayValue(row, metrics);
@@ -1567,10 +1585,75 @@ function handleTableInput(event) {
       input.value = sanitized;
     }
     row[field] = sanitized;
+    recalcPositionTriad(row, field);
     updateLiveRowUi(row.id);
   }
 
   scheduleAutosave();
+}
+
+// Con dos datos cualesquiera del trío inversión/tokens/entrada se calcula el
+// tercero. El campo calculado queda marcado en row.derivedField y se
+// recalcula en vivo al cambiar los otros dos; si el usuario lo escribe a
+// mano deja de ser automático. Vaciar un campo teniendo los otros dos lo
+// convierte en el automático.
+function recalcPositionTriad(row, editedField) {
+  if (!TRIAD_FIELDS.includes(editedField)) {
+    return;
+  }
+
+  if (row.derivedField === editedField && String(row[editedField]).trim()) {
+    // El usuario escribió sobre el campo automático: pasa a manual.
+    row.derivedField = "";
+  }
+
+  const others = TRIAD_FIELDS.filter((field) => field !== editedField);
+  const editedValue = parseDecimal(row[editedField]);
+  const othersFilled = others.filter((field) => parseDecimal(row[field]) > 0);
+
+  let target = "";
+  if (row.derivedField && row.derivedField !== editedField) {
+    target = row.derivedField;
+  } else if (!String(row[editedField]).trim() && othersFilled.length === 2) {
+    target = editedField;
+  } else if (editedValue > 0 && othersFilled.length === 1) {
+    target = others.find((field) => !(parseDecimal(row[field]) > 0));
+  }
+
+  if (!target) {
+    return;
+  }
+
+  const investment = parseDecimal(row.investment);
+  const tokens = parseDecimal(row.tokens);
+  const entryPrice = parseDecimal(row.entryPrice);
+
+  let result = NaN;
+  if (target === "investment" && tokens > 0 && entryPrice > 0) {
+    result = tokens * entryPrice;
+  } else if (target === "tokens" && investment > 0 && entryPrice > 0) {
+    result = investment / entryPrice;
+  } else if (target === "entryPrice" && investment > 0 && tokens > 0) {
+    result = investment / tokens;
+  }
+
+  if (Number.isFinite(result) && result > 0) {
+    row[target] = formatEditableNumber(result);
+    row.derivedField = target;
+  } else if (row.derivedField === target) {
+    // Faltan datos de origen: el campo automático se limpia.
+    row[target] = "";
+    row.derivedField = "";
+  } else {
+    return;
+  }
+
+  const targetInput = dom.tableBody.querySelector(
+    `input[data-row-id="${row.id}"][data-field="${target}"]`
+  );
+  if (targetInput && document.activeElement !== targetInput) {
+    targetInput.value = row[target];
+  }
 }
 
 function handleTableBlur(event) {
@@ -1610,7 +1693,8 @@ function handleTableBlur(event) {
 
   const normalized = normalizeNumericString(input.value);
   row[field] = normalized;
-  input.value = normalized;
+  recalcPositionTriad(row, field);
+  input.value = row[field];
   updateLiveRowUi(row.id);
 
   // Re-sort only when focus leaves the table: re-rendering mid-Tab destroys
@@ -1781,7 +1865,8 @@ function handleExportCsv() {
     "tp2",
     "tp3",
     "favorite",
-    "pinned"
+    "pinned",
+    "derivedField"
   ];
 
   const rows = state.rows.map((row) => [
@@ -1796,7 +1881,8 @@ function handleExportCsv() {
     row.tp2,
     row.tp3,
     row.favorite ? "true" : "false",
-    row.pinned ? "true" : "false"
+    row.pinned ? "true" : "false",
+    row.derivedField || ""
   ]);
 
   const csv = [headers, ...rows]
@@ -2270,7 +2356,8 @@ async function handleImportCsv(event) {
       tp2: record.tp2 || "",
       tp3: record.tp3 || "",
       favorite: record.favorite === "true",
-      pinned: record.pinned === "true"
+      pinned: record.pinned === "true",
+      derivedField: record.derivedField || ""
     }));
 
     renderAll();
@@ -4109,6 +4196,7 @@ function persistState(manual) {
         priceHistory: row.priceHistory,
         favorite: row.favorite,
         pinned: row.pinned,
+        derivedField: row.derivedField,
         alertsFired: row.alertsFired
       })),
       activity: state.activity.slice(0, MAX_ACTIVITY_ITEMS)
