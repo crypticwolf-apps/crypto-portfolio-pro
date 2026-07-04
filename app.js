@@ -2129,12 +2129,14 @@ async function handleDownloadPdf() {
       ? (totalPnl / snapshot.totals.investment) * 100
       : 0;
     const weightBase = snapshot.totals.currentValue > 0 ? snapshot.totals.currentValue : snapshot.totals.investment;
-    const pdfRows = [...meaningfulItems]
-      .sort((a, b) => {
-        const valueA = a.metrics.currentValue || a.metrics.investment;
-        const valueB = b.metrics.currentValue || b.metrics.investment;
-        return valueB - valueA;
-      });
+    // El PDF respeta el mismo orden que la tabla en pantalla (columna de
+    // orden activa, dirección y fijados), igual que la ve el usuario.
+    const tableOrder = new Map(getSortedRows().map((row, index) => [row.id, index]));
+    const pdfRows = [...meaningfulItems].sort(
+      (a, b) =>
+        (tableOrder.get(a.row.id) ?? Number.MAX_SAFE_INTEGER) -
+        (tableOrder.get(b.row.id) ?? Number.MAX_SAFE_INTEGER)
+    );
     const generatedAt = formatGeneratedDate(now);
     let pageNum = 1;
 
