@@ -27,11 +27,14 @@ jobs:
         with:
           path: .
       # GitHub Pages devuelve a veces "Deployment failed, try again later"
-      # de forma transitoria: un segundo intento dentro del mismo run lo
-      # resuelve (relanzar el job duplicaria el artefacto y falla).
+      # (limite de frecuencia de despliegues): un segundo intento tras una
+      # pausa lo resuelve. Relanzar el job entero duplicaria el artefacto.
       - id: deployment
         uses: actions/deploy-pages@v4
         continue-on-error: true
+      - name: Esperar antes de reintentar
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 60
       - id: deployment-retry
         if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
