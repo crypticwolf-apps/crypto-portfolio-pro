@@ -74,6 +74,29 @@ const DOMINANCE_TTL = 60 * 1000;
 const FNG_TTL = 45 * 60 * 1000;
 const FNG_URL = "https://api.alternative.me/fng/?limit=1";
 const APP_TABS = ["home", "portfolio", "analytics", "more"];
+// Cada pestaña recuerda su posición de scroll: al volver no hay saltos ni
+// se hereda el desplazamiento de la pestaña anterior. (Debe declararse antes
+// de la llamada a init(): las const de módulo no se izan.)
+const tabScrollPositions = {};
+// Categorías simples para filtros y reparto de capital.
+const STABLE_SYMBOLS = new Set([
+  "USDT", "USDC", "DAI", "TUSD", "BUSD", "FDUSD", "USDE", "PYUSD",
+  "USDS", "GUSD", "USDP", "FRAX", "LUSD", "USDD"
+]);
+
+function getAssetCategory(row) {
+  const symbol = String(row.symbol || "").toUpperCase();
+  if (row.coinId === "bitcoin" || symbol === "BTC") {
+    return "btc";
+  }
+  if (row.coinId === "ethereum" || symbol === "ETH") {
+    return "eth";
+  }
+  if (STABLE_SYMBOLS.has(symbol)) {
+    return "stable";
+  }
+  return "alt";
+}
 const CHART_RANGE_WINDOWS = {
   "1m": 60 * 1000,
   "1h": 60 * 60 * 1000,
@@ -102,7 +125,7 @@ const DEFAULT_PREFS = {
   autoRefreshSec: 1800,
   showCharts: true,
   chartRange: "total",
-  sortBy: "currentValue",
+  sortBy: "marketCap",
   sortDir: "desc",
   hiddenColumns: [],
   hideBalance: false,
@@ -257,6 +280,8 @@ const state = {
   refreshRequestId: 0,
   currencySwitchId: 0,
   filterQuery: "",
+  quickFilter: "all",
+  heroVisible: true,
   lastRefreshAt: 0,
   market: {
     btc: null,
@@ -547,6 +572,10 @@ function isMobileViewport() {
 // ── Pestañas ──
 function setActiveTab(tab) {
   const nextTab = APP_TABS.includes(tab) ? tab : "home";
+  const previousTab = state.prefs.activeTab;
+  if (previousTab && previousTab !== nextTab && document.body.dataset.activeTab) {
+    tabScrollPositions[previousTab] = window.scrollY;
+  }
   state.prefs.activeTab = nextTab;
   document.body.dataset.activeTab = nextTab;
 
@@ -571,7 +600,11 @@ function setActiveTab(tab) {
   }
 
   savePreferences();
-  window.scrollTo({ top: 0 });
+  updateStickyBarVisibility();
+  const targetScroll = tabScrollPositions[nextTab] || 0;
+  window.scrollTo({ top: targetScroll });
+  // Refuerzo tras el layout (rAF no es fiable en segundo plano/PWA oculta).
+  window.setTimeout(() => window.scrollTo({ top: targetScroll }), 0);
 }
 
 function applyBalanceVisibility() {
@@ -797,6 +830,26 @@ function bindEvents() {
       state.filterQuery = event.target.value;
       applyPositionFilter();
     });
+  }
+
+  const quickFilters = document.getElementById("quickFilters");
+  if (quickFilters) {
+    quickFilters.addEventListener("click", (event) => {
+      const chip = event.target.closest("[data-quick-filter]");
+      if (!chip) {
+        return;
+      }
+      state.quickFilter = chip.dataset.quickFilter;
+      quickFilters.querySelectorAll(".qf-chip").forEach((node) => {
+        node.classList.toggle("is-active", node === chip);
+      });
+      applyPositionFilter();
+    });
+  }
+
+  const moreRefreshBtn = document.getElementById("moreRefreshBtn");
+  if (moreRefreshBtn) {
+    moreRefreshBtn.addEventListener("click", () => dom.refreshPricesBtn.click());
   }
 
   if (dom.mobileSortSelect) {
@@ -1114,6 +1167,7 @@ function renderDashboardOnly() {
   const insights = getPortfolioInsights(snapshot);
   renderSummary(snapshot, insights);
   renderMarketSection();
+  renderAnalyticsSummary(snapshot);
   renderInsights(insights);
   renderTotalsRow(snapshot);
   renderStickyBar(snapshot);
@@ -1212,14 +1266,30 @@ function renderTableBody() {
   applyPositionFilter();
 }
 
-// Filtro de posiciones por nombre, símbolo o coinId. Solo oculta/muestra
+// Filtro de posiciones (texto + filtros rápidos). Solo oculta/muestra
 // filas ya renderizadas: no re-renderiza ni toca el estado de los datos.
+function rowMatchesQuickFilter(row) {
+  const filter = state.quickFilter || "all";
+  if (filter === "all") {
+    return true;
+  }
+  if (filter === "favorites") {
+    return Boolean(row.favorite);
+  }
+  if (filter === "gaining" || filter === "losing") {
+    const metrics = computeRowMetrics(row);
+    return filter === "gaining" ? metrics.pnlUsd > 0 : metrics.pnlUsd < 0;
+  }
+  return getAssetCategory(row) === filter;
+}
+
 function applyPositionFilter() {
   const query = normalizeSearchText(state.filterQuery || "");
   dom.tableBody.querySelectorAll("tr[data-row-id]").forEach((tr) => {
     const row = getRowById(tr.dataset.rowId);
-    const match = !query || [row?.crypto, row?.resolvedName, row?.symbol, row?.coinId]
+    const matchesQuery = !query || [row?.crypto, row?.resolvedName, row?.symbol, row?.coinId]
       .some((value) => normalizeSearchText(String(value || "")).includes(query));
+    const match = matchesQuery && row && rowMatchesQuickFilter(row);
     tr.style.display = match ? "" : "none";
   });
 }
@@ -1273,6 +1343,7 @@ function renderRow(row) {
             />
             <div class="asset-meta">
               <span class="rank-badge" data-role="rankBadge" ${Number.isFinite(row.marketCapRank) ? "" : "hidden"}>#${Number.isFinite(row.marketCapRank) ? row.marketCapRank : ""}</span>
+              <span class="cat-badge cat-${getAssetCategory(row)}">${escapeHtml(getAssetCategory(row).toUpperCase())}</span>
               <span class="lookup-meta ${lookupToneClass(row)}" data-role="lookupMeta">
                 ${renderLookupMeta(row)}
               </span>
@@ -1520,6 +1591,10 @@ function renderSummary(snapshot, insights = getPortfolioInsights(snapshot)) {
     (item) => item.metrics.investment > 0 || item.metrics.currentValue > 0
   ).length;
 
+  const dayItems = get24hInsightItems(snapshot);
+  const bestDay = [...dayItems].sort((a, b) => b.change24h - a.change24h)[0] || null;
+  const worstDay = [...dayItems].sort((a, b) => a.change24h - b.change24h)[0] || null;
+
   const cards = [
     {
       icon: summaryIconSvg("invested"),
@@ -1532,6 +1607,18 @@ function renderSummary(snapshot, insights = getPortfolioInsights(snapshot)) {
       label: t("summary.change24h"),
       value: change ? formatSignedPercent(change.pct) : "--",
       tone: change ? toneClass(change.pct) : ""
+    },
+    {
+      icon: summaryIconSvg("change"),
+      label: t("summary.bestDay"),
+      value: bestDay ? `${assetDisplayName(bestDay.row)} ${formatSignedPercent(bestDay.change24h)}` : "--",
+      tone: bestDay ? "positive" : ""
+    },
+    {
+      icon: summaryIconSvg("change"),
+      label: t("summary.worstDay"),
+      value: worstDay ? `${assetDisplayName(worstDay.row)} ${formatSignedPercent(worstDay.change24h)}` : "--",
+      tone: worstDay ? "negative" : ""
     },
     {
       icon: summaryIconSvg("assets"),
@@ -1559,7 +1646,65 @@ function renderSummary(snapshot, insights = getPortfolioInsights(snapshot)) {
     )
     .join("");
 
+  renderAllocationCard(snapshot);
   renderHomeHighlights(snapshot, insights, tpCandidates);
+}
+
+// Reparto del capital entre BTC / ETH / stables / altcoins (barra apilada).
+function getAllocationBreakdown(snapshot) {
+  const totals = { btc: 0, eth: 0, stable: 0, alt: 0 };
+  let sum = 0;
+  snapshot.items.forEach(({ row, metrics }) => {
+    if (metrics.currentValue > 0) {
+      totals[getAssetCategory(row)] += metrics.currentValue;
+      sum += metrics.currentValue;
+    }
+  });
+  if (!(sum > 0)) {
+    return null;
+  }
+  return {
+    btc: (totals.btc / sum) * 100,
+    eth: (totals.eth / sum) * 100,
+    stable: (totals.stable / sum) * 100,
+    alt: (totals.alt / sum) * 100
+  };
+}
+
+function renderAllocationCard(snapshot) {
+  const card = document.getElementById("allocationCard");
+  if (!card) {
+    return;
+  }
+
+  const alloc = getAllocationBreakdown(snapshot);
+  if (!alloc) {
+    card.hidden = true;
+    return;
+  }
+
+  const segments = [
+    { key: "btc", label: "BTC", color: "#f6b34c" },
+    { key: "eth", label: "ETH", color: "#7da4ff" },
+    { key: "stable", label: t("alloc.stables"), color: "#6d9ec4" },
+    { key: "alt", label: t("alloc.alts"), color: "#3effa8" }
+  ].filter((segment) => alloc[segment.key] > 0.05);
+
+  card.hidden = false;
+  card.innerHTML = `
+    <span class="alloc-title">${escapeHtml(t("alloc.title"))}</span>
+    <div class="alloc-bar" aria-hidden="true">
+      ${segments.map((segment) => `<span style="width:${alloc[segment.key].toFixed(2)}%;background:${segment.color}"></span>`).join("")}
+    </div>
+    <div class="alloc-legend">
+      ${segments.map((segment) => `
+        <span class="alloc-chip">
+          <i style="background:${segment.color}"></i>
+          ${escapeHtml(segment.label)} <strong>${alloc[segment.key].toFixed(1)}%</strong>
+        </span>
+      `).join("")}
+    </div>
+  `;
 }
 
 function renderMainValueCard(snapshot) {
@@ -1704,6 +1849,21 @@ function renderMarketSection() {
     dominanceCard,
     fngCard
   ].filter(Boolean).join("");
+
+  // Tendencia simple del mercado: media de las variaciones 24h de BTC y ETH.
+  const trendChip = document.getElementById("marketTrendChip");
+  if (trendChip) {
+    const changes = [market.btc?.change24h, market.eth?.change24h].filter(Number.isFinite);
+    if (changes.length) {
+      const average = changes.reduce((total, value) => total + value, 0) / changes.length;
+      const key = average > 1.5 ? "market.trendUp" : average < -1.5 ? "market.trendDown" : "market.trendFlat";
+      trendChip.textContent = t(key);
+      trendChip.className = `trend-chip ${average > 1.5 ? "positive" : average < -1.5 ? "negative" : "neutral"}`;
+      trendChip.hidden = false;
+    } else {
+      trendChip.hidden = true;
+    }
+  }
 }
 
 // Bloques de Inicio: mejores, peores, próximos TP y alertas (máx. 3 c/u).
@@ -1957,6 +2117,119 @@ function renderInsights(insights) {
   dom.insightsRankingsGrid.innerHTML = rankingCards.map(renderRankingCard).join("");
 }
 
+// Rentabilidad del portafolio en una ventana temporal según el historial.
+function getHistoryChangePct(windowMs) {
+  const points = state.history.filter((point) => point.currency === state.prefs.currency);
+  if (points.length < 2) {
+    return null;
+  }
+  const last = Number(points[points.length - 1].total || 0);
+  if (!(last > 0)) {
+    return null;
+  }
+  const cutoff = Date.now() - windowMs;
+  let base = null;
+  for (const point of points) {
+    if (new Date(point.at).getTime() >= cutoff) {
+      base = Number(point.total || 0);
+      break;
+    }
+  }
+  if (base === null) {
+    return null;
+  }
+  if (!(base > 0)) {
+    base = Number(points[0].total || 0);
+  }
+  return base > 0 ? ((last - base) / base) * 100 : null;
+}
+
+// Máxima caída pico-valle registrada en el historial disponible.
+function getMaxDrawdownPct() {
+  const values = state.history
+    .filter((point) => point.currency === state.prefs.currency)
+    .map((point) => Number(point.total || 0))
+    .filter((value) => value > 0);
+  if (values.length < 2) {
+    return null;
+  }
+  let peak = values[0];
+  let maxDrawdown = 0;
+  for (const value of values) {
+    if (value > peak) {
+      peak = value;
+    }
+    const drawdown = ((peak - value) / peak) * 100;
+    if (drawdown > maxDrawdown) {
+      maxDrawdown = drawdown;
+    }
+  }
+  return maxDrawdown;
+}
+
+// Resumen de Analítica: ROI, rentabilidad por periodos, drawdown,
+// concentración (Top 1/3/5), % en stables y riesgo de concentración.
+function renderAnalyticsSummary(snapshot) {
+  const grid = document.getElementById("analyticsSummaryGrid");
+  if (!grid) {
+    return;
+  }
+
+  const totalPnl = snapshot.totals.currentValue - snapshot.totals.investment;
+  const roi = snapshot.totals.investment ? (totalPnl / snapshot.totals.investment) * 100 : null;
+  const change24h = getPortfolio24hChange(snapshot);
+  const ret7d = getHistoryChangePct(7 * 24 * 60 * 60 * 1000);
+  const ret30d = getHistoryChangePct(30 * 24 * 60 * 60 * 1000);
+  const drawdown = getMaxDrawdownPct();
+  const alloc = getAllocationBreakdown(snapshot);
+
+  const weights = snapshot.items
+    .filter((item) => item.metrics.currentValue > 0)
+    .map((item) => ({
+      name: assetDisplayName(item.row),
+      pct: snapshot.totals.currentValue > 0
+        ? (item.metrics.currentValue / snapshot.totals.currentValue) * 100
+        : 0
+    }))
+    .sort((a, b) => b.pct - a.pct);
+  const top1 = weights[0] || null;
+  const topSum = (count) => weights.slice(0, count).reduce((total, item) => total + item.pct, 0);
+  const riskLevel = top1 ? (top1.pct > 40 ? "high" : top1.pct > 25 ? "medium" : "low") : null;
+  const riskLabels = { low: t("analytics.riskLow"), medium: t("analytics.riskMedium"), high: t("analytics.riskHigh") };
+  const riskTones = { low: "positive", medium: "warning", high: "negative" };
+
+  const pct = (value) => (value == null ? "--" : formatSignedPercent(value));
+  const stats = [
+    { label: t("analytics.roi"), value: pct(roi), tone: roi != null ? toneClass(roi) : "" },
+    { label: t("analytics.ret24h"), value: change24h ? formatSignedPercent(change24h.pct) : "--", tone: change24h ? toneClass(change24h.pct) : "" },
+    { label: t("analytics.ret7d"), value: pct(ret7d), tone: ret7d != null ? toneClass(ret7d) : "" },
+    { label: t("analytics.ret30d"), value: pct(ret30d), tone: ret30d != null ? toneClass(ret30d) : "" },
+    { label: t("analytics.retTotal"), value: pct(roi), tone: roi != null ? toneClass(roi) : "" },
+    { label: t("analytics.drawdown"), value: drawdown != null ? (drawdown < 0.005 ? "0.00%" : `-${drawdown.toFixed(2)}%`) : "--", tone: drawdown != null && drawdown >= 0.005 ? "negative" : "" },
+    { label: t("analytics.top1"), value: top1 ? `${top1.name} ${top1.pct.toFixed(1)}%` : "--", tone: "" },
+    { label: t("analytics.top3"), value: weights.length ? `${topSum(3).toFixed(1)}%` : "--", tone: "" },
+    { label: t("analytics.top5"), value: weights.length ? `${topSum(5).toFixed(1)}%` : "--", tone: "" },
+    { label: t("analytics.stables"), value: alloc ? `${alloc.stable.toFixed(1)}%` : "--", tone: "" },
+    {
+      label: t("analytics.concentration"),
+      value: riskLevel ? riskLabels[riskLevel] : "--",
+      tone: riskLevel ? riskTones[riskLevel] : "",
+      dot: true
+    }
+  ];
+
+  grid.innerHTML = stats
+    .map(
+      (stat) => `
+        <article class="as-item">
+          <span>${escapeHtml(stat.label)}</span>
+          <strong class="${stat.tone}">${stat.dot && stat.tone ? `<i class="as-dot ${stat.tone}"></i>` : ""}${escapeHtml(stat.value)}</strong>
+        </article>
+      `
+    )
+    .join("");
+}
+
 function renderStickyBar(snapshot) {
   if (!dom.stickyBar) {
     return;
@@ -1993,11 +2266,21 @@ function observeHeroForStickyBar() {
   }
 
   const io = new IntersectionObserver(([entry]) => {
-    const visible = !entry.isIntersecting;
-    dom.stickyBar.classList.toggle("is-visible", visible);
-    dom.stickyBar.setAttribute("aria-hidden", visible ? "false" : "true");
+    state.heroVisible = entry.isIntersecting;
+    updateStickyBarVisibility();
   }, { rootMargin: "-10px 0px 0px 0px" });
   io.observe(hero);
+}
+
+// La sticky bar solo aparece en Inicio con la tarjeta principal fuera de
+// pantalla; en el resto de pestañas tapaba la barra de acciones y títulos.
+function updateStickyBarVisibility() {
+  if (!dom.stickyBar) {
+    return;
+  }
+  const visible = state.prefs.activeTab === "home" && !state.heroVisible;
+  dom.stickyBar.classList.toggle("is-visible", visible);
+  dom.stickyBar.setAttribute("aria-hidden", visible ? "false" : "true");
 }
 
 function renderTotalsRow(snapshot) {

@@ -130,8 +130,13 @@
 
         <section class="summary-grid" id="summaryGrid" aria-label="Resumen del portafolio" data-i18n-aria-label="summary.ariaLabel"></section>
 
+        <section class="alloc-card" id="allocationCard" hidden></section>
+
         <section class="market-section">
-          <h2 class="home-section-title" data-i18n="market.title">Mercado</h2>
+          <div class="home-section-head">
+            <h2 class="home-section-title" data-i18n="market.title">Mercado</h2>
+            <span id="marketTrendChip" class="trend-chip" hidden></span>
+          </div>
           <div id="marketGrid" class="market-grid"></div>
         </section>
 
@@ -140,6 +145,16 @@
 
       <!-- ═══ PESTAÑA ANALITICA ═══ -->
       <section class="tab-section" data-tab="analytics">
+
+      <section class="panel analytics-summary-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow" data-i18n="analytics.eyebrow">Analitica</p>
+            <h2 data-i18n="analytics.summaryTitle">Resumen del rendimiento</h2>
+          </div>
+        </div>
+        <div id="analyticsSummaryGrid" class="analytics-summary-grid"></div>
+      </section>
 
       <section class="panel insights-panel">
         <div class="panel-heading">
@@ -234,6 +249,17 @@
             Ordena por cualquier columna, marca favoritos, accede a la web del activo y usa
             busqueda asistida contra CoinGecko.
           </p>
+        </div>
+
+        <div class="quick-filters" id="quickFilters" role="group" aria-label="Filtros rapidos" data-i18n-aria-label="filters.ariaLabel">
+          <button class="qf-chip is-active" type="button" data-quick-filter="all" data-i18n="filters.all">Todos</button>
+          <button class="qf-chip" type="button" data-quick-filter="gaining" data-i18n="filters.gaining">Ganando</button>
+          <button class="qf-chip" type="button" data-quick-filter="losing" data-i18n="filters.losing">Perdiendo</button>
+          <button class="qf-chip" type="button" data-quick-filter="favorites" data-i18n="filters.favorites">Favoritos</button>
+          <button class="qf-chip" type="button" data-quick-filter="btc">BTC</button>
+          <button class="qf-chip" type="button" data-quick-filter="eth">ETH</button>
+          <button class="qf-chip" type="button" data-quick-filter="stable" data-i18n="filters.stables">Stables</button>
+          <button class="qf-chip" type="button" data-quick-filter="alt" data-i18n="filters.alts">Altcoins</button>
         </div>
 
         <div class="table-filter">
@@ -336,7 +362,10 @@
           <button id="themeToggle" class="ghost-btn" type="button" data-i18n="theme.light">Modo claro</button>
         </div>
 
-        <p class="autorefresh-meta" id="autoRefreshMeta"></p>
+        <div class="autorefresh-row">
+          <p class="autorefresh-meta" id="autoRefreshMeta"></p>
+          <button id="moreRefreshBtn" class="ghost-btn" type="button" data-i18n="buttons.refreshNow">Actualizar ahora</button>
+        </div>
 
         <div class="status-strip">
           <article class="status-card">
