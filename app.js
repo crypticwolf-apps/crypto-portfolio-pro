@@ -76,7 +76,7 @@ const MARKETS_PAGE_SIZE = 25;
 const DOMINANCE_TTL = 60 * 1000;
 const FNG_TTL = 45 * 60 * 1000;
 const FNG_URL = "https://api.alternative.me/fng/?limit=1";
-const APP_TABS = ["home", "markets", "analytics", "more"];
+const APP_TABS = ["home", "markets", "plan", "analytics", "more"];
 // Símbolos meme conocidos para la pestaña "Meme Coins" (el endpoint /markets
 // no trae categoría; se filtra por símbolo sobre el top de capitalización).
 const MEME_SYMBOLS = new Set([
@@ -90,6 +90,9 @@ const MEME_SYMBOLS = new Set([
 const tabScrollPositions = {};
 // Umbrales de capitalización del deslizador de filtros (0 = cualquiera).
 const CAP_STEPS = [0, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12];
+// Aviso obligatorio del Plan (const antes de init() para evitar TDZ).
+const PLAN_DISCLAIMER = "Esta propuesta usa tu distribucion objetivo, limites y preferencias. No usa predicciones de precio ni constituye asesoramiento financiero.";
+let planLastResult = null;
 // Estado del editor-portal (declarado antes de init() para evitar TDZ).
 let editorSearchTimer = null;
 let editorPortal = null;
@@ -145,7 +148,8 @@ const DEFAULT_PREFS = {
   hiddenColumns: [],
   hideBalance: false,
   activeTab: "home",
-  filters: null
+  filters: null,
+  plan: null
 };
 
 const TOGGLEABLE_COLUMNS = ["priority", "targets", "tpSignal"];
@@ -253,6 +257,7 @@ const state = {
   currencySwitchId: 0,
   filterQuery: "",
   filters: { category: "all", performance: "all", weightMin: 0, capMin: 0, favorites: false, alerts: false },
+  plan: { goalTotal: null, monthlyContribution: null, mode: "balance", reserveStable: 0, feePct: 0, lastAmount: null, targets: {} },
   heroVisible: true,
   editorRowId: null,
   rowMenuOpen: false,
@@ -583,6 +588,10 @@ function setActiveTab(tab) {
     renderMarketsTab();
   }
 
+  if (nextTab === "plan") {
+    renderPlan();
+  }
+
   savePreferences();
   updateStickyBarVisibility();
   const targetScroll = tabScrollPositions[nextTab] || 0;
@@ -652,24 +661,34 @@ async function handleShareSummary() {
   );
 }
 
-// ── Botón central "+" y su bottom sheet de acciones ──
+// ── Bottom sheet de acciones (abierto desde las acciones rápidas de Inicio) ──
 function bindFab() {
-  const fabBtn = document.getElementById("fabBtn");
   const sheet = document.getElementById("fabSheet");
-  if (!fabBtn || !sheet) {
-    return;
+  if (sheet) {
+    sheet.addEventListener("click", (event) => {
+      if (event.target.closest("[data-fab-close]")) {
+        closeFabSheet();
+        return;
+      }
+      const action = event.target.closest("[data-fab-action]")?.dataset.fabAction;
+      if (action) {
+        closeFabSheet();
+        handleFabAction(action);
+      }
+    });
   }
-  fabBtn.addEventListener("click", () => openFabSheet());
-  sheet.addEventListener("click", (event) => {
-    if (event.target.closest("[data-fab-close]")) {
-      closeFabSheet();
-      return;
-    }
-    const action = event.target.closest("[data-fab-action]")?.dataset.fabAction;
-    if (action) {
-      closeFabSheet();
-      handleFabAction(action);
-    }
+
+  // Acciones rápidas de la pantalla de Inicio.
+  document.getElementById("quickAddBtn")?.addEventListener("click", () => openFabSheet());
+  document.querySelectorAll("[data-quick]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.quick;
+      if (action === "plan") {
+        setActiveTab("plan");
+      } else {
+        handleFabAction(action);
+      }
+    });
   });
 }
 
@@ -713,6 +732,517 @@ function handleFabAction(action) {
       // "Alerta" = objetivos TP de una posición: abre el editor en la
       // posición elegida (o una nueva) donde se fijan TP1/TP2/TP3.
       openTradeSheet("alert");
+      break;
+    default:
+      break;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   PLAN — distribución objetivo + rebalanceo con aportación
+   manual (algoritmo tipo "water-filling"). Solo usa la
+   estrategia del usuario; sin predicciones de mercado.
+   ═══════════════════════════════════════════════════════ */
+
+function savePlan() {
+  state.prefs.plan = { ...state.plan };
+  savePreferences();
+}
+
+function getPlanTarget(rowId) {
+  const base = { weight: 0, min: 0, max: 0, include: true, locked: false, minBuy: 0, maxBuy: 0 };
+  return { ...base, ...(state.plan.targets[rowId] || {}) };
+}
+
+function setPlanTarget(rowId, patch) {
+  state.plan.targets[rowId] = { ...getPlanTarget(rowId), ...patch };
+  savePlan();
+}
+
+// Posiciones aptas para la estrategia (tienen activo definido).
+function getPlanPositions() {
+  return state.rows
+    .filter((row) => row.crypto.trim())
+    .map((row) => {
+      const m = computeRowMetrics(row);
+      return {
+        row,
+        id: row.id,
+        name: assetDisplayName(row),
+        value: m.currentValue,
+        price: m.currentPrice > 0 ? m.currentPrice : m.entryPrice,
+        cat: getAssetCategory(row),
+        target: getPlanTarget(row.id)
+      };
+    });
+}
+
+function planTargetsSum() {
+  return getPlanPositions().reduce((s, p) => s + (Number(p.target.weight) || 0), 0);
+}
+
+// Núcleo: reparte "amount" según la estrategia. mode: balance|maintain|safety.
+function computeContributionPlan(amount, mode) {
+  const positions = getPlanPositions();
+  const currentTotal = positions.reduce((s, p) => s + (p.value > 0 ? p.value : 0), 0);
+  const withTarget = positions.filter((p) => Number(p.target.weight) > 0);
+  const sumW = withTarget.reduce((s, p) => s + Number(p.target.weight), 0);
+
+  if (!withTarget.length || sumW <= 0) {
+    return { error: "no-strategy" };
+  }
+  if (!(amount > 0)) {
+    return { error: "no-amount" };
+  }
+
+  const newTotal = currentTotal + amount;
+  positions.forEach((p) => {
+    p.targetW = Number(p.target.weight) > 0 ? (Number(p.target.weight) / sumW) * 100 : 0;
+    p.currentW = currentTotal > 0 ? (p.value / currentTotal) * 100 : 0;
+    p.targetValue = (p.targetW / 100) * newTotal;
+    p.deficit = Math.max(0, p.targetValue - p.value);
+    const maxW = Number(p.target.max) > 0 ? Number(p.target.max) : 100;
+    const capByWeight = Math.max(0, (maxW / 100) * newTotal - p.value);
+    const maxBuy = Number(p.target.maxBuy) > 0 ? Number(p.target.maxBuy) : Infinity;
+    p.eligible = p.target.include !== false && !p.target.locked && p.targetW > 0 && p.price > 0;
+    p.cap = mode === "maintain"
+      ? Math.min(capByWeight, maxBuy)
+      : Math.min(capByWeight, maxBuy, p.deficit);
+    p.nearMax = capByWeight < p.deficit - 0.01;
+    p.alloc = 0;
+  });
+
+  const weightFor = (p) => {
+    if (!p.eligible) return 0;
+    if (mode === "maintain") return p.targetW;
+    if (mode === "safety") {
+      const defensive = p.cat === "stable" || p.cat === "btc" || p.cat === "eth" || p.row.favorite;
+      return Math.max(p.deficit, 0.0001) * (defensive ? 3 : 1);
+    }
+    return p.deficit;
+  };
+
+  // Reparto progresivo: en cada ronda se asigna proporcional al peso y se
+  // recalcula el sobrante hasta agotar el importe o los topes.
+  let remaining = amount;
+  for (let iter = 0; iter < 60 && remaining > 0.005; iter += 1) {
+    const active = positions.filter((p) => p.eligible && (p.cap - p.alloc) > 0.005 && weightFor(p) > 0);
+    if (!active.length) break;
+    const totalW = active.reduce((s, p) => s + weightFor(p), 0);
+    if (totalW <= 0) break;
+    let placed = 0;
+    for (const p of active) {
+      let give = remaining * (weightFor(p) / totalW);
+      give = Math.min(give, p.cap - p.alloc);
+      p.alloc += give;
+      placed += give;
+    }
+    remaining -= placed;
+    if (placed < 0.005) break;
+  }
+
+  // Mínimo de compra: se descartan asignaciones demasiado pequeñas.
+  positions.forEach((p) => {
+    const minBuy = Number(p.target.minBuy) > 0 ? Number(p.target.minBuy) : 0;
+    if (p.alloc > 0 && minBuy > 0 && p.alloc < minBuy) {
+      p.alloc = 0;
+    }
+    p.alloc = Math.round(p.alloc * 100) / 100;
+  });
+
+  const assigned = positions.reduce((s, p) => s + p.alloc, 0);
+  const unassigned = Math.max(0, Math.round((amount - assigned) * 100) / 100);
+  const investedTotal = currentTotal + assigned;
+
+  positions.forEach((p) => {
+    p.expectedValue = p.value + p.alloc;
+    p.expectedW = investedTotal > 0 ? (p.expectedValue / investedTotal) * 100 : 0;
+    p.devBefore = p.currentW - p.targetW;
+    p.devAfter = p.expectedW - p.targetW;
+    p.pctOfAmount = amount > 0 ? (p.alloc / amount) * 100 : 0;
+    p.explain = explainAllocation(p);
+  });
+
+  const devBeforeTotal = positions.reduce((s, p) => s + Math.abs(p.devBefore), 0);
+  const devAfterTotal = positions.reduce((s, p) => s + Math.abs(p.devAfter), 0);
+  const feePct = Math.max(0, Number(state.plan.feePct) || 0);
+
+  return {
+    amount,
+    mode,
+    assigned,
+    unassigned,
+    fee: assigned * (feePct / 100),
+    feePct,
+    improvement: devBeforeTotal - devAfterTotal,
+    devBeforeTotal,
+    devAfterTotal,
+    items: positions.filter((p) => Number(p.target.weight) > 0 || p.alloc > 0)
+      .sort((a, b) => b.alloc - a.alloc)
+  };
+}
+
+function explainAllocation(p) {
+  if (!p.eligible) {
+    if (p.target.include === false) return t("plan.exWhyExcluded");
+    if (p.target.locked) return t("plan.exWhyLocked");
+    if (!(p.price > 0)) return t("plan.exWhyNoPrice");
+  }
+  if (p.alloc <= 0) {
+    if (p.currentW >= p.targetW) {
+      return t("plan.exWhyOver", { cur: p.currentW.toFixed(1), tgt: p.targetW.toFixed(1) });
+    }
+    return t("plan.exWhyNone");
+  }
+  if (p.nearMax) {
+    return t("plan.exWhyNearMax");
+  }
+  if (p.devBefore < -0.1) {
+    return t("plan.exWhyUnder", { d: Math.abs(p.devBefore).toFixed(1) });
+  }
+  return t("plan.exWhyStrategy");
+}
+
+// Aplica la propuesta como compras (mismo criterio que la compra simplificada).
+function applyContributionPlan() {
+  if (!planLastResult) {
+    return;
+  }
+  let applied = 0;
+  planLastResult.items.forEach((p) => {
+    if (p.alloc > 0 && p.price > 0) {
+      const row = getRowById(p.id);
+      if (!row) return;
+      const addTokens = p.alloc / p.price;
+      const curTokens = parseDecimal(row.tokens);
+      const curInv = parseDecimal(row.investment);
+      const newTokens = curTokens + addTokens;
+      const newInv = curInv + p.alloc;
+      row.tokens = formatEditableNumber(newTokens);
+      row.investment = formatEditableNumber(newInv);
+      row.entryPrice = newTokens > 0 ? formatEditableNumber(newInv / newTokens) : "";
+      row.derivedField = "";
+      applied += 1;
+    }
+  });
+  if (!applied) {
+    return;
+  }
+  persistState(true);
+  renderAll();
+  pushActivity(t("plan.appliedTitle"), t("plan.appliedText", { amount: formatCurrency(planLastResult.assigned) }), "positive");
+  showToast(t("plan.appliedTitle"), t("plan.appliedText", { amount: formatCurrency(planLastResult.assigned) }), "positive");
+  planLastResult = null;
+  renderPlan();
+}
+
+// ── Render de la pestaña Plan ──
+function renderPlan() {
+  const box = document.getElementById("planContent");
+  if (!box) {
+    return;
+  }
+  const positions = getPlanPositions();
+
+  if (!positions.length) {
+    box.innerHTML = `
+      <div class="plan-empty detail-empty">
+        <strong>${escapeHtml(t("plan.emptyTitle"))}</strong>
+        <p>${escapeHtml(t("plan.emptyText"))}</p>
+      </div>`;
+    return;
+  }
+
+  const snapshot = buildSnapshot();
+  const currentTotal = snapshot.totals.currentValue;
+  const goal = Number(state.plan.goalTotal) || 0;
+  const monthly = Number(state.plan.monthlyContribution) || 0;
+  const progress = goal > 0 ? Math.min(100, (currentTotal / goal) * 100) : 0;
+  const pending = goal > 0 ? Math.max(0, goal - currentTotal) : 0;
+  const monthsToGoal = monthly > 0 && pending > 0 ? Math.ceil(pending / monthly) : null;
+  const sumTargets = planTargetsSum();
+  const targetsOk = sumTargets > 0;
+
+  const modeChip = (key, label) => `
+    <button class="plan-mode ${state.plan.mode === key ? "is-active" : ""}" type="button" data-plan-mode="${key}">${escapeHtml(label)}</button>`;
+
+  box.innerHTML = `
+    <section class="panel plan-goal-card">
+      <div class="panel-heading compact-heading">
+        <h2 class="home-section-title" data-i18n="plan.goalTitle">Objetivo de cartera</h2>
+      </div>
+      <div class="plan-goal-grid">
+        <label class="editor-field">
+          <span>${escapeHtml(t("plan.goalTotal"))}</span>
+          <input type="text" inputmode="decimal" data-plan-field="goalTotal" value="${goal ? escapeHtml(formatEditableNumber(goal)) : ""}" placeholder="0" />
+        </label>
+        <label class="editor-field">
+          <span>${escapeHtml(t("plan.monthly"))}</span>
+          <input type="text" inputmode="decimal" data-plan-field="monthlyContribution" value="${monthly ? escapeHtml(formatEditableNumber(monthly)) : ""}" placeholder="0" />
+        </label>
+      </div>
+      ${goal > 0 ? `
+        <div class="plan-progress">
+          <div class="plan-progress-bar"><span style="width:${progress.toFixed(1)}%"></span></div>
+          <div class="plan-progress-meta">
+            <span>${maskedCurrency(currentTotal)} / ${maskedCurrency(goal)} (${progress.toFixed(0)}%)</span>
+            <span>${escapeHtml(t("plan.pending"))}: ${maskedCurrency(pending)}</span>
+          </div>
+          ${monthsToGoal ? `<p class="plan-hint">${escapeHtml(t("plan.monthsToGoal", { n: monthsToGoal }))}</p>` : ""}
+        </div>` : ""}
+    </section>
+
+    <section class="panel plan-strategy-card">
+      <div class="panel-heading compact-heading">
+        <h2 class="home-section-title" data-i18n="plan.strategyTitle">Distribucion objetivo</h2>
+        <span class="plan-sum ${Math.abs(sumTargets - 100) < 0.5 ? "ok" : "warn"}">${sumTargets.toFixed(0)}%</span>
+      </div>
+      <div class="plan-strategy-actions">
+        <button class="ghost-btn" type="button" data-plan-action="equal">${escapeHtml(t("plan.autoEqual"))}</button>
+        <button class="ghost-btn" type="button" data-plan-action="current">${escapeHtml(t("plan.autoCurrent"))}</button>
+      </div>
+      <div class="plan-strategy-list">
+        ${positions.map((p) => renderStrategyRow(p, currentTotal)).join("")}
+      </div>
+    </section>
+
+    <section class="panel plan-rebal-card">
+      <div class="panel-heading compact-heading">
+        <h2 class="home-section-title" data-i18n="plan.contribTitle">Aportacion manual</h2>
+      </div>
+      <div class="plan-amount-row">
+        <label class="editor-field plan-amount-field">
+          <span>${escapeHtml(t("plan.amount"))}</span>
+          <input type="text" inputmode="decimal" id="planAmountInput" value="${state.plan.lastAmount ? escapeHtml(formatEditableNumber(state.plan.lastAmount)) : ""}" placeholder="0" />
+        </label>
+        <div class="plan-presets">
+          ${[50, 100, 250, 500].map((v) => `<button class="chip-preset" type="button" data-plan-preset="${v}">${v}</button>`).join("")}
+        </div>
+      </div>
+      <div class="plan-modes">
+        ${modeChip("balance", t("plan.modeBalance"))}
+        ${modeChip("maintain", t("plan.modeMaintain"))}
+        ${modeChip("safety", t("plan.modeSafety"))}
+      </div>
+      <div class="plan-adv">
+        <label class="editor-field">
+          <span>${escapeHtml(t("plan.reserveStable"))} (%)</span>
+          <input type="text" inputmode="decimal" data-plan-field="reserveStable" value="${state.plan.reserveStable || ""}" placeholder="0" />
+        </label>
+        <label class="editor-field">
+          <span>${escapeHtml(t("plan.fee"))} (%)</span>
+          <input type="text" inputmode="decimal" data-plan-field="feePct" value="${state.plan.feePct || ""}" placeholder="0" />
+        </label>
+      </div>
+      <button class="primary-btn plan-calc-btn" type="button" data-plan-action="calc" ${targetsOk ? "" : "disabled"}>${escapeHtml(t("plan.calc"))}</button>
+      ${targetsOk ? "" : `<p class="plan-hint">${escapeHtml(t("plan.needStrategy"))}</p>`}
+      <div id="planResult" class="plan-result"></div>
+    </section>
+
+    <p class="plan-disclaimer">${escapeHtml(PLAN_DISCLAIMER)}</p>
+  `;
+
+  if (planLastResult) {
+    renderPlanResult(planLastResult);
+  }
+}
+
+function renderStrategyRow(p, currentTotal) {
+  const curW = currentTotal > 0 ? (p.value / currentTotal) * 100 : 0;
+  const tw = Number(p.target.weight) || 0;
+  const status = tw <= 0 ? "" : curW < tw - 1 ? "under" : curW > tw + 1 ? "over" : "on";
+  const statusLabel = { under: t("plan.under"), over: t("plan.over"), on: t("plan.onTarget"), "": "" }[status];
+  return `
+    <div class="strategy-row ${p.target.include === false ? "is-excluded" : ""}" data-strategy-row="${p.id}">
+      <div class="strategy-main">
+        <span class="asset-avatar">${renderAssetAvatar(p.row)}</span>
+        <div class="strategy-id">
+          <strong>${escapeHtml(p.name)}</strong>
+          <small>${escapeHtml(t("plan.current"))} ${curW.toFixed(1)}%${statusLabel ? ` · <em class="st-${status}">${escapeHtml(statusLabel)}</em>` : ""}</small>
+        </div>
+        <label class="strategy-weight">
+          <input type="text" inputmode="decimal" data-strategy-field="weight" data-row-id="${p.id}" value="${tw || ""}" placeholder="0" />
+          <span>%</span>
+        </label>
+      </div>
+      <div class="strategy-adv">
+        <label>${escapeHtml(t("plan.min"))}<input type="text" inputmode="decimal" data-strategy-field="min" data-row-id="${p.id}" value="${p.target.min || ""}" placeholder="0" /></label>
+        <label>${escapeHtml(t("plan.max"))}<input type="text" inputmode="decimal" data-strategy-field="max" data-row-id="${p.id}" value="${p.target.max || ""}" placeholder="0" /></label>
+        <button class="strategy-toggle ${p.target.include === false ? "" : "is-on"}" type="button" data-strategy-field="include" data-row-id="${p.id}" title="${escapeHtml(t("plan.include"))}">${p.target.include === false ? "✕" : "✓"}</button>
+        <button class="strategy-toggle ${p.target.locked ? "is-lock" : ""}" type="button" data-strategy-field="locked" data-row-id="${p.id}" title="${escapeHtml(t("plan.lock"))}">${p.target.locked ? "🔒" : "🔓"}</button>
+      </div>
+    </div>`;
+}
+
+function renderPlanResult(result) {
+  const box = document.getElementById("planResult");
+  if (!box) {
+    return;
+  }
+  if (result.error === "no-strategy") {
+    box.innerHTML = `<p class="plan-hint">${escapeHtml(t("plan.needStrategy"))}</p>`;
+    return;
+  }
+  if (result.error === "no-amount") {
+    box.innerHTML = `<p class="plan-hint">${escapeHtml(t("plan.needAmount"))}</p>`;
+    return;
+  }
+
+  box.innerHTML = `
+    <div class="plan-result-head">
+      <strong>${escapeHtml(t("plan.availableToInvest", { amount: formatCurrency(result.amount) }))}</strong>
+      <span>${escapeHtml(t("plan.proposalIntro"))}</span>
+    </div>
+    <div class="plan-alloc-list">
+      ${result.items.map((p) => `
+        <div class="plan-alloc ${p.alloc > 0 ? "" : "is-zero"}">
+          <div class="plan-alloc-top">
+            <span class="asset-avatar">${renderAssetAvatar(p.row)}</span>
+            <strong class="plan-alloc-name">${escapeHtml(p.name)}</strong>
+            <strong class="plan-alloc-amount ${p.alloc > 0 ? "positive" : "neutral"}">${formatCurrency(p.alloc)}${p.alloc > 0 ? ` <small>(${p.pctOfAmount.toFixed(0)}%)</small>` : ""}</strong>
+          </div>
+          <div class="plan-alloc-weights">
+            <span>${escapeHtml(t("plan.now"))} ${p.currentW.toFixed(1)}%</span>
+            <span>→ ${p.expectedW.toFixed(1)}%</span>
+            <span class="plan-alloc-target">${escapeHtml(t("plan.target"))} ${p.targetW.toFixed(1)}%</span>
+          </div>
+          <p class="plan-alloc-why">${escapeHtml(p.explain)}</p>
+        </div>`).join("")}
+    </div>
+    <div class="plan-summary">
+      <div><span>${escapeHtml(t("plan.assigned"))}</span><strong>${formatCurrency(result.assigned)}</strong></div>
+      ${result.unassigned > 0 ? `<div><span>${escapeHtml(t("plan.unassigned"))}</span><strong class="warning">${formatCurrency(result.unassigned)}</strong></div>` : ""}
+      <div><span>${escapeHtml(t("plan.balanceImprove"))}</span><strong class="${result.improvement >= 0 ? "positive" : "negative"}">${result.improvement >= 0 ? "-" : "+"}${Math.abs(result.improvement).toFixed(1)} pp</strong></div>
+      ${result.fee > 0 ? `<div><span>${escapeHtml(t("plan.feeEst"))}</span><strong>${formatCurrency(result.fee)}</strong></div>` : ""}
+    </div>
+    <div class="plan-result-actions">
+      <button class="ghost-btn" type="button" data-plan-action="copy">${escapeHtml(t("plan.copy"))}</button>
+      <button class="primary-btn" type="button" data-plan-action="apply" ${result.assigned > 0 ? "" : "disabled"}>${escapeHtml(t("plan.apply"))}</button>
+    </div>
+    <p class="plan-disclaimer small">${escapeHtml(PLAN_DISCLAIMER)}</p>
+  `;
+}
+
+function planResultToText(result) {
+  const lines = [t("plan.availableToInvest", { amount: formatCurrency(result.amount) }), t("plan.proposalIntro"), ""];
+  result.items.forEach((p) => {
+    lines.push(`${p.name}: ${formatCurrency(p.alloc)} (${p.pctOfAmount.toFixed(0)}%) · ${p.currentW.toFixed(1)}% → ${p.expectedW.toFixed(1)}% (obj ${p.targetW.toFixed(1)}%)`);
+  });
+  lines.push("", `${t("plan.assigned")}: ${formatCurrency(result.assigned)}`);
+  if (result.unassigned > 0) lines.push(`${t("plan.unassigned")}: ${formatCurrency(result.unassigned)}`);
+  lines.push("", PLAN_DISCLAIMER);
+  return lines.join("\n");
+}
+
+function bindPlan() {
+  const box = document.getElementById("planContent");
+  if (!box) {
+    return;
+  }
+
+  box.addEventListener("click", (event) => {
+    const modeBtn = event.target.closest("[data-plan-mode]");
+    if (modeBtn) {
+      state.plan.mode = modeBtn.dataset.planMode;
+      savePlan();
+      box.querySelectorAll("[data-plan-mode]").forEach((b) => b.classList.toggle("is-active", b === modeBtn));
+      if (planLastResult) {
+        planLastResult = computeContributionPlan(planLastResult.amount, state.plan.mode);
+        renderPlanResult(planLastResult);
+      }
+      return;
+    }
+    const preset = event.target.closest("[data-plan-preset]");
+    if (preset) {
+      const input = document.getElementById("planAmountInput");
+      if (input) input.value = preset.dataset.planPreset;
+      return;
+    }
+    const strategyToggle = event.target.closest("button[data-strategy-field]");
+    if (strategyToggle) {
+      const rowId = strategyToggle.dataset.rowId;
+      const field = strategyToggle.dataset.strategyField;
+      const cur = getPlanTarget(rowId);
+      setPlanTarget(rowId, { [field]: field === "include" ? cur.include === false : !cur.locked });
+      renderPlan();
+      return;
+    }
+    const action = event.target.closest("[data-plan-action]")?.dataset.planAction;
+    if (!action) return;
+    handlePlanAction(action);
+  });
+
+  box.addEventListener("input", (event) => {
+    const planField = event.target.closest("[data-plan-field]");
+    if (planField) {
+      const key = planField.dataset.planField;
+      const val = parseDecimal(planField.value);
+      state.plan[key] = planField.value.trim() === "" ? (key === "goalTotal" || key === "monthlyContribution" ? null : 0) : val;
+      savePlan();
+      return;
+    }
+    const stratInput = event.target.closest("input[data-strategy-field]");
+    if (stratInput) {
+      const rowId = stratInput.dataset.rowId;
+      const field = stratInput.dataset.strategyField;
+      setPlanTarget(rowId, { [field]: parseDecimal(stratInput.value) });
+      // Actualiza el indicador de suma y habilita "Calcular" sin re-render
+      // (así no se pierde el foco del input que se está editando).
+      const sum = planTargetsSum();
+      const chip = box.querySelector(".plan-sum");
+      if (chip) {
+        chip.textContent = `${sum.toFixed(0)}%`;
+        chip.className = `plan-sum ${Math.abs(sum - 100) < 0.5 ? "ok" : "warn"}`;
+      }
+      const calcBtn = box.querySelector("[data-plan-action='calc']");
+      if (calcBtn) {
+        calcBtn.disabled = !(sum > 0);
+      }
+      const needHint = box.querySelector(".plan-rebal-card .plan-hint");
+      if (needHint && sum > 0) {
+        needHint.remove();
+      }
+    }
+  });
+}
+
+function handlePlanAction(action) {
+  switch (action) {
+    case "equal": {
+      const positions = getPlanPositions();
+      const w = positions.length ? Math.round((100 / positions.length) * 10) / 10 : 0;
+      positions.forEach((p) => setPlanTarget(p.id, { weight: w }));
+      renderPlan();
+      break;
+    }
+    case "current": {
+      const snapshot = buildSnapshot();
+      const total = snapshot.totals.currentValue;
+      getPlanPositions().forEach((p) => {
+        const w = total > 0 ? Math.round((p.value / total) * 1000) / 10 : 0;
+        setPlanTarget(p.id, { weight: w });
+      });
+      renderPlan();
+      break;
+    }
+    case "calc": {
+      const input = document.getElementById("planAmountInput");
+      const amount = parseDecimal(input?.value);
+      state.plan.lastAmount = amount || null;
+      savePlan();
+      planLastResult = computeContributionPlan(amount, state.plan.mode);
+      renderPlanResult(planLastResult);
+      break;
+    }
+    case "apply":
+      applyContributionPlan();
+      break;
+    case "copy":
+      if (planLastResult && !planLastResult.error) {
+        copyTextToClipboard(planResultToText(planLastResult)).then((ok) => {
+          showToast(ok ? t("share.copiedTitle") : t("share.errorTitle"), ok ? t("plan.copiedText") : t("share.errorText"), ok ? "positive" : "warning");
+        });
+      }
       break;
     default:
       break;
@@ -1693,6 +2223,7 @@ function bindEvents() {
   bindMarkets();
   bindAnalyticsTabs();
   bindFilters();
+  bindPlan();
   updateFiltersBadge();
 
   document.querySelectorAll("[data-copy-wallet]").forEach((button) => {
@@ -1795,6 +2326,13 @@ function loadState() {
   state.prefs.hideBalance = Boolean(state.prefs.hideBalance);
   if (state.prefs.filters && typeof state.prefs.filters === "object") {
     state.filters = { ...state.filters, ...state.prefs.filters };
+  }
+  if (state.prefs.plan && typeof state.prefs.plan === "object") {
+    state.plan = { ...state.plan, ...state.prefs.plan, targets: state.prefs.plan.targets || {} };
+  }
+  // Migración segura: la pestaña activa "portfolio" antigua ya no existe.
+  if (state.prefs.activeTab === "portfolio") {
+    state.prefs.activeTab = "home";
   }
   // Migración: la antigua pestaña "portfolio" (posiciones) ahora vive dentro
   // de "home" (Portafolio); cualquier valor desconocido cae a "home".

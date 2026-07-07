@@ -62,10 +62,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-6 4 3 6-8"/><path d="M17 6h4v4"/></svg>
         <span data-i18n="nav.markets">Mercados</span>
       </button>
-      <button class="tab-btn tab-fab" type="button" id="fabBtn" aria-label="Anadir" data-i18n-aria-label="nav.add">
-        <span class="tab-fab-circle" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        </span>
+      <button class="tab-btn" type="button" data-tab-target="plan" aria-current="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M5 8l7-4 7 4"/><path d="M5 8l-2 5a3 3 0 0 0 6 0z"/><path d="M19 8l-2 5a3 3 0 0 0 6 0z"/></svg>
+        <span data-i18n="nav.plan">Plan</span>
       </button>
       <button class="tab-btn" type="button" data-tab-target="analytics" aria-current="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>
@@ -165,6 +164,25 @@
             <polyline id="mainSparklinePath" fill="none" stroke-width="1.5" points=""></polyline>
           </svg>
           <span class="mvc-meta" id="mainUpdated">--</span>
+        </section>
+
+        <section class="quick-actions" aria-label="Acciones rapidas">
+          <button class="quick-action" type="button" id="quickAddBtn">
+            <span class="qa-icon accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+            <span data-i18n="quick.add">Anadir</span>
+          </button>
+          <button class="quick-action" type="button" data-quick="buy">
+            <span class="qa-icon positive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
+            <span data-i18n="quick.buy">Comprar</span>
+          </button>
+          <button class="quick-action" type="button" data-quick="sell">
+            <span class="qa-icon negative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg></span>
+            <span data-i18n="quick.sell">Vender</span>
+          </button>
+          <button class="quick-action" type="button" data-quick="plan">
+            <span class="qa-icon accent2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 8l7-4 7 4"/><path d="M5 8l-2 5a3 3 0 0 0 6 0z"/><path d="M19 8l-2 5a3 3 0 0 0 6 0z"/></svg></span>
+            <span data-i18n="quick.plan">Rebalanceo</span>
+          </button>
         </section>
 
         <section class="summary-grid" id="summaryGrid" aria-label="Resumen del portafolio" data-i18n-aria-label="summary.ariaLabel"></section>
@@ -387,6 +405,18 @@
           <div id="marketsRanking" class="markets-ranking"></div>
           <div id="marketsPagination" class="markets-pagination"></div>
         </section>
+      </section>
+
+      <!-- ═══ PESTAÑA PLAN ═══ -->
+      <section class="tab-section" data-tab="plan">
+        <header class="home-header">
+          <div class="home-header-main">
+            <p class="portfolio-name-display" data-i18n="nav.plan">Plan</p>
+            <p class="home-status" data-i18n="plan.subtitle">Objetivo, estrategia y aportaciones</p>
+          </div>
+        </header>
+
+        <div id="planContent"></div>
       </section>
 
       <!-- ═══ PESTAÑA MAS ═══ -->
