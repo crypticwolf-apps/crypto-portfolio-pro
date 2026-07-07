@@ -6027,3 +6027,14 @@ body.filters-open { overflow: hidden; }
 .plan-result-actions .primary-btn { flex: 1; min-height: 48px; }
 .plan-disclaimer { font-size: 0.7rem; color: var(--muted-2); line-height: 1.5; text-align: center; padding: 0 8px; }
 .plan-disclaimer.small { text-align: left; margin-top: 4px; }
+
+/* Rebalanceo completo y simulador */
+.sim-inputs { display: flex; flex-direction: column; gap: 10px; }
+.sim-inputs select, .sim-inputs input {
+  min-height: 46px; padding: 0 12px; border-radius: 12px;
+  border: 1px solid var(--glass-border); background: rgba(5,12,22,0.5);
+  color: var(--text); font-size: 16px;
+}
+:root[data-theme="light"] .sim-inputs select, :root[data-theme="light"] .sim-inputs input { background: rgba(255,255,255,0.8); }
+.plan-sim-card select#simType { min-height: 46px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--glass-border); background: rgba(5,12,22,0.5); color: var(--text); font-size: 16px; }
+:root[data-theme="light"] .plan-sim-card select#simType { background: rgba(255,255,255,0.8); }
