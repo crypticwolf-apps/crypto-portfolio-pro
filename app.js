@@ -88,6 +88,8 @@ const MEME_SYMBOLS = new Set([
 // se hereda el desplazamiento de la pestaña anterior. (Debe declararse antes
 // de la llamada a init(): las const de módulo no se izan.)
 const tabScrollPositions = {};
+// Umbrales de capitalización del deslizador de filtros (0 = cualquiera).
+const CAP_STEPS = [0, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12];
 // Estado del editor-portal (declarado antes de init() para evitar TDZ).
 let editorSearchTimer = null;
 let editorPortal = null;
@@ -142,7 +144,8 @@ const DEFAULT_PREFS = {
   sortDir: "desc",
   hiddenColumns: [],
   hideBalance: false,
-  activeTab: "home"
+  activeTab: "home",
+  filters: null
 };
 
 const TOGGLEABLE_COLUMNS = ["priority", "targets", "tpSignal"];
@@ -213,13 +216,19 @@ const DEFAULT_ROWS = [
   }
 ];
 
-// Tabla simplificada de solo lectura: la edición vive en el editor-portal.
+// Tabla de solo lectura: la edición vive en el editor-portal. Las columnas
+// marcadas "desktop" solo se ven en la vista avanzada de escritorio; en móvil
+// se usan tarjetas y quedan ocultas por CSS.
 const TABLE_COLUMNS = [
   { key: "asset", labelKey: "table.columns.asset", sortKey: "asset" },
+  { key: "qty", labelKey: "table.columns.qty", sortKey: "tokens", desktop: true },
   { key: "price", labelKey: "table.columns.priceCol", sortKey: "currentPrice" },
   { key: "invested", labelKey: "table.columns.invested", sortKey: "investment" },
   { key: "value", labelKey: "table.columns.value", sortKey: "currentValue" },
   { key: "pnl", labelKey: "table.columns.performance", sortKey: "pnlPct" },
+  { key: "pnl24", labelKey: "table.columns.pnl24", sortKey: "change24h", desktop: true },
+  { key: "weight", labelKey: "table.columns.weight", sortKey: "currentValue", desktop: true },
+  { key: "cap", labelKey: "table.columns.cap", sortKey: "marketCap", desktop: true },
   { key: "actions", labelKey: "table.columns.actions", sortKey: null }
 ];
 
@@ -249,6 +258,7 @@ const state = {
   refreshRequestId: 0,
   currencySwitchId: 0,
   filterQuery: "",
+  filters: { category: "all", performance: "all", weightMin: 0, capMin: 0, favorites: false, alerts: false },
   heroVisible: true,
   editorRowId: null,
   rowMenuOpen: false,
@@ -1688,6 +1698,8 @@ function bindEvents() {
   bindAssetDetail();
   bindMarkets();
   bindAnalyticsTabs();
+  bindFilters();
+  updateFiltersBadge();
 
   document.querySelectorAll("[data-copy-wallet]").forEach((button) => {
     button.addEventListener("click", () => copyWalletAddress(button));
@@ -1747,6 +1759,8 @@ function bindEvents() {
     if (event.key === "Escape") {
       if (state.rowMenuOpen) {
         closeRowMenu();
+      } else if (!document.getElementById("filtersDrawer")?.hidden) {
+        document.getElementById("filtersDrawer").querySelector("[data-filters-close]")?.click();
       } else if (!document.getElementById("tradeSheet")?.hidden) {
         closeTradeSheet();
       } else if (state.editorRowId) {
@@ -1785,6 +1799,9 @@ function loadState() {
       : DEFAULT_PREFS.autoRefreshSec;
   }
   state.prefs.hideBalance = Boolean(state.prefs.hideBalance);
+  if (state.prefs.filters && typeof state.prefs.filters === "object") {
+    state.filters = { ...state.filters, ...state.prefs.filters };
+  }
   // Migración: la antigua pestaña "portfolio" (posiciones) ahora vive dentro
   // de "home" (Portafolio); cualquier valor desconocido cae a "home".
   if (state.prefs.activeTab === "portfolio") {
@@ -2097,18 +2114,162 @@ function renderTableBody() {
   applyPositionFilter();
 }
 
-// Filtro por texto opcional (se conserva la utilidad, sin chips de categoría).
+// Filtro combinado: búsqueda + categoría + rentabilidad + peso/cap mínimos +
+// favoritos + objetivos TP. Solo muestra/oculta filas ya renderizadas.
 function applyPositionFilter() {
   const query = normalizeSearchText(state.filterQuery || "");
-  if (!query) {
-    return;
-  }
+  const f = state.filters;
+  const totalValue = state.rows.reduce((sum, r) => {
+    const v = computeRowMetrics(r).currentValue;
+    return sum + (v > 0 ? v : 0);
+  }, 0);
+  const capMin = CAP_STEPS[f.capMin] || 0;
+
   dom.tableBody.querySelectorAll("tr[data-row-id]").forEach((tr) => {
     const row = getRowById(tr.dataset.rowId);
-    const match = row && [row.crypto, row.resolvedName, row.symbol, row.coinId]
-      .some((value) => normalizeSearchText(String(value || "")).includes(query));
+    if (!row) {
+      return;
+    }
+    const metrics = computeRowMetrics(row);
+    const weight = totalValue > 0 && metrics.currentValue > 0 ? (metrics.currentValue / totalValue) * 100 : 0;
+
+    let match = true;
+    if (query) {
+      match = [row.crypto, row.resolvedName, row.symbol, row.coinId]
+        .some((value) => normalizeSearchText(String(value || "")).includes(query));
+    }
+    if (match && f.category !== "all") match = getAssetCategory(row) === f.category;
+    if (match && f.performance === "gaining") match = metrics.pnlUsd > 0;
+    if (match && f.performance === "losing") match = metrics.pnlUsd < 0;
+    if (match && f.favorites) match = Boolean(row.favorite);
+    if (match && f.alerts) match = [metrics.tp1, metrics.tp2, metrics.tp3].some((v) => v > 0);
+    if (match && f.weightMin > 0) match = weight >= f.weightMin;
+    if (match && capMin > 0) match = Number.isFinite(row.marketCap) && row.marketCap >= capMin;
+
     tr.style.display = match ? "" : "none";
   });
+}
+
+function countActiveFilters() {
+  const f = state.filters;
+  let n = 0;
+  if (f.category !== "all") n += 1;
+  if (f.performance !== "all") n += 1;
+  if (f.weightMin > 0) n += 1;
+  if (f.capMin > 0) n += 1;
+  if (f.favorites) n += 1;
+  if (f.alerts) n += 1;
+  return n;
+}
+
+function updateFiltersBadge() {
+  const badge = document.getElementById("filtersCount");
+  if (!badge) {
+    return;
+  }
+  const n = countActiveFilters();
+  badge.textContent = String(n);
+  badge.hidden = n === 0;
+}
+
+function capStepLabel(step) {
+  if (!step) {
+    return t("filters.any");
+  }
+  return formatCompactCurrency(CAP_STEPS[step] || 0);
+}
+
+function bindFilters() {
+  const drawer = document.getElementById("filtersDrawer");
+  const openBtn = document.getElementById("openFiltersBtn");
+  const search = document.getElementById("positionSearchInput");
+  if (search) {
+    search.addEventListener("input", (event) => {
+      state.filterQuery = event.target.value;
+      applyPositionFilter();
+    });
+  }
+  if (!drawer || !openBtn) {
+    return;
+  }
+
+  openBtn.addEventListener("click", () => {
+    syncFilterInputs();
+    drawer.hidden = false;
+    document.body.classList.add("filters-open");
+  });
+
+  const close = () => {
+    drawer.classList.add("is-closing");
+    window.setTimeout(() => {
+      drawer.hidden = true;
+      drawer.classList.remove("is-closing");
+      document.body.classList.remove("filters-open");
+    }, 200);
+  };
+
+  drawer.addEventListener("click", (event) => {
+    if (event.target.closest("[data-filters-close]")) {
+      close();
+    }
+    if (event.target.closest("[data-filters-reset]")) {
+      state.filters = { category: "all", performance: "all", weightMin: 0, capMin: 0, favorites: false, alerts: false };
+      syncFilterInputs();
+      commitFilters();
+    }
+  });
+
+  drawer.addEventListener("input", (event) => {
+    const control = event.target.closest("[data-filter]");
+    if (!control) {
+      return;
+    }
+    const key = control.dataset.filter;
+    if (control.type === "checkbox") {
+      state.filters[key] = control.checked;
+    } else if (control.type === "range") {
+      state.filters[key] = Number(control.value);
+    } else {
+      state.filters[key] = control.value;
+    }
+    // Etiquetas de los deslizadores.
+    if (key === "weightMin") {
+      const out = drawer.querySelector('[data-filter-out="weightMin"]');
+      if (out) out.textContent = `${state.filters.weightMin}%`;
+    }
+    if (key === "capMin") {
+      const out = drawer.querySelector('[data-filter-out="capMin"]');
+      if (out) out.textContent = capStepLabel(state.filters.capMin);
+    }
+    commitFilters();
+  });
+}
+
+function syncFilterInputs() {
+  const drawer = document.getElementById("filtersDrawer");
+  if (!drawer) {
+    return;
+  }
+  const f = state.filters;
+  drawer.querySelectorAll("[data-filter]").forEach((control) => {
+    const key = control.dataset.filter;
+    if (control.type === "checkbox") {
+      control.checked = Boolean(f[key]);
+    } else {
+      control.value = f[key];
+    }
+  });
+  const wOut = drawer.querySelector('[data-filter-out="weightMin"]');
+  if (wOut) wOut.textContent = `${f.weightMin}%`;
+  const cOut = drawer.querySelector('[data-filter-out="capMin"]');
+  if (cOut) cOut.textContent = capStepLabel(f.capMin);
+}
+
+function commitFilters() {
+  applyPositionFilter();
+  updateFiltersBadge();
+  state.prefs.filters = { ...state.filters };
+  savePreferences();
 }
 
 // Fila de solo lectura: toda la edición ocurre en el editor-portal.
@@ -2137,6 +2298,10 @@ function renderRow(row, totalValue = 0) {
         </div>
       </td>
 
+      <td class="qty-col col-qty" data-label="${escapeHtml(t("table.columns.qty"))}">
+        <strong class="numeric" data-role="rowQty">${metrics.tokens > 0 ? formatNumber(metrics.tokens, metrics.tokens >= 1 ? 4 : 8) : "--"}</strong>
+      </td>
+
       <td class="price-col col-price" data-label="${escapeHtml(t("table.columns.priceCol"))}">
         <div class="stack-cell">
           <strong class="money" data-role="rowPrice">${priceText}</strong>
@@ -2161,6 +2326,18 @@ function renderRow(row, totalValue = 0) {
           <strong class="money ${toneClass(metrics.pnlUsd)}" data-role="rowPnlAbs">${maskedSignedCurrency(metrics.pnlUsd)}</strong>
           <span class="numeric ${toneClass(metrics.pnlPct)}" data-role="rowPnlPct">${formatPercent(metrics.pnlPct)}</span>
         </div>
+      </td>
+
+      <td class="pnl24-col col-pnl24" data-label="${escapeHtml(t("table.columns.pnl24"))}">
+        <strong class="numeric ${toneClass(row.priceChange24h || 0)}" data-role="rowPnl24">${changeText}</strong>
+      </td>
+
+      <td class="weight-col col-weight" data-label="${escapeHtml(t("table.columns.weight"))}">
+        <strong class="numeric" data-role="rowWeightCol">${weight != null ? weight.toFixed(1) + "%" : "--"}</strong>
+      </td>
+
+      <td class="cap-col col-cap" data-label="${escapeHtml(t("table.columns.cap"))}">
+        <strong class="numeric" data-role="rowCap">${Number.isFinite(row.marketCap) ? formatCompactCurrency(row.marketCap) : "--"}</strong>
       </td>
 
       <td class="actions-cell col-actions" data-label="${escapeHtml(t("table.columns.actions"))}">
@@ -3202,6 +3379,7 @@ function renderTotalsRow(snapshot) {
   dom.totalsFoot.innerHTML = `
     <tr class="totals-row">
       <td class="totals-label-cell col-asset">${escapeHtml(t("table.totals"))}</td>
+      <td class="col-qty"></td>
       <td class="col-price"></td>
       <td class="totals-inline-cell money col-invested" data-label="${escapeHtml(t("summary.totalInvested"))}">${maskedCurrency(snapshot.totals.investment)}</td>
       <td class="totals-inline-cell money col-value" data-label="${escapeHtml(t("summary.totalValue"))}">${maskedCurrency(snapshot.totals.currentValue)}</td>
@@ -3209,6 +3387,9 @@ function renderTotalsRow(snapshot) {
         <span class="money ${toneClass(totalPnl)}">${maskedSignedCurrency(totalPnl)}</span>
         <span class="totals-inline-meta ${toneClass(totalPnlPct)}">${formatPercent(totalPnlPct)}</span>
       </td>
+      <td class="col-pnl24"></td>
+      <td class="col-weight"></td>
+      <td class="col-cap"></td>
       <td class="col-actions"></td>
     </tr>
   `;
@@ -3406,6 +3587,17 @@ function updateLiveRowUi(rowId) {
   setRole("rowInvested", (node) => { node.textContent = maskedCurrency(metrics.investment); });
   setRole("rowValue", (node) => { node.textContent = maskedCurrency(metrics.currentValue); });
   setRole("rowWeight", (node) => { node.textContent = weight != null ? `${weight.toFixed(1)}%` : "--"; });
+  setRole("rowWeightCol", (node) => { node.textContent = weight != null ? `${weight.toFixed(1)}%` : "--"; });
+  setRole("rowQty", (node) => {
+    node.textContent = metrics.tokens > 0 ? formatNumber(metrics.tokens, metrics.tokens >= 1 ? 4 : 8) : "--";
+  });
+  setRole("rowCap", (node) => {
+    node.textContent = Number.isFinite(row.marketCap) ? formatCompactCurrency(row.marketCap) : "--";
+  });
+  setRole("rowPnl24", (node) => {
+    node.textContent = Number.isFinite(row.priceChange24h) ? formatSignedPercent(row.priceChange24h) : "--";
+    node.className = `numeric ${toneClass(row.priceChange24h || 0)}`;
+  });
   setRole("rowPnlAbs", (node) => {
     node.textContent = maskedSignedCurrency(metrics.pnlUsd);
     node.className = `money ${toneClass(metrics.pnlUsd)}`;

@@ -324,6 +324,15 @@
         <div class="panel-heading compact-heading">
           <h2 class="home-section-title" data-i18n="table.eyebrow">Posiciones</h2>
           <div class="cartera-toolbar">
+            <div class="table-search desktop-only-inline">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+              <input id="positionSearchInput" type="search" autocomplete="off" placeholder="Buscar activo..." data-i18n-placeholder="markets.search" aria-label="Buscar activo" data-i18n-aria-label="markets.search" />
+            </div>
+            <button id="openFiltersBtn" class="ghost-btn filters-btn" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+              <span data-i18n="filters.button">Filtros</span>
+              <span id="filtersCount" class="filters-count" hidden>0</span>
+            </button>
             <div class="mobile-sort" id="mobileSort">
               <label class="mobile-sort-field" for="mobileSortSelect">
                 <span data-i18n="table.sortBy">Ordenar por</span>
@@ -549,6 +558,58 @@
 
       </section>
 
+    </div>
+
+    <div id="filtersDrawer" class="filters-drawer" hidden>
+      <div class="filters-backdrop" data-filters-close></div>
+      <aside class="filters-panel" role="dialog" aria-modal="true" aria-label="Filtros">
+        <header class="filters-head">
+          <h2 data-i18n="filters.button">Filtros</h2>
+          <button type="button" class="icon-circle-btn" data-filters-close aria-label="Cerrar" data-i18n-aria-label="buttons.close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </header>
+        <div class="filters-body">
+          <div class="filter-field">
+            <span data-i18n="filters.category">Categoria</span>
+            <select data-filter="category">
+              <option value="all" data-i18n="filters.all">Todos</option>
+              <option value="btc">BTC</option>
+              <option value="eth">ETH</option>
+              <option value="stable" data-i18n="filters.stables">Stablecoins</option>
+              <option value="alt" data-i18n="filters.alts">Altcoins</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <span data-i18n="filters.performance">Rentabilidad</span>
+            <select data-filter="performance">
+              <option value="all" data-i18n="filters.all">Todas</option>
+              <option value="gaining" data-i18n="filters.gaining">Ganando</option>
+              <option value="losing" data-i18n="filters.losing">Perdiendo</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <span><span data-i18n="filters.weightMin">Peso minimo</span>: <strong data-filter-out="weightMin">0%</strong></span>
+            <input type="range" data-filter="weightMin" min="0" max="100" step="1" value="0" />
+          </div>
+          <div class="filter-field">
+            <span><span data-i18n="filters.capMin">Cap. minima</span>: <strong data-filter-out="capMin" data-i18n="filters.any">Cualquiera</strong></span>
+            <input type="range" data-filter="capMin" min="0" max="6" step="1" value="0" />
+          </div>
+          <label class="filter-toggle">
+            <span data-i18n="filters.onlyFavorites">Solo favoritos</span>
+            <input type="checkbox" data-filter="favorites" />
+          </label>
+          <label class="filter-toggle">
+            <span data-i18n="filters.onlyAlerts">Con objetivos TP</span>
+            <input type="checkbox" data-filter="alerts" />
+          </label>
+        </div>
+        <footer class="filters-foot">
+          <button type="button" class="ghost-btn" data-filters-reset data-i18n="filters.reset">Restablecer</button>
+          <button type="button" class="primary-btn" data-filters-close data-i18n="filters.apply">Aplicar</button>
+        </footer>
+      </aside>
     </div>
 
     <div id="assetDetailScreen" class="asset-detail" hidden></div>
