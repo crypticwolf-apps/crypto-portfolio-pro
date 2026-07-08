@@ -1,4 +1,12 @@
 const STORAGE_KEY = "crypto-dashboard-rows-v3";
+// Versión del esquema de datos guardados. Subirla cuando cambie la forma del
+// payload y añadir la migración correspondiente en migrateStoredPayload().
+const DATA_SCHEMA_VERSION = 1;
+// Memo por fila: computeRowMetrics se invoca decenas de veces por repintado
+// (tabla, resumen, analítica, plan). La firma cubre todas sus entradas, así
+// el cache se invalida solo cuando cambia algún dato de la fila.
+// OJO: debe declararse antes de la llamada a init() (línea ~350).
+const rowMetricsMemo = new WeakMap();
 const PREFS_KEY = "crypto-dashboard-prefs-v2";
 const HISTORY_KEY = "crypto-dashboard-history-v2";
 const FX_RATE_CACHE_KEY = "crypto-dashboard-fx-v1";
@@ -526,6 +534,9 @@ function init() {
   startAutoRefresh();
   observeChartsPanelForLazyLoad();
   observeHeroForStickyBar();
+  document.querySelector(".diag-details")?.addEventListener("toggle", (e) => {
+    if (e.target.open) renderDiagnostics();
+  });
 
   // Ticker ligero: refresca las etiquetas "hace X / en X" cada minuto.
   window.setInterval(() => {
@@ -592,12 +603,43 @@ function setActiveTab(tab) {
     renderPlan();
   }
 
+  if (nextTab === "more") {
+    renderDiagnostics();
+  }
+
   savePreferences();
   updateStickyBarVisibility();
   const targetScroll = tabScrollPositions[nextTab] || 0;
   window.scrollTo({ top: targetScroll });
   // Refuerzo tras el layout (rAF no es fiable en segundo plano/PWA oculta).
   window.setTimeout(() => window.scrollTo({ top: targetScroll }), 0);
+}
+
+// Diagnóstico discreto en "Más": estado real de datos y caches.
+function renderDiagnostics() {
+  const grid = document.getElementById("diagGrid");
+  if (!grid) return;
+  let storedBytes = 0;
+  try {
+    [STORAGE_KEY, PREFS_KEY, HISTORY_KEY, FX_RATE_CACHE_KEY].forEach((key) => {
+      const v = localStorage.getItem(key);
+      if (v) storedBytes += key.length + v.length;
+    });
+  } catch (error) {
+    storedBytes = -1;
+  }
+  const assets = state.rows.filter((r) => r.crypto.trim()).length;
+  const cells = [
+    [t("diag.lastSync"), state.lastRefreshAt ? formatRelativeTime(state.lastRefreshAt) : t("status.noSyncYet")],
+    [t("diag.assets"), String(assets)],
+    [t("diag.activity"), String(state.activity.length)],
+    [t("diag.stored"), storedBytes >= 0 ? `${(storedBytes / 1024).toFixed(1)} KB` : "--"],
+    [t("diag.priceCache"), String(state.priceCache.size)],
+    [t("diag.historyPoints"), String(state.history.length)]
+  ];
+  grid.innerHTML = cells
+    .map(([label, value]) => `<div><span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b></div>`)
+    .join("");
 }
 
 function applyBalanceVisibility() {
@@ -2478,8 +2520,20 @@ function bindEvents() {
   });
 }
 
+// Migra payloads guardados con esquemas anteriores al actual. Cada paso de
+// versión es aditivo: nunca borra datos que no entiende.
+function migrateStoredPayload(payload) {
+  if (!payload || typeof payload !== "object") return payload;
+  const from = Number(payload.schema) || 0;
+  if (from >= DATA_SCHEMA_VERSION) return payload;
+  // v0 → v1: payloads previos a la versión de esquema; forma compatible,
+  // solo se etiqueta. Futuras migraciones se encadenan aquí.
+  payload.schema = DATA_SCHEMA_VERSION;
+  return payload;
+}
+
 function loadState() {
-  const payload = safeParse(localStorage.getItem(STORAGE_KEY));
+  const payload = migrateStoredPayload(safeParse(localStorage.getItem(STORAGE_KEY)));
   const prefs = safeParse(localStorage.getItem(PREFS_KEY));
   const history = safeParse(localStorage.getItem(HISTORY_KEY));
 
@@ -6548,6 +6602,15 @@ function buildSnapshot() {
 }
 
 function computeRowMetrics(row) {
+  const sig = `${row.investment}|${row.tokens}|${row.entryPrice}|${row.tp1}|${row.tp2}|${row.tp3}|${row.currentPrice}`;
+  const hit = rowMetricsMemo.get(row);
+  if (hit && hit.sig === sig) return hit.metrics;
+  const metrics = computeRowMetricsUncached(row);
+  rowMetricsMemo.set(row, { sig, metrics });
+  return metrics;
+}
+
+function computeRowMetricsUncached(row) {
   const investment = parseDecimal(row.investment);
   const tokens = parseDecimal(row.tokens);
   const manualEntryPrice = parseDecimal(row.entryPrice);
@@ -7455,6 +7518,9 @@ function scheduleAutosave() {
 function persistState(manual) {
   try {
     const payload = {
+      // Versión de esquema: permite migrar datos antiguos si cambia la forma.
+      schema: DATA_SCHEMA_VERSION,
+      savedAt: Date.now(),
       rows: state.rows.map((row) => ({
         id: row.id,
         crypto: row.crypto,

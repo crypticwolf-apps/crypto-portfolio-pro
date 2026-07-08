@@ -6176,6 +6176,17 @@ body.filters-open { overflow: hidden; }
 .tp-config-pct { display: flex; align-items: center; gap: 3px; justify-content: flex-end; font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
 .tp-config-pct input { width: 52px; }
 
+/* ── Diagnóstico (Más) ── */
+.diag-panel { padding: 10px 16px; }
+.diag-summary { cursor: pointer; font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.06em; padding: 6px 0; list-style: none; }
+.diag-summary::-webkit-details-marker { display: none; }
+.diag-summary::after { content: "▾"; margin-left: 8px; opacity: 0.6; }
+.diag-details[open] .diag-summary::after { content: "▴"; }
+.diag-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; padding: 10px 0 6px; }
+.diag-grid > div { display: flex; flex-direction: column; }
+.diag-grid span { font-size: 0.56rem; text-transform: uppercase; color: var(--muted); font-family: var(--font-mono); }
+.diag-grid b { font-family: var(--font-mono); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+
 .tp-quick { display: flex; flex-direction: column; gap: 10px; }
 .tp-quick-head strong { display: block; font-size: 0.85rem; }
 .tp-quick-head small { display: block; font-size: 0.66rem; color: var(--muted); line-height: 1.35; margin-top: 2px; }
