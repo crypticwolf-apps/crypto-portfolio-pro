@@ -1243,20 +1243,36 @@ function renderTpTool() {
     const cfg = getTpConfig(p.id);
     const noData = !(p.price > 0);
 
-    const configRows = [
-      { label: "TP1", price: p.tp1, pctKey: "p1", priceKey: null },
-      { label: "TP2", price: p.tp2, pctKey: "p2", priceKey: null },
-      { label: "TP3", price: p.tp3, pctKey: "p3", priceKey: null },
-      { label: "TP4", price: Number(cfg.price4) || 0, pctKey: "p4", priceKey: "price4", optional: true },
-      { label: "TP5", price: Number(cfg.price5) || 0, pctKey: "p5", priceKey: "price5", optional: true }
-    ].map((l) => `
-      <div class="tp-config-row${l.optional ? " is-optional" : ""}">
+    // TP1-3: precio en la fila (data-tp-rowprice). TP4/5: precio en config (data-tp-price).
+    // Mostrar solo los TP con precio + un único slot para añadir el siguiente.
+    const levelDefs = [
+      { key: "tp1", label: "TP1", raw: p.row.tp1, price: p.tp1, pctKey: "p1", kind: "row" },
+      { key: "tp2", label: "TP2", raw: p.row.tp2, price: p.tp2, pctKey: "p2", kind: "row" },
+      { key: "tp3", label: "TP3", raw: p.row.tp3, price: p.tp3, pctKey: "p3", kind: "row" },
+      { key: "price4", label: "TP4", price: Number(cfg.price4) || 0, pctKey: "p4", kind: "cfg" },
+      { key: "price5", label: "TP5", price: Number(cfg.price5) || 0, pctKey: "p5", kind: "cfg" }
+    ];
+    let addShown = false;
+    const display = [];
+    levelDefs.forEach((l) => {
+      if (l.price > 0) display.push({ ...l, isAdd: false });
+      else if (!addShown) { display.push({ ...l, isAdd: true }); addShown = true; }
+    });
+    const configRows = display.map((l) => {
+      const val = l.kind === "row"
+        ? escapeHtml(l.raw || "")
+        : (l.price > 0 ? escapeHtml(formatEditableNumber(l.price)) : "");
+      const priceAttr = l.kind === "row" ? "data-tp-rowprice" : "data-tp-price";
+      return `
+      <div class="tp-config-row${l.kind === "cfg" ? " is-optional" : ""}${l.isAdd ? " is-add" : ""}">
         <span class="tp-config-label">${l.label}</span>
-        ${l.priceKey
-          ? `<input class="tp-config-price" type="text" inputmode="decimal" data-tp-price="${l.priceKey}" data-row-id="${p.id}" value="${l.price > 0 ? escapeHtml(formatEditableNumber(l.price)) : ""}" placeholder="${escapeHtml(t("tp.price"))}" />`
-          : `<span class="tp-config-price-ro">${l.price > 0 ? formatCurrency(l.price, getPriceDigits(l.price)) : `<span class="muted">${escapeHtml(t("tp.setInEditor"))}</span>`}</span>`}
+        <input class="tp-config-price" type="text" inputmode="decimal" ${priceAttr}="${l.key}" data-row-id="${p.id}" value="${val}" placeholder="${escapeHtml(t("tp.price"))}" />
         <span class="tp-config-pct"><input type="text" inputmode="decimal" data-tp-field="${l.pctKey}" data-row-id="${p.id}" value="${planClamp(Number(cfg[l.pctKey]) || 0, 0, 100)}" />%</span>
-      </div>`).join("");
+        ${l.isAdd
+          ? `<span class="tp-config-del-spacer" aria-hidden="true"></span>`
+          : `<button class="tp-config-del" type="button" data-tp-del="${l.key}" data-row-id="${p.id}" aria-label="${escapeHtml(t("tp.deleteLevel"))}" title="${escapeHtml(t("tp.deleteLevel"))}">✕</button>`}
+      </div>`;
+    }).join("");
 
     const head = `
       <div class="tp-card-head">
@@ -1269,7 +1285,7 @@ function renderTpTool() {
       return `<section class="panel tp-card">${head}${configBlock}<p class="plan-hint tp-warn">${escapeHtml(t("tp.noData"))}</p></section>`;
     }
     if (!sim.hasTp) {
-      return `<section class="panel tp-card">${head}${configBlock}<p class="plan-hint">${escapeHtml(t("tp.noTargets"))}</p><button class="ghost-btn" type="button" data-tp-edit="${p.id}">${escapeHtml(t("tp.setTargets"))}</button></section>`;
+      return `<section class="panel tp-card">${head}${configBlock}<p class="plan-hint">${escapeHtml(t("tp.noTargets"))}</p></section>`;
     }
 
     const steps = sim.steps.map((s) => `
@@ -1302,7 +1318,21 @@ function renderTpTool() {
     ? `<section class="panel tp-notice"><strong>${escapeHtml(t("tp.noTpTitle"))}</strong><p class="plan-hint">${prog.noTp.map((p) => escapeHtml(p.symbol || p.name)).join(" · ")}</p></section>`
     : "";
 
+  // ── Barra rápida: aplicar los % TP1-TP3 a todos los activos de golpe ──
+  const tpAll = state.plan.tpAll || { p1: 30, p2: 50, p3: 100 };
+  const quickBar = `
+    <section class="panel tp-quick">
+      <div class="tp-quick-head"><strong>${escapeHtml(t("tp.applyAllTitle"))}</strong><small>${escapeHtml(t("tp.applyAllHint"))}</small></div>
+      <div class="tp-quick-row">
+        <label class="tp-quick-field">TP1<input type="text" inputmode="decimal" data-tp-all="p1" value="${planClamp(Number(tpAll.p1) || 0, 0, 100)}" />%</label>
+        <label class="tp-quick-field">TP2<input type="text" inputmode="decimal" data-tp-all="p2" value="${planClamp(Number(tpAll.p2) || 0, 0, 100)}" />%</label>
+        <label class="tp-quick-field">TP3<input type="text" inputmode="decimal" data-tp-all="p3" value="${planClamp(Number(tpAll.p3) || 0, 0, 100)}" />%</label>
+        <button class="primary-btn tp-quick-btn" type="button" data-plan-action="tpApplyAll">${escapeHtml(t("tp.applyAllBtn"))}</button>
+      </div>
+    </section>`;
+
   box.innerHTML = `
+    ${quickBar}
     ${block1}
     ${block2}
     ${block3}
@@ -1336,6 +1366,19 @@ function bindPlan() {
     }
     const preset = event.target.closest("[data-reb-preset]");
     if (preset) { const i = document.getElementById("rebAmount"); if (i) i.value = preset.dataset.rebPreset; return; }
+    const tpDel = event.target.closest("[data-tp-del]");
+    if (tpDel) {
+      const key = tpDel.dataset.tpDel;
+      const rid = tpDel.dataset.rowId;
+      if (key === "tp1" || key === "tp2" || key === "tp3") {
+        const r = getRowById(rid);
+        if (r) { r[key] = ""; if (r.alertsFired) r.alertsFired[key] = false; persistState(true); updateLiveRowUi(r.id); }
+      } else {
+        setTpConfig(rid, { [key]: 0 });
+      }
+      renderTpTool();
+      return;
+    }
     const tpEdit = event.target.closest("[data-tp-edit]");
     if (tpEdit) { openPositionEditor(tpEdit.dataset.tpEdit); return; }
     const action = event.target.closest("[data-plan-action]")?.dataset.planAction;
@@ -1353,6 +1396,19 @@ function bindPlan() {
     const tpPrice = event.target.closest("[data-tp-price]");
     if (tpPrice) {
       setTpConfig(tpPrice.dataset.rowId, { [tpPrice.dataset.tpPrice]: Math.max(0, parseDecimal(tpPrice.value)) });
+      renderTpTool();
+      return;
+    }
+    const tpRowPrice = event.target.closest("[data-tp-rowprice]");
+    if (tpRowPrice) {
+      const r = getRowById(tpRowPrice.dataset.rowId);
+      if (r) {
+        const key = tpRowPrice.dataset.tpRowprice;
+        r[key] = sanitizeNumericInput(tpRowPrice.value);
+        if (r.alertsFired) r.alertsFired[key] = false;
+        persistState(true);
+        updateLiveRowUi(r.id);
+      }
       renderTpTool();
     }
   });
@@ -1373,6 +1429,18 @@ function handlePlanAction(action) {
     case "rebApply":
       applyRebalance(planRebResult);
       break;
+    case "tpApplyAll": {
+      const box = document.getElementById("planSubContent");
+      if (!box) break;
+      const read = (k) => planClamp(parseDecimal(box.querySelector(`[data-tp-all="${k}"]`)?.value), 0, 100);
+      const vals = { p1: read("p1"), p2: read("p2"), p3: read("p3") };
+      state.plan.tpAll = vals;
+      savePlan();
+      getPlanPositions().forEach((p) => setTpConfig(p.id, vals));
+      renderTpTool();
+      showToast(t("tp.appliedTitle"), t("tp.appliedText"), "positive");
+      break;
+    }
     default:
       break;
   }
