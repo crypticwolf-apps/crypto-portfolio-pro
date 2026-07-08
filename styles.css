@@ -6181,3 +6181,17 @@ body.filters-open { overflow: hidden; }
 .tp-full-grid { display: flex; flex-wrap: wrap; gap: 6px 14px; width: 100%; }
 .tp-full-grid > div { display: flex; align-items: baseline; gap: 5px; font-family: var(--font-mono); font-size: 0.72rem; }
 .tp-full-grid small { font-size: 0.62rem; }
+
+/* ── Simulador TP en móvil: tablas legibles sin romper el layout ── */
+@media (max-width: 560px) {
+  /* Bloque 1: la columna Explicacion es repetitiva → se oculta; 4 numéricas legibles */
+  .tp-table-prog .tpg-row { grid-template-columns: 34px 1fr 1fr 1fr; gap: 6px; font-size: 0.66rem; white-space: nowrap; }
+  .tp-table-prog .tpg-row > :nth-child(5) { display: none; }
+  /* Bloque 2: las tarjetas de escenario ya muestran total/beneficio/rentabilidad */
+  .tp-block-full .tp-table-full { display: none; }
+  .tp-scenarios { grid-template-columns: 1fr; }
+  .tp-scenario-top strong, .tp-scenario-top b { white-space: nowrap; }
+  /* Bloque 3: matriz activo×TP con scroll horizontal y columnas de ancho fijo */
+  .tp-table-compare { align-items: flex-start; }
+  .tp-table-compare .tpg-row { grid-template-columns: 48px repeat(calc(var(--tp-cols, 5) - 1), 82px); width: max-content; min-width: 100%; font-size: 0.66rem; white-space: nowrap; }
+}

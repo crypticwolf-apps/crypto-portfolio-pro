@@ -245,7 +245,7 @@ window.APP_I18N = {
       "tp.expFirst": "Se vende el % configurado en cada activo",
       "tp.expNext": "Se vende el % sobre lo que queda",
       "tp.grandTotal": "Total todos los TP",
-      "tp.remainingAfter": "Sin vender tras el ultimo TP",
+      "tp.remainingAfter": "Sin vender (final)",
       "tp.scenario": "Escenario",
       "tp.sell100at": "100% en {tp}",
       "tp.price": "Precio objetivo",
