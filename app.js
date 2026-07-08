@@ -91,9 +91,8 @@ const tabScrollPositions = {};
 // Umbrales de capitalización del deslizador de filtros (0 = cualquiera).
 const CAP_STEPS = [0, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12];
 // Aviso obligatorio del Plan (const antes de init() para evitar TDZ).
-const PLAN_DISCLAIMER = "Esta propuesta usa tu distribucion objetivo, limites y preferencias. No usa predicciones de precio ni constituye asesoramiento financiero.";
-let planLastResult = null;
-let planFullResult = null;
+const PLAN_DISCLAIMER = "Propuesta basada en tu estrategia y distribucion objetivo. No constituye asesoramiento financiero.";
+let planRebResult = null;
 // Estado del editor-portal (declarado antes de init() para evitar TDZ).
 let editorSearchTimer = null;
 let editorPortal = null;
@@ -258,7 +257,7 @@ const state = {
   currencySwitchId: 0,
   filterQuery: "",
   filters: { category: "all", performance: "all", weightMin: 0, capMin: 0, favorites: false, alerts: false },
-  plan: { goalTotal: null, monthlyContribution: null, mode: "balance", fullMode: "equilibrado", reserveStable: 0, feePct: 0, lastAmount: null, targets: {}, dca: [] },
+  plan: { subtab: "rebal", rebalStrategy: "equilibrada", rebalAmount: null, tp: {} },
   heroVisible: true,
   editorRowId: null,
   rowMenuOpen: false,
@@ -740,9 +739,8 @@ function handleFabAction(action) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   PLAN — distribución objetivo + rebalanceo con aportación
-   manual (algoritmo tipo "water-filling"). Solo usa la
-   estrategia del usuario; sin predicciones de mercado.
+   HERRAMIENTAS — Rebalanceo con nueva aportación + Simulador
+   de Take Profits. Solo cálculo con los datos del usuario.
    ═══════════════════════════════════════════════════════ */
 
 function savePlan() {
@@ -750,17 +748,11 @@ function savePlan() {
   savePreferences();
 }
 
-function getPlanTarget(rowId) {
-  const base = { weight: 0, min: 0, max: 0, include: true, locked: false, minBuy: 0, maxBuy: 0 };
-  return { ...base, ...(state.plan.targets[rowId] || {}) };
+function planClamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
 }
 
-function setPlanTarget(rowId, patch) {
-  state.plan.targets[rowId] = { ...getPlanTarget(rowId), ...patch };
-  savePlan();
-}
-
-// Posiciones aptas para la estrategia (tienen activo definido).
+// Posiciones aptas (con activo definido). Usa coste real cuando existe.
 function getPlanPositions() {
   return state.rows
     .filter((row) => row.crypto.trim())
@@ -770,908 +762,453 @@ function getPlanPositions() {
         row,
         id: row.id,
         name: assetDisplayName(row),
+        symbol: row.symbol || "",
+        tokens: m.tokens,
+        investment: m.investment,
+        avg: m.entryPrice,
+        price: m.currentPrice,
         value: m.currentValue,
-        price: m.currentPrice > 0 ? m.currentPrice : m.entryPrice,
+        pnlPct: m.pnlPct,
+        tp1: m.tp1,
+        tp2: m.tp2,
+        tp3: m.tp3,
         cat: getAssetCategory(row),
-        target: getPlanTarget(row.id)
+        marketCap: Number.isFinite(row.marketCap) ? row.marketCap : 0
       };
     });
 }
 
-function planTargetsSum() {
-  return getPlanPositions().reduce((s, p) => s + (Number(p.target.weight) || 0), 0);
+/* ── Estrategias de reparto (segura / equilibrada / rendimiento) ── */
+function strategyScore(p, strategy, curTotal, totalCap) {
+  if (!(p.price > 0)) return 0;
+  const capShare = totalCap > 0 && p.marketCap > 0 ? p.marketCap / totalCap : 0;
+  const curW = curTotal > 0 ? p.value / curTotal : 0;
+
+  if (strategy === "segura") {
+    // Prioriza gran capitalización infraponderada; frena small-caps ya pesadas.
+    const deficit = Math.max(0, capShare - curW);
+    let score = (capShare * 0.45 + deficit) * (0.2 + Math.sqrt(Math.max(0, capShare)));
+    if (capShare < 0.01 && curW > capShare) score *= 0.12;
+    return Math.max(0, score);
+  }
+  if (strategy === "equilibrada") {
+    // Combina capitalización, rendimiento y penaliza sobrepeso.
+    const perf = 1 + planClamp(-p.pnlPct / 60, -0.35, 0.6);
+    const weightPenalty = planClamp(1.25 - curW * 2.5, 0.35, 1.4);
+    return Math.max(0, (capShare * 0.5 + 0.02) * perf * weightPenalty);
+  }
+  // rendimiento: mejora del precio medio (activos por debajo de su media).
+  const below = p.avg > 0 && p.price > 0 ? Math.max(0, (p.avg - p.price) / p.avg) : 0;
+  const capDamp = planClamp(Math.sqrt(Math.max(0, capShare)) * 3, 0.12, 1);
+  const score = below * capDamp;
+  return score > 0 ? score : capShare * 0.3 + 0.01;
 }
 
-// Núcleo: reparte "amount" según la estrategia. mode: balance|maintain|safety.
-function computeContributionPlan(amount, mode) {
-  const positions = getPlanPositions();
-  const currentTotal = positions.reduce((s, p) => s + (p.value > 0 ? p.value : 0), 0);
-  const withTarget = positions.filter((p) => Number(p.target.weight) > 0);
-  const sumW = withTarget.reduce((s, p) => s + Number(p.target.weight), 0);
+function computeRebalance(amount, strategy) {
+  const positions = getPlanPositions().filter((p) => p.price > 0);
+  if (!positions.length) return { error: "no-positions" };
+  if (!(amount > 0)) return { error: "no-amount" };
 
-  if (!withTarget.length || sumW <= 0) {
-    return { error: "no-strategy" };
-  }
-  if (!(amount > 0)) {
-    return { error: "no-amount" };
-  }
+  const curTotal = positions.reduce((s, p) => s + (p.value > 0 ? p.value : 0), 0);
+  const totalCap = positions.reduce((s, p) => s + (p.marketCap > 0 ? p.marketCap : 0), 0);
+  const scores = positions.map((p) => strategyScore(p, strategy, curTotal, totalCap));
+  let totalScore = scores.reduce((s, x) => s + x, 0);
+  const effective = totalScore > 0 ? scores : positions.map(() => 1);
+  if (totalScore <= 0) totalScore = positions.length;
 
-  const newTotal = currentTotal + amount;
-  positions.forEach((p) => {
-    p.targetW = Number(p.target.weight) > 0 ? (Number(p.target.weight) / sumW) * 100 : 0;
-    p.currentW = currentTotal > 0 ? (p.value / currentTotal) * 100 : 0;
-    p.targetValue = (p.targetW / 100) * newTotal;
-    p.deficit = Math.max(0, p.targetValue - p.value);
-    const maxW = Number(p.target.max) > 0 ? Number(p.target.max) : 100;
-    const capByWeight = Math.max(0, (maxW / 100) * newTotal - p.value);
-    const maxBuy = Number(p.target.maxBuy) > 0 ? Number(p.target.maxBuy) : Infinity;
-    p.eligible = p.target.include !== false && !p.target.locked && p.targetW > 0 && p.price > 0;
-    p.cap = mode === "maintain"
-      ? Math.min(capByWeight, maxBuy)
-      : Math.min(capByWeight, maxBuy, p.deficit);
-    p.nearMax = capByWeight < p.deficit - 0.01;
-    p.alloc = 0;
+  const newTotal = curTotal + amount;
+  let items = positions.map((p, i) => {
+    const alloc = Math.round((amount * (effective[i] / totalScore)) * 100) / 100;
+    return buildRebalItem(p, alloc, curTotal, newTotal);
   });
 
-  const weightFor = (p) => {
-    if (!p.eligible) return 0;
-    if (mode === "maintain") return p.targetW;
-    if (mode === "safety") {
-      const defensive = p.cat === "stable" || p.cat === "btc" || p.cat === "eth" || p.row.favorite;
-      return Math.max(p.deficit, 0.0001) * (defensive ? 3 : 1);
-    }
-    return p.deficit;
-  };
-
-  // Reparto progresivo: en cada ronda se asigna proporcional al peso y se
-  // recalcula el sobrante hasta agotar el importe o los topes.
-  let remaining = amount;
-  for (let iter = 0; iter < 60 && remaining > 0.005; iter += 1) {
-    const active = positions.filter((p) => p.eligible && (p.cap - p.alloc) > 0.005 && weightFor(p) > 0);
-    if (!active.length) break;
-    const totalW = active.reduce((s, p) => s + weightFor(p), 0);
-    if (totalW <= 0) break;
-    let placed = 0;
-    for (const p of active) {
-      let give = remaining * (weightFor(p) / totalW);
-      give = Math.min(give, p.cap - p.alloc);
-      p.alloc += give;
-      placed += give;
-    }
-    remaining -= placed;
-    if (placed < 0.005) break;
+  // Reparte el redondeo sobrante en el activo mejor puntuado.
+  const assigned = items.reduce((s, it) => s + it.alloc, 0);
+  const remainder = Math.round((amount - assigned) * 100) / 100;
+  if (Math.abs(remainder) >= 0.01 && items.length) {
+    const idx = items.reduce((best, it, i) => (it.alloc > items[best].alloc ? i : best), 0);
+    const p = positions[idx];
+    items[idx] = buildRebalItem(p, Math.max(0, items[idx].alloc + remainder), curTotal, newTotal);
   }
 
-  // Mínimo de compra: se descartan asignaciones demasiado pequeñas.
-  positions.forEach((p) => {
-    const minBuy = Number(p.target.minBuy) > 0 ? Number(p.target.minBuy) : 0;
-    if (p.alloc > 0 && minBuy > 0 && p.alloc < minBuy) {
-      p.alloc = 0;
-    }
-    p.alloc = Math.round(p.alloc * 100) / 100;
-  });
+  items.sort((a, b) => b.alloc - a.alloc);
+  const funded = items.filter((i) => i.alloc > 0.005);
+  const smallShare = amount > 0
+    ? funded.reduce((s, i) => s + (i.marketCap > 0 && i.marketCap < 2e9 ? i.alloc : 0), 0) / amount
+    : 0;
+  let risk = strategy === "segura" ? "low" : strategy === "equilibrada" ? "medium" : "high";
+  if (strategy !== "segura" && smallShare > 0.5) risk = "high";
+  if (strategy === "equilibrada" && smallShare < 0.15) risk = "medium";
 
-  const assigned = positions.reduce((s, p) => s + p.alloc, 0);
-  const unassigned = Math.max(0, Math.round((amount - assigned) * 100) / 100);
-  const investedTotal = currentTotal + assigned;
-
-  positions.forEach((p) => {
-    p.expectedValue = p.value + p.alloc;
-    p.expectedW = investedTotal > 0 ? (p.expectedValue / investedTotal) * 100 : 0;
-    p.devBefore = p.currentW - p.targetW;
-    p.devAfter = p.expectedW - p.targetW;
-    p.pctOfAmount = amount > 0 ? (p.alloc / amount) * 100 : 0;
-    p.explain = explainAllocation(p);
-  });
-
-  const devBeforeTotal = positions.reduce((s, p) => s + Math.abs(p.devBefore), 0);
-  const devAfterTotal = positions.reduce((s, p) => s + Math.abs(p.devAfter), 0);
-  const feePct = Math.max(0, Number(state.plan.feePct) || 0);
+  const improved = funded.filter((i) => i.avgOld > 0 && i.avgNew < i.avgOld);
+  const avgImprovePct = improved.length
+    ? improved.reduce((s, i) => s + (i.avgOld - i.avgNew) / i.avgOld * 100, 0) / improved.length
+    : 0;
 
   return {
-    amount,
-    mode,
-    assigned,
-    unassigned,
-    fee: assigned * (feePct / 100),
-    feePct,
-    improvement: devBeforeTotal - devAfterTotal,
-    devBeforeTotal,
-    devAfterTotal,
-    items: positions.filter((p) => Number(p.target.weight) > 0 || p.alloc > 0)
-      .sort((a, b) => b.alloc - a.alloc)
+    amount, strategy, items, funded, curTotal, newTotal,
+    risk, topAsset: funded[0] || null, fundedCount: funded.length,
+    avgImprovePct, improvedCount: improved.length
   };
 }
 
-function explainAllocation(p) {
-  if (!p.eligible) {
-    if (p.target.include === false) return t("plan.exWhyExcluded");
-    if (p.target.locked) return t("plan.exWhyLocked");
-    if (!(p.price > 0)) return t("plan.exWhyNoPrice");
-  }
-  if (p.alloc <= 0) {
-    if (p.currentW >= p.targetW) {
-      return t("plan.exWhyOver", { cur: p.currentW.toFixed(1), tgt: p.targetW.toFixed(1) });
-    }
-    return t("plan.exWhyNone");
-  }
-  if (p.nearMax) {
-    return t("plan.exWhyNearMax");
-  }
-  if (p.devBefore < -0.1) {
-    return t("plan.exWhyUnder", { d: Math.abs(p.devBefore).toFixed(1) });
-  }
-  return t("plan.exWhyStrategy");
+function buildRebalItem(p, alloc, curTotal, newTotal) {
+  const units = p.price > 0 ? alloc / p.price : 0;
+  const newTokens = p.tokens + units;
+  const newInvest = p.investment + alloc;
+  const avgNew = newTokens > 0 ? newInvest / newTokens : p.avg;
+  const curW = curTotal > 0 ? (p.value / curTotal) * 100 : 0;
+  const newValue = p.value + alloc;
+  const newW = newTotal > 0 ? (newValue / newTotal) * 100 : 0;
+  return { ...p, alloc, units, curW, newW, avgOld: p.avg, avgNew, avgDiff: avgNew - p.avg, newValue };
 }
 
-// Aplica la propuesta como compras (mismo criterio que la compra simplificada).
-function applyContributionPlan() {
-  if (!planLastResult) {
-    return;
-  }
-  let applied = 0;
-  planLastResult.items.forEach((p) => {
-    if (p.alloc > 0 && p.price > 0) {
-      const row = getRowById(p.id);
-      if (!row) return;
-      const addTokens = p.alloc / p.price;
-      const curTokens = parseDecimal(row.tokens);
-      const curInv = parseDecimal(row.investment);
-      const newTokens = curTokens + addTokens;
-      const newInv = curInv + p.alloc;
-      row.tokens = formatEditableNumber(newTokens);
-      row.investment = formatEditableNumber(newInv);
-      row.entryPrice = newTokens > 0 ? formatEditableNumber(newInv / newTokens) : "";
-      row.derivedField = "";
-      applied += 1;
-    }
+function applyRebalance(result) {
+  if (!result || result.error) return;
+  if (!window.confirm(t("reb.applyConfirm", { amount: formatCurrency(result.amount) }))) return;
+  let n = 0;
+  result.funded.forEach((it) => {
+    const row = getRowById(it.id);
+    if (!row || !(it.price > 0) || !(it.alloc > 0)) return;
+    const curTokens = parseDecimal(row.tokens);
+    const curInv = parseDecimal(row.investment);
+    const newTokens = curTokens + it.alloc / it.price;
+    const newInv = curInv + it.alloc;
+    row.tokens = formatEditableNumber(newTokens);
+    row.investment = formatEditableNumber(newInv);
+    row.entryPrice = newTokens > 0 ? formatEditableNumber(newInv / newTokens) : "";
+    row.derivedField = "";
+    n += 1;
   });
-  if (!applied) {
-    return;
-  }
+  if (!n) return;
   persistState(true);
   renderAll();
-  pushActivity(t("plan.appliedTitle"), t("plan.appliedText", { amount: formatCurrency(planLastResult.assigned) }), "positive");
-  showToast(t("plan.appliedTitle"), t("plan.appliedText", { amount: formatCurrency(planLastResult.assigned) }), "positive");
-  planLastResult = null;
+  pushActivity(t("reb.appliedTitle"), t("reb.appliedText", { amount: formatCurrency(result.amount) }), "positive");
+  showToast(t("reb.appliedTitle"), t("reb.appliedText", { amount: formatCurrency(result.amount) }), "positive");
   renderPlan();
 }
 
-// ── Render de la pestaña Plan ──
+/* ── Simulador de Take Profits ── */
+function getTpConfig(rowId) {
+  const def = { p1: 30, p2: 50, p3: 100 };
+  return { ...def, ...((state.plan.tp || {})[rowId] || {}) };
+}
+function setTpConfig(rowId, patch) {
+  state.plan.tp = state.plan.tp || {};
+  state.plan.tp[rowId] = { ...getTpConfig(rowId), ...patch };
+  savePlan();
+}
+
+// Salida progresiva: cada porcentaje se aplica sobre lo que queda.
+function computeTpProgressive(p) {
+  const cfg = getTpConfig(p.id);
+  const levels = [
+    { price: p.tp1, pct: planClamp(Number(cfg.p1) || 0, 0, 100) },
+    { price: p.tp2, pct: planClamp(Number(cfg.p2) || 0, 0, 100) },
+    { price: p.tp3, pct: planClamp(Number(cfg.p3) || 0, 0, 100) }
+  ].filter((l) => l.price > 0);
+
+  const cost = p.investment > 0 ? p.investment : p.tokens * p.avg;
+  let rem = p.tokens;
+  let out = 0;
+  const steps = levels.map((l, i) => {
+    const sold = rem * (l.pct / 100);
+    const income = sold * l.price;
+    rem -= sold;
+    out += income;
+    return { label: `TP${i + 1}`, price: l.price, pct: l.pct, sold, remaining: rem, income };
+  });
+  const remainingValue = p.price > 0 ? rem * p.price : 0;
+  const totalOut = out;
+  const profit = totalOut + remainingValue - cost;
+  const roi = cost > 0 ? (profit / cost) * 100 : 0;
+  // Venta del 100% en cada TP por separado.
+  const full = levels.map((l, i) => ({ label: `TP${i + 1}`, price: l.price, income: p.tokens * l.price }));
+  const best = full.reduce((b, f) => (f.income > (b?.income || 0) ? f : b), null);
+  return { hasTp: levels.length > 0, steps, remaining: rem, remainingValue, totalOut, cost, profit, roi, full, best };
+}
+
+function computeTpGlobal() {
+  const positions = getPlanPositions().filter((p) => p.tokens > 0);
+  let invested = 0, currentValue = 0, totalOut = 0, remainingValue = 0, profit = 0;
+  const phases = [0, 0, 0];
+  const rows = [];
+  positions.forEach((p) => {
+    const sim = computeTpProgressive(p);
+    invested += p.investment;
+    currentValue += p.value;
+    if (!sim.hasTp) return;
+    totalOut += sim.totalOut;
+    remainingValue += sim.remainingValue;
+    profit += sim.profit;
+    sim.steps.forEach((s, i) => { if (i < 3) phases[i] += s.income; });
+    rows.push({ p, sim });
+  });
+  const estTotal = totalOut + remainingValue;
+  const roi = invested > 0 ? ((estTotal - invested) / invested) * 100 : 0;
+  return { invested, currentValue, totalOut, remainingValue, estTotal, profit, roi, phases, rows, count: rows.length };
+}
+
+/* ── Render de la pestaña (dos sub-herramientas) ── */
 function renderPlan() {
   const box = document.getElementById("planContent");
-  if (!box) {
-    return;
-  }
-  const positions = getPlanPositions();
-
-  if (!positions.length) {
-    box.innerHTML = `
-      <div class="plan-empty detail-empty">
-        <strong>${escapeHtml(t("plan.emptyTitle"))}</strong>
-        <p>${escapeHtml(t("plan.emptyText"))}</p>
-      </div>`;
-    return;
-  }
-
-  const snapshot = buildSnapshot();
-  const currentTotal = snapshot.totals.currentValue;
-  const goal = Number(state.plan.goalTotal) || 0;
-  const monthly = Number(state.plan.monthlyContribution) || 0;
-  const progress = goal > 0 ? Math.min(100, (currentTotal / goal) * 100) : 0;
-  const pending = goal > 0 ? Math.max(0, goal - currentTotal) : 0;
-  const monthsToGoal = monthly > 0 && pending > 0 ? Math.ceil(pending / monthly) : null;
-  const sumTargets = planTargetsSum();
-  const targetsOk = sumTargets > 0;
-
-  const modeChip = (key, label) => `
-    <button class="plan-mode ${state.plan.mode === key ? "is-active" : ""}" type="button" data-plan-mode="${key}">${escapeHtml(label)}</button>`;
+  if (!box) return;
+  const sub = state.plan.subtab === "tp" ? "tp" : "rebal";
 
   box.innerHTML = `
-    <section class="panel plan-goal-card">
-      <div class="panel-heading compact-heading">
-        <h2 class="home-section-title" data-i18n="plan.goalTitle">Objetivo de cartera</h2>
-      </div>
-      <div class="plan-goal-grid">
-        <label class="editor-field">
-          <span>${escapeHtml(t("plan.goalTotal"))}</span>
-          <input type="text" inputmode="decimal" data-plan-field="goalTotal" value="${goal ? escapeHtml(formatEditableNumber(goal)) : ""}" placeholder="0" />
-        </label>
-        <label class="editor-field">
-          <span>${escapeHtml(t("plan.monthly"))}</span>
-          <input type="text" inputmode="decimal" data-plan-field="monthlyContribution" value="${monthly ? escapeHtml(formatEditableNumber(monthly)) : ""}" placeholder="0" />
-        </label>
-      </div>
-      ${goal > 0 ? `
-        <div class="plan-progress">
-          <div class="plan-progress-bar"><span style="width:${progress.toFixed(1)}%"></span></div>
-          <div class="plan-progress-meta">
-            <span>${maskedCurrency(currentTotal)} / ${maskedCurrency(goal)} (${progress.toFixed(0)}%)</span>
-            <span>${escapeHtml(t("plan.pending"))}: ${maskedCurrency(pending)}</span>
-          </div>
-          ${monthsToGoal ? `<p class="plan-hint">${escapeHtml(t("plan.monthsToGoal", { n: monthsToGoal }))}</p>` : ""}
-        </div>` : ""}
-    </section>
+    <nav class="sub-tabs" id="planSubTabs" role="tablist">
+      <button class="sub-tab ${sub === "rebal" ? "is-active" : ""}" type="button" data-plan-sub="rebal">${escapeHtml(t("reb.tab"))}</button>
+      <button class="sub-tab ${sub === "tp" ? "is-active" : ""}" type="button" data-plan-sub="tp">${escapeHtml(t("tp.tab"))}</button>
+    </nav>
+    <div id="planSubContent"></div>
+  `;
+  if (sub === "tp") { renderTpTool(); } else { renderRebalTool(); }
+}
 
-    <section class="panel plan-strategy-card">
-      <div class="panel-heading compact-heading">
-        <h2 class="home-section-title" data-i18n="plan.strategyTitle">Distribucion objetivo</h2>
-        <span class="plan-sum ${Math.abs(sumTargets - 100) < 0.5 ? "ok" : "warn"}">${sumTargets.toFixed(0)}%</span>
-      </div>
-      <div class="plan-strategy-actions">
-        <button class="ghost-btn" type="button" data-plan-action="equal">${escapeHtml(t("plan.autoEqual"))}</button>
-        <button class="ghost-btn" type="button" data-plan-action="current">${escapeHtml(t("plan.autoCurrent"))}</button>
-      </div>
-      <div class="plan-strategy-list">
-        ${positions.map((p) => renderStrategyRow(p, currentTotal)).join("")}
-      </div>
-    </section>
+function renderRebalTool() {
+  const box = document.getElementById("planSubContent");
+  if (!box) return;
+  const positions = getPlanPositions().filter((p) => p.price > 0);
+  if (!positions.length) {
+    box.innerHTML = `<div class="panel plan-empty detail-empty"><strong>${escapeHtml(t("reb.emptyTitle"))}</strong><p>${escapeHtml(t("reb.emptyText"))}</p></div>`;
+    return;
+  }
+  const strat = state.plan.rebalStrategy || "equilibrada";
+  const amount = Number(state.plan.rebalAmount) || 0;
+  const chip = (key) => `<button class="plan-mode ${strat === key ? "is-active" : ""}" type="button" data-reb-strat="${key}">${escapeHtml(t("reb.s_" + key))}</button>`;
 
-    <section class="panel plan-rebal-card">
-      <div class="panel-heading compact-heading">
-        <h2 class="home-section-title" data-i18n="plan.contribTitle">Aportacion manual</h2>
-      </div>
-      <div class="plan-amount-row">
-        <label class="editor-field plan-amount-field">
-          <span>${escapeHtml(t("plan.amount"))}</span>
-          <input type="text" inputmode="decimal" id="planAmountInput" value="${state.plan.lastAmount ? escapeHtml(formatEditableNumber(state.plan.lastAmount)) : ""}" placeholder="0" />
-        </label>
-        <div class="plan-presets">
-          ${[50, 100, 250, 500].map((v) => `<button class="chip-preset" type="button" data-plan-preset="${v}">${v}</button>`).join("")}
-        </div>
-      </div>
-      <div class="plan-modes">
-        ${modeChip("balance", t("plan.modeBalance"))}
-        ${modeChip("maintain", t("plan.modeMaintain"))}
-        ${modeChip("safety", t("plan.modeSafety"))}
-      </div>
-      <div class="plan-adv">
-        <label class="editor-field">
-          <span>${escapeHtml(t("plan.reserveStable"))} (%)</span>
-          <input type="text" inputmode="decimal" data-plan-field="reserveStable" value="${state.plan.reserveStable || ""}" placeholder="0" />
-        </label>
-        <label class="editor-field">
-          <span>${escapeHtml(t("plan.fee"))} (%)</span>
-          <input type="text" inputmode="decimal" data-plan-field="feePct" value="${state.plan.feePct || ""}" placeholder="0" />
-        </label>
-      </div>
-      <button class="primary-btn plan-calc-btn" type="button" data-plan-action="calc" ${targetsOk ? "" : "disabled"}>${escapeHtml(t("plan.calc"))}</button>
-      ${targetsOk ? "" : `<p class="plan-hint">${escapeHtml(t("plan.needStrategy"))}</p>`}
-      <div id="planResult" class="plan-result"></div>
-    </section>
-
-    <section class="panel plan-full-card">
-      <div class="panel-heading compact-heading">
-        <h2 class="home-section-title" data-i18n="plan.fullTitle">Rebalanceo completo</h2>
-      </div>
-      <p class="plan-hint" data-i18n="plan.fullIntro">Simula compras y ventas para acercar la cartera a tu objetivo, sin aportar dinero nuevo.</p>
-      <div class="plan-modes">
-        ${["suave", "equilibrado", "estricto"].map((m) => `<button class="plan-mode ${(state.plan.fullMode || "equilibrado") === m ? "is-active" : ""}" type="button" data-full-mode="${m}">${escapeHtml(t("plan.full" + m.charAt(0).toUpperCase() + m.slice(1)))}</button>`).join("")}
-      </div>
-      <button class="ghost-btn plan-calc-btn" type="button" data-plan-action="fullcalc" ${targetsOk ? "" : "disabled"}>${escapeHtml(t("plan.fullCalc"))}</button>
-      <div id="planFullResult" class="plan-result"></div>
-    </section>
-
-    <section class="panel plan-sim-card">
-      <div class="panel-heading compact-heading">
-        <h2 class="home-section-title" data-i18n="sim.title">Simulador</h2>
-      </div>
-      <label class="editor-field">
-        <span>${escapeHtml(t("sim.scenario"))}</span>
-        <select id="simType">
-          <option value="contrib">${escapeHtml(t("sim.optContrib"))}</option>
-          <option value="sell">${escapeHtml(t("sim.optSell"))}</option>
-          <option value="goal">${escapeHtml(t("sim.optGoal"))}</option>
-        </select>
+  box.innerHTML = `
+    <section class="panel">
+      <label class="editor-field plan-amount-field">
+        <span>${escapeHtml(t("reb.amount"))}</span>
+        <input type="text" inputmode="decimal" id="rebAmount" value="${amount ? escapeHtml(formatEditableNumber(amount)) : ""}" placeholder="0" />
       </label>
-      <div id="simInputs" class="sim-inputs"></div>
-      <button class="ghost-btn" type="button" data-plan-action="simRun">${escapeHtml(t("sim.run"))}</button>
-      <div id="simResult" class="plan-result"></div>
+      <div class="plan-presets">${[100, 250, 500, 1000].map((v) => `<button class="chip-preset" type="button" data-reb-preset="${v}">${v}</button>`).join("")}</div>
+      <div class="plan-modes reb-strats">${chip("segura")}${chip("equilibrada")}${chip("rendimiento")}</div>
+      <p class="plan-hint" id="rebStratDesc">${escapeHtml(t("reb.desc_" + strat))}</p>
+      <button class="primary-btn plan-calc-btn" type="button" data-plan-action="rebCalc">${escapeHtml(t("reb.calc"))}</button>
+      <div id="rebResult" class="plan-result"></div>
     </section>
-
-    ${renderDcaSection()}
-
     <p class="plan-disclaimer">${escapeHtml(PLAN_DISCLAIMER)}</p>
   `;
-
-  renderSimInputs();
-  if (planLastResult) {
-    renderPlanResult(planLastResult);
-  }
-  if (planFullResult) {
-    renderFullResult(planFullResult);
-  }
+  if (planRebResult && !planRebResult.error) renderRebalResult(planRebResult);
 }
 
-// Campos del simulador según el escenario elegido.
-function renderSimInputs() {
-  const box = document.getElementById("simInputs");
-  const typeSel = document.getElementById("simType");
-  if (!box || !typeSel) return;
-  const type = typeSel.value;
-  if (type === "contrib") {
-    box.innerHTML = `<label class="editor-field"><span>${escapeHtml(t("plan.amount"))}</span><input type="text" inputmode="decimal" id="simAmount" placeholder="0" /></label>`;
-  } else if (type === "sell") {
-    const opts = getPlanPositions().filter((p) => parseDecimal(p.row.tokens) > 0)
-      .map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
-    box.innerHTML = `
-      <div class="plan-adv">
-        <label class="editor-field"><span>${escapeHtml(t("trade.asset"))}</span><select id="simAsset">${opts}</select></label>
-        <label class="editor-field"><span>${escapeHtml(t("sim.sellPct"))} (%)</span><input type="text" inputmode="decimal" id="simPct" placeholder="20" /></label>
-      </div>`;
-  } else {
-    box.innerHTML = `<p class="plan-hint">${escapeHtml(t("sim.goalHint"))}</p>`;
-  }
-}
+function renderRebalResult(result) {
+  const box = document.getElementById("rebResult");
+  if (!box) return;
+  if (result.error === "no-amount") { box.innerHTML = `<p class="plan-hint">${escapeHtml(t("reb.needAmount"))}</p>`; return; }
+  if (result.error) { box.innerHTML = `<p class="plan-hint">${escapeHtml(t("reb.emptyText"))}</p>`; return; }
 
-function renderStrategyRow(p, currentTotal) {
-  const curW = currentTotal > 0 ? (p.value / currentTotal) * 100 : 0;
-  const tw = Number(p.target.weight) || 0;
-  const status = tw <= 0 ? "" : curW < tw - 1 ? "under" : curW > tw + 1 ? "over" : "on";
-  const statusLabel = { under: t("plan.under"), over: t("plan.over"), on: t("plan.onTarget"), "": "" }[status];
-  return `
-    <div class="strategy-row ${p.target.include === false ? "is-excluded" : ""}" data-strategy-row="${p.id}">
-      <div class="strategy-main">
+  const riskLabel = { low: t("reb.riskLow"), medium: t("reb.riskMed"), high: t("reb.riskHigh") }[result.risk];
+  const money = (v, d) => formatCurrency(v, d);
+
+  const rows = result.funded.map((p) => `
+    <div class="reb-item">
+      <div class="reb-item-head">
         <span class="asset-avatar">${renderAssetAvatar(p.row)}</span>
-        <div class="strategy-id">
-          <strong>${escapeHtml(p.name)}</strong>
-          <small>${escapeHtml(t("plan.current"))} ${curW.toFixed(1)}%${statusLabel ? ` · <em class="st-${status}">${escapeHtml(statusLabel)}</em>` : ""}</small>
-        </div>
-        <label class="strategy-weight">
-          <input type="text" inputmode="decimal" data-strategy-field="weight" data-row-id="${p.id}" value="${tw || ""}" placeholder="0" />
-          <span>%</span>
-        </label>
+        <strong class="reb-item-name">${escapeHtml(p.name)}</strong>
+        <strong class="reb-item-amount positive">${money(p.alloc)}</strong>
       </div>
-      <div class="strategy-adv">
-        <label>${escapeHtml(t("plan.min"))}<input type="text" inputmode="decimal" data-strategy-field="min" data-row-id="${p.id}" value="${p.target.min || ""}" placeholder="0" /></label>
-        <label>${escapeHtml(t("plan.max"))}<input type="text" inputmode="decimal" data-strategy-field="max" data-row-id="${p.id}" value="${p.target.max || ""}" placeholder="0" /></label>
-        <button class="strategy-toggle ${p.target.include === false ? "" : "is-on"}" type="button" data-strategy-field="include" data-row-id="${p.id}" title="${escapeHtml(t("plan.include"))}">${p.target.include === false ? "✕" : "✓"}</button>
-        <button class="strategy-toggle ${p.target.locked ? "is-lock" : ""}" type="button" data-strategy-field="locked" data-row-id="${p.id}" title="${escapeHtml(t("plan.lock"))}">${p.target.locked ? "🔒" : "🔓"}</button>
+      <div class="reb-item-grid">
+        <div><span>${escapeHtml(t("reb.units"))}</span><b>${formatNumber(p.units, p.units >= 1 ? 4 : 8)}</b></div>
+        <div><span>${escapeHtml(t("reb.price"))}</span><b>${money(p.price, getPriceDigits(p.price))}</b></div>
+        <div><span>${escapeHtml(t("reb.weight"))}</span><b>${p.curW.toFixed(1)}% → ${p.newW.toFixed(1)}%</b></div>
+        <div><span>${escapeHtml(t("reb.avg"))}</span><b>${p.avgOld > 0 ? money(p.avgOld, getPriceDigits(p.avgOld)) : "--"} → ${p.avgNew > 0 ? money(p.avgNew, getPriceDigits(p.avgNew)) : "--"}</b></div>
+        <div><span>${escapeHtml(t("reb.value"))}</span><b>${maskedCurrency(p.value)} → ${maskedCurrency(p.newValue)}</b></div>
+        <div><span>${escapeHtml(t("reb.avgDiff"))}</span><b class="${p.avgDiff < 0 ? "positive" : "neutral"}">${p.avgDiff < 0 ? "" : "+"}${p.avgOld > 0 ? money(p.avgDiff, getPriceDigits(Math.abs(p.avgDiff) || 1)) : "--"}</b></div>
       </div>
-    </div>`;
-}
-
-function renderPlanResult(result) {
-  const box = document.getElementById("planResult");
-  if (!box) {
-    return;
-  }
-  if (result.error === "no-strategy") {
-    box.innerHTML = `<p class="plan-hint">${escapeHtml(t("plan.needStrategy"))}</p>`;
-    return;
-  }
-  if (result.error === "no-amount") {
-    box.innerHTML = `<p class="plan-hint">${escapeHtml(t("plan.needAmount"))}</p>`;
-    return;
-  }
+      <div class="reb-weightbar"><span class="wb-before" style="width:${Math.min(100, p.curW)}%"></span><span class="wb-after" style="width:${Math.min(100, p.newW)}%"></span></div>
+    </div>`).join("");
 
   box.innerHTML = `
-    <div class="plan-result-head">
-      <strong>${escapeHtml(t("plan.availableToInvest", { amount: formatCurrency(result.amount) }))}</strong>
-      <span>${escapeHtml(t("plan.proposalIntro"))}</span>
+    <div class="reb-summary">
+      <div class="reb-sum-top">
+        <strong>${escapeHtml(t("reb.summary"))}</strong>
+        <span class="risk-badge risk-${result.risk}">${escapeHtml(riskLabel)}</span>
+      </div>
+      <div class="reb-sum-grid">
+        <div><span>${escapeHtml(t("reb.total"))}</span><b>${money(result.amount)}</b></div>
+        <div><span>${escapeHtml(t("reb.nAssets"))}</span><b>${result.fundedCount}</b></div>
+        <div><span>${escapeHtml(t("reb.topAsset"))}</span><b>${result.topAsset ? escapeHtml(result.topAsset.name) : "--"}</b></div>
+        <div><span>${escapeHtml(t("reb.avgImprove"))}</span><b class="${result.avgImprovePct > 0 ? "positive" : "neutral"}">${result.improvedCount ? "-" + result.avgImprovePct.toFixed(1) + "%" : "--"}</b></div>
+      </div>
+      <p class="plan-hint">${escapeHtml(t("reb.why_" + result.strategy))}</p>
     </div>
-    <div class="plan-alloc-list">
-      ${result.items.map((p) => `
-        <div class="plan-alloc ${p.alloc > 0 ? "" : "is-zero"}">
-          <div class="plan-alloc-top">
-            <span class="asset-avatar">${renderAssetAvatar(p.row)}</span>
-            <strong class="plan-alloc-name">${escapeHtml(p.name)}</strong>
-            <strong class="plan-alloc-amount ${p.alloc > 0 ? "positive" : "neutral"}">${formatCurrency(p.alloc)}${p.alloc > 0 ? ` <small>(${p.pctOfAmount.toFixed(0)}%)</small>` : ""}</strong>
-          </div>
-          <div class="plan-alloc-weights">
-            <span>${escapeHtml(t("plan.now"))} ${p.currentW.toFixed(1)}%</span>
-            <span>→ ${p.expectedW.toFixed(1)}%</span>
-            <span class="plan-alloc-target">${escapeHtml(t("plan.target"))} ${p.targetW.toFixed(1)}%</span>
-          </div>
-          <p class="plan-alloc-why">${escapeHtml(p.explain)}</p>
-        </div>`).join("")}
-    </div>
-    <div class="plan-summary">
-      <div><span>${escapeHtml(t("plan.assigned"))}</span><strong>${formatCurrency(result.assigned)}</strong></div>
-      ${result.unassigned > 0 ? `<div><span>${escapeHtml(t("plan.unassigned"))}</span><strong class="warning">${formatCurrency(result.unassigned)}</strong></div>` : ""}
-      <div><span>${escapeHtml(t("plan.balanceImprove"))}</span><strong class="${result.improvement >= 0 ? "positive" : "negative"}">${result.improvement >= 0 ? "-" : "+"}${Math.abs(result.improvement).toFixed(1)} pp</strong></div>
-      ${result.fee > 0 ? `<div><span>${escapeHtml(t("plan.feeEst"))}</span><strong>${formatCurrency(result.fee)}</strong></div>` : ""}
-    </div>
+    <div class="reb-list">${rows}</div>
     <div class="plan-result-actions">
-      <button class="ghost-btn" type="button" data-plan-action="copy">${escapeHtml(t("plan.copy"))}</button>
-      <button class="primary-btn" type="button" data-plan-action="apply" ${result.assigned > 0 ? "" : "disabled"}>${escapeHtml(t("plan.apply"))}</button>
+      <button class="ghost-btn" type="button" data-plan-action="rebCompare">${escapeHtml(t("reb.compare"))}</button>
+      <button class="primary-btn" type="button" data-plan-action="rebApply">${escapeHtml(t("reb.apply"))}</button>
     </div>
+    <div id="rebCompareBox"></div>
     <p class="plan-disclaimer small">${escapeHtml(PLAN_DISCLAIMER)}</p>
   `;
 }
 
-function planResultToText(result) {
-  const lines = [t("plan.availableToInvest", { amount: formatCurrency(result.amount) }), t("plan.proposalIntro"), ""];
-  result.items.forEach((p) => {
-    lines.push(`${p.name}: ${formatCurrency(p.alloc)} (${p.pctOfAmount.toFixed(0)}%) · ${p.currentW.toFixed(1)}% → ${p.expectedW.toFixed(1)}% (obj ${p.targetW.toFixed(1)}%)`);
-  });
-  lines.push("", `${t("plan.assigned")}: ${formatCurrency(result.assigned)}`);
-  if (result.unassigned > 0) lines.push(`${t("plan.unassigned")}: ${formatCurrency(result.unassigned)}`);
-  lines.push("", PLAN_DISCLAIMER);
-  return lines.join("\n");
+function renderRebalCompare() {
+  const box = document.getElementById("rebCompareBox");
+  if (!box || !planRebResult || planRebResult.error) return;
+  const amount = planRebResult.amount;
+  const strategies = ["segura", "equilibrada", "rendimiento"];
+  const results = strategies.map((s) => computeRebalance(amount, s));
+  const mostDiverse = results.reduce((b, r) => (r.fundedCount > (b?.fundedCount || 0) ? r : b), null);
+  const bestAvg = results.reduce((b, r) => (r.avgImprovePct > (b?.avgImprovePct || 0) ? r : b), null);
+
+  box.innerHTML = `
+    <div class="reb-compare">
+      <h3 class="home-section-title">${escapeHtml(t("reb.comparator"))}</h3>
+      <div class="reb-compare-grid">
+        ${results.map((r) => `
+          <div class="reb-compare-col ${r.strategy === planRebResult.strategy ? "is-active" : ""}">
+            <div class="reb-compare-head"><span class="risk-badge risk-${r.risk}">${escapeHtml(t("reb.s_" + r.strategy))}</span></div>
+            <div class="reb-compare-body">
+              <div><span>${escapeHtml(t("reb.nAssets"))}</span><b>${r.fundedCount}</b></div>
+              <div><span>${escapeHtml(t("reb.avgImprove"))}</span><b>${r.improvedCount ? "-" + r.avgImprovePct.toFixed(1) + "%" : "--"}</b></div>
+              <div><span>${escapeHtml(t("reb.topAsset"))}</span><b>${r.topAsset ? escapeHtml(r.topAsset.name) : "--"}</b></div>
+            </div>
+            <div class="reb-compare-assets">${r.funded.slice(0, 4).map((f) => `${escapeHtml(f.symbol || f.name)} ${formatCurrency(f.alloc)}`).join(" · ")}</div>
+          </div>`).join("")}
+      </div>
+      <ul class="reb-compare-notes">
+        <li>${escapeHtml(t("reb.mostConservative"))}: <b>${escapeHtml(t("reb.s_segura"))}</b></li>
+        <li>${escapeHtml(t("reb.bestAvg"))}: <b>${bestAvg && bestAvg.improvedCount ? escapeHtml(t("reb.s_" + bestAvg.strategy)) : "--"}</b></li>
+        <li>${escapeHtml(t("reb.bestDiverse"))}: <b>${mostDiverse ? escapeHtml(t("reb.s_" + mostDiverse.strategy)) : "--"}</b></li>
+      </ul>
+    </div>`;
 }
 
-function bindPlan() {
-  const box = document.getElementById("planContent");
-  if (!box) {
+function renderTpTool() {
+  const box = document.getElementById("planSubContent");
+  if (!box) return;
+  const positions = getPlanPositions().filter((p) => p.tokens > 0);
+  if (!positions.length) {
+    box.innerHTML = `<div class="panel plan-empty detail-empty"><strong>${escapeHtml(t("tp.emptyTitle"))}</strong><p>${escapeHtml(t("tp.emptyText"))}</p></div>`;
     return;
   }
+  const global = computeTpGlobal();
+  const money = (v) => maskedCurrency(v);
 
-  box.addEventListener("change", (event) => {
-    if (event.target.id === "simType") {
-      renderSimInputs();
-      const res = document.getElementById("simResult");
-      if (res) res.innerHTML = "";
+  const perAsset = positions.map((p) => {
+    const sim = computeTpProgressive(p);
+    const cfg = getTpConfig(p.id);
+    if (!sim.hasTp) {
+      return `<section class="panel tp-card"><div class="tp-card-head"><span class="asset-avatar">${renderAssetAvatar(p.row)}</span><strong>${escapeHtml(p.name)}</strong></div><p class="plan-hint">${escapeHtml(t("tp.noTargets"))}</p><button class="ghost-btn" type="button" data-tp-edit="${p.id}">${escapeHtml(t("tp.setTargets"))}</button></section>`;
     }
-  });
+    const pctInputs = `
+      <div class="tp-pcts">
+        ${[["p1", "TP1", p.tp1], ["p2", "TP2", p.tp2], ["p3", "TP3", p.tp3]].filter((x) => x[2] > 0).map(([k, lbl]) => `
+          <label>${lbl} %<input type="text" inputmode="decimal" data-tp-field="${k}" data-row-id="${p.id}" value="${cfg[k]}" /></label>`).join("")}
+      </div>`;
+    const steps = sim.steps.map((s) => `
+      <div class="tp-step">
+        <div class="tp-step-top"><strong>${s.label}</strong><span>${formatCurrency(s.price, getPriceDigits(s.price))} · ${s.pct.toFixed(0)}%</span></div>
+        <div class="tp-step-grid">
+          <div><span>${escapeHtml(t("tp.sold"))}</span><b>${formatNumber(s.sold, s.sold >= 1 ? 4 : 8)}</b></div>
+          <div><span>${escapeHtml(t("tp.remaining"))}</span><b>${formatNumber(s.remaining, s.remaining >= 1 ? 4 : 8)}</b></div>
+          <div><span>${escapeHtml(t("tp.income"))}</span><b class="positive">${money(s.income)}</b></div>
+        </div>
+      </div>`).join("");
+    const full = sim.full.map((f) => `<div><span>${f.label} 100%</span><b>${money(f.income)}</b></div>`).join("");
+    return `
+      <section class="panel tp-card">
+        <div class="tp-card-head">
+          <span class="asset-avatar">${renderAssetAvatar(p.row)}</span>
+          <div class="tp-card-id"><strong>${escapeHtml(p.name)}</strong><small>${formatNumber(p.tokens, p.tokens >= 1 ? 4 : 8)} · ${escapeHtml(t("tp.avg"))} ${p.avg > 0 ? formatCurrency(p.avg, getPriceDigits(p.avg)) : "--"} · ${escapeHtml(t("tp.now"))} ${p.price > 0 ? formatCurrency(p.price, getPriceDigits(p.price)) : "--"}</small></div>
+        </div>
+        ${pctInputs}
+        <div class="tp-steps">${steps}</div>
+        <div class="tp-summary">
+          <div><span>${escapeHtml(t("tp.totalOut"))}</span><b>${money(sim.totalOut)}</b></div>
+          <div><span>${escapeHtml(t("tp.remainValue"))}</span><b>${money(sim.remainingValue)}</b></div>
+          <div><span>${escapeHtml(t("tp.profit"))}</span><b class="${sim.profit >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(sim.profit)}</b></div>
+          <div><span>${escapeHtml(t("tp.roi"))}</span><b class="${sim.roi >= 0 ? "positive" : "negative"}">${formatPercent(sim.roi)}</b></div>
+        </div>
+        <div class="tp-full"><span class="tp-full-label">${escapeHtml(t("tp.full100"))}</span>${full}</div>
+      </section>`;
+  }).join("");
+
+  box.innerHTML = `
+    <section class="panel tp-global">
+      <div class="panel-heading compact-heading"><h2 class="home-section-title">${escapeHtml(t("tp.globalTitle"))}</h2></div>
+      <div class="tp-global-grid">
+        <div><span>${escapeHtml(t("tp.invested"))}</span><b>${money(global.invested)}</b></div>
+        <div><span>${escapeHtml(t("tp.current"))}</span><b>${money(global.currentValue)}</b></div>
+        <div><span>${escapeHtml(t("tp.estTotal"))}</span><b>${money(global.estTotal)}</b></div>
+        <div><span>${escapeHtml(t("tp.profit"))}</span><b class="${global.profit >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(global.profit)}</b></div>
+        <div><span>${escapeHtml(t("tp.roi"))}</span><b class="${global.roi >= 0 ? "positive" : "negative"}">${formatPercent(global.roi)}</b></div>
+        <div><span>${escapeHtml(t("tp.tp1total"))}</span><b>${money(global.phases[0])}</b></div>
+        <div><span>${escapeHtml(t("tp.tp2total"))}</span><b>${money(global.phases[1])}</b></div>
+        <div><span>${escapeHtml(t("tp.tp3total"))}</span><b>${money(global.phases[2])}</b></div>
+      </div>
+      ${global.count ? `
+      <div class="tp-global-table">
+        <div class="tpg-row tpg-head"><span>${escapeHtml(t("reb.asset"))}</span><span>TP1</span><span>TP2</span><span>TP3</span><span>${escapeHtml(t("tp.total"))}</span></div>
+        ${global.rows.map((r) => `<div class="tpg-row"><span>${escapeHtml(r.p.symbol || r.p.name)}</span><span>${money(r.sim.steps[0]?.income || 0)}</span><span>${money(r.sim.steps[1]?.income || 0)}</span><span>${money(r.sim.steps[2]?.income || 0)}</span><span>${money(r.sim.totalOut)}</span></div>`).join("")}
+      </div>` : `<p class="plan-hint">${escapeHtml(t("tp.noneConfigured"))}</p>`}
+    </section>
+    ${perAsset}
+    <p class="plan-disclaimer">${escapeHtml(PLAN_DISCLAIMER)}</p>
+  `;
+}
+
+/* ── Bindings ── */
+function bindPlan() {
+  const box = document.getElementById("planContent");
+  if (!box) return;
 
   box.addEventListener("click", (event) => {
-    const modeBtn = event.target.closest("[data-plan-mode]");
-    if (modeBtn) {
-      state.plan.mode = modeBtn.dataset.planMode;
-      savePlan();
-      box.querySelectorAll("[data-plan-mode]").forEach((b) => b.classList.toggle("is-active", b === modeBtn));
-      if (planLastResult) {
-        planLastResult = computeContributionPlan(planLastResult.amount, state.plan.mode);
-        renderPlanResult(planLastResult);
+    const sub = event.target.closest("[data-plan-sub]");
+    if (sub) { state.plan.subtab = sub.dataset.planSub; savePlan(); renderPlan(); return; }
+    const strat = event.target.closest("[data-reb-strat]");
+    if (strat) {
+      state.plan.rebalStrategy = strat.dataset.rebStrat; savePlan();
+      box.querySelectorAll("[data-reb-strat]").forEach((b) => b.classList.toggle("is-active", b === strat));
+      const desc = document.getElementById("rebStratDesc");
+      if (desc) desc.textContent = t("reb.desc_" + state.plan.rebalStrategy);
+      if (planRebResult && !planRebResult.error) {
+        const input = document.getElementById("rebAmount");
+        planRebResult = computeRebalance(parseDecimal(input?.value), state.plan.rebalStrategy);
+        renderRebalResult(planRebResult);
       }
       return;
     }
-    const fullModeBtn = event.target.closest("[data-full-mode]");
-    if (fullModeBtn) {
-      state.plan.fullMode = fullModeBtn.dataset.fullMode;
-      savePlan();
-      box.querySelectorAll("[data-full-mode]").forEach((b) => b.classList.toggle("is-active", b === fullModeBtn));
-      if (planFullResult && !planFullResult.error) {
-        planFullResult = computeFullRebalance(state.plan.fullMode);
-        renderFullResult(planFullResult);
-      }
-      return;
-    }
-    const preset = event.target.closest("[data-plan-preset]");
-    if (preset) {
-      const input = document.getElementById("planAmountInput");
-      if (input) input.value = preset.dataset.planPreset;
-      return;
-    }
-    const strategyToggle = event.target.closest("button[data-strategy-field]");
-    if (strategyToggle) {
-      const rowId = strategyToggle.dataset.rowId;
-      const field = strategyToggle.dataset.strategyField;
-      const cur = getPlanTarget(rowId);
-      setPlanTarget(rowId, { [field]: field === "include" ? cur.include === false : !cur.locked });
-      renderPlan();
-      return;
-    }
-    const dcaRun = event.target.closest("[data-dca-run]");
-    if (dcaRun) { executeDca(dcaRun.dataset.dcaRun); return; }
-    const dcaSkip = event.target.closest("[data-dca-skip]");
-    if (dcaSkip) { skipDca(dcaSkip.dataset.dcaSkip); return; }
-    const dcaDel = event.target.closest("[data-dca-del]");
-    if (dcaDel) { if (window.confirm(t("dca.deleteConfirm"))) deleteDca(dcaDel.dataset.dcaDel); return; }
-
+    const preset = event.target.closest("[data-reb-preset]");
+    if (preset) { const i = document.getElementById("rebAmount"); if (i) i.value = preset.dataset.rebPreset; return; }
+    const tpEdit = event.target.closest("[data-tp-edit]");
+    if (tpEdit) { openPositionEditor(tpEdit.dataset.tpEdit); return; }
     const action = event.target.closest("[data-plan-action]")?.dataset.planAction;
-    if (!action) return;
-    handlePlanAction(action);
+    if (action) handlePlanAction(action);
   });
 
   box.addEventListener("input", (event) => {
-    const planField = event.target.closest("[data-plan-field]");
-    if (planField) {
-      const key = planField.dataset.planField;
-      const val = parseDecimal(planField.value);
-      state.plan[key] = planField.value.trim() === "" ? (key === "goalTotal" || key === "monthlyContribution" ? null : 0) : val;
-      savePlan();
-      return;
-    }
-    const stratInput = event.target.closest("input[data-strategy-field]");
-    if (stratInput) {
-      const rowId = stratInput.dataset.rowId;
-      const field = stratInput.dataset.strategyField;
-      setPlanTarget(rowId, { [field]: parseDecimal(stratInput.value) });
-      // Actualiza el indicador de suma y habilita "Calcular" sin re-render
-      // (así no se pierde el foco del input que se está editando).
-      const sum = planTargetsSum();
-      const chip = box.querySelector(".plan-sum");
-      if (chip) {
-        chip.textContent = `${sum.toFixed(0)}%`;
-        chip.className = `plan-sum ${Math.abs(sum - 100) < 0.5 ? "ok" : "warn"}`;
-      }
-      const calcBtn = box.querySelector("[data-plan-action='calc']");
-      if (calcBtn) {
-        calcBtn.disabled = !(sum > 0);
-      }
-      const needHint = box.querySelector(".plan-rebal-card .plan-hint");
-      if (needHint && sum > 0) {
-        needHint.remove();
-      }
+    const tpField = event.target.closest("[data-tp-field]");
+    if (tpField) {
+      setTpConfig(tpField.dataset.rowId, { [tpField.dataset.tpField]: planClamp(parseDecimal(tpField.value), 0, 100) });
+      renderTpTool();
     }
   });
 }
 
 function handlePlanAction(action) {
   switch (action) {
-    case "equal": {
-      const positions = getPlanPositions();
-      const w = positions.length ? Math.round((100 / positions.length) * 10) / 10 : 0;
-      positions.forEach((p) => setPlanTarget(p.id, { weight: w }));
-      renderPlan();
+    case "rebCalc": {
+      const amount = parseDecimal(document.getElementById("rebAmount")?.value);
+      state.plan.rebalAmount = amount || null; savePlan();
+      planRebResult = computeRebalance(amount, state.plan.rebalStrategy || "equilibrada");
+      renderRebalResult(planRebResult);
       break;
     }
-    case "current": {
-      const snapshot = buildSnapshot();
-      const total = snapshot.totals.currentValue;
-      getPlanPositions().forEach((p) => {
-        const w = total > 0 ? Math.round((p.value / total) * 1000) / 10 : 0;
-        setPlanTarget(p.id, { weight: w });
-      });
-      renderPlan();
+    case "rebCompare":
+      renderRebalCompare();
       break;
-    }
-    case "calc": {
-      const input = document.getElementById("planAmountInput");
-      const amount = parseDecimal(input?.value);
-      state.plan.lastAmount = amount || null;
-      savePlan();
-      planLastResult = computeContributionPlan(amount, state.plan.mode);
-      renderPlanResult(planLastResult);
+    case "rebApply":
+      applyRebalance(planRebResult);
       break;
-    }
-    case "apply":
-      applyContributionPlan();
-      break;
-    case "copy":
-      if (planLastResult && !planLastResult.error) {
-        copyTextToClipboard(planResultToText(planLastResult)).then((ok) => {
-          showToast(ok ? t("share.copiedTitle") : t("share.errorTitle"), ok ? t("plan.copiedText") : t("share.errorText"), ok ? "positive" : "warning");
-        });
-      }
-      break;
-    case "fullcalc":
-      planFullResult = computeFullRebalance(state.plan.fullMode || "equilibrado");
-      renderFullResult(planFullResult);
-      break;
-    case "fullapply":
-      applyFullRebalance();
-      break;
-    case "fullcopy":
-      if (planFullResult && !planFullResult.error) {
-        copyTextToClipboard(fullResultToText(planFullResult)).then((ok) => {
-          showToast(ok ? t("share.copiedTitle") : t("share.errorTitle"), ok ? t("plan.copiedText") : t("share.errorText"), ok ? "positive" : "warning");
-        });
-      }
-      break;
-    case "simRun":
-      runSimulator();
-      break;
-    case "dcaCreate": {
-      const amount = parseDecimal(document.getElementById("dcaAmount")?.value);
-      const freq = document.getElementById("dcaFreq")?.value || "monthly";
-      const mode = document.getElementById("dcaMode")?.value || "dynamic";
-      if (amount > 0) {
-        createDcaPlan(amount, freq, mode);
-      } else {
-        showToast(t("plan.needAmount"), t("plan.needAmount"), "warning");
-      }
-      break;
-    }
-    case "simApplySell": {
-      const btn = document.querySelector("[data-plan-action='simApplySell']");
-      const row = getRowById(btn?.dataset.rowId);
-      const pct = parseDecimal(btn?.dataset.pct);
-      if (row && pct > 0) {
-        const curTokens = parseDecimal(row.tokens);
-        const curInv = parseDecimal(row.investment);
-        const avgCost = curTokens > 0 ? curInv / curTokens : 0;
-        const newTokens = Math.max(0, curTokens - curTokens * Math.min(100, pct) / 100);
-        row.tokens = newTokens > 0 ? formatEditableNumber(newTokens) : "";
-        row.investment = newTokens > 0 ? formatEditableNumber(newTokens * avgCost) : "";
-        row.entryPrice = newTokens > 0 ? formatEditableNumber(avgCost) : "";
-        row.derivedField = "";
-        persistState(true);
-        renderAll();
-        pushActivity(t("trade.activityTitle"), t("trade.sellSaved", { tokens: `${pct}%`, asset: assetDisplayName(row) }), "neutral");
-        showToast(t("editor.savedTitle"), t("trade.sellSaved", { tokens: `${pct}%`, asset: assetDisplayName(row) }), "positive");
-        renderPlan();
-      }
-      break;
-    }
     default:
       break;
   }
 }
 
-/* ── Rebalanceo completo (compras + ventas hacia el objetivo) ── */
-function computeFullRebalance(mode) {
-  const positions = getPlanPositions();
-  const currentTotal = positions.reduce((s, p) => s + (p.value > 0 ? p.value : 0), 0);
-  const withTarget = positions.filter((p) => Number(p.target.weight) > 0);
-  const sumW = withTarget.reduce((s, p) => s + Number(p.target.weight), 0);
-  if (!withTarget.length || sumW <= 0) return { error: "no-strategy" };
-  if (!(currentTotal > 0)) return { error: "no-value" };
-
-  // Banda de tolerancia según el perfil: suave actúa solo con desvíos amplios.
-  const tol = mode === "suave" ? 8 : mode === "estricto" ? 0 : 4;
-  positions.forEach((p) => {
-    p.targetW = Number(p.target.weight) > 0 ? (Number(p.target.weight) / sumW) * 100 : 0;
-    p.currentW = (p.value / currentTotal) * 100;
-    p.targetValue = (p.targetW / 100) * currentTotal;
-    p.dev = p.currentW - p.targetW;
-    const actionable = p.target.include !== false && !p.target.locked && p.price > 0 && Number(p.target.weight) > 0;
-    p.delta = actionable && Math.abs(p.dev) > tol ? Math.round((p.targetValue - p.value) * 100) / 100 : 0;
-    p.afterValue = p.value + p.delta;
-    p.afterW = (p.afterValue / currentTotal) * 100;
-    p.devAfter = p.afterW - p.targetW;
-  });
-
-  const buys = positions.filter((p) => p.delta > 0).sort((a, b) => b.delta - a.delta);
-  const sells = positions.filter((p) => p.delta < 0).sort((a, b) => a.delta - b.delta);
-  const buyTotal = buys.reduce((s, p) => s + p.delta, 0);
-  const sellTotal = -sells.reduce((s, p) => s + p.delta, 0);
-  const devBefore = positions.reduce((s, p) => s + Math.abs(p.dev), 0);
-  const devAfter = positions.reduce((s, p) => s + Math.abs(p.devAfter), 0);
-  const feePct = Math.max(0, Number(state.plan.feePct) || 0);
-
-  return {
-    mode,
-    buys,
-    sells,
-    buyTotal: Math.round(buyTotal * 100) / 100,
-    sellTotal: Math.round(sellTotal * 100) / 100,
-    netCash: Math.round((buyTotal - sellTotal) * 100) / 100,
-    fee: (buyTotal + sellTotal) * (feePct / 100),
-    improvement: devBefore - devAfter
-  };
-}
-
-function applyFullRebalance() {
-  if (!planFullResult || planFullResult.error) return;
-  if (!window.confirm(t("plan.fullConfirm"))) return;
-
-  [...planFullResult.sells, ...planFullResult.buys].forEach((p) => {
-    const row = getRowById(p.id);
-    if (!row || !(p.price > 0) || !p.delta) return;
-    const curTokens = parseDecimal(row.tokens);
-    const curInv = parseDecimal(row.investment);
-    if (p.delta > 0) {
-      const addTokens = p.delta / p.price;
-      const newTokens = curTokens + addTokens;
-      const newInv = curInv + p.delta;
-      row.tokens = formatEditableNumber(newTokens);
-      row.investment = formatEditableNumber(newInv);
-      row.entryPrice = newTokens > 0 ? formatEditableNumber(newInv / newTokens) : "";
-    } else {
-      const avgCost = curTokens > 0 ? curInv / curTokens : 0;
-      const sellTokens = Math.min(curTokens, -p.delta / p.price);
-      const newTokens = Math.max(0, curTokens - sellTokens);
-      row.tokens = newTokens > 0 ? formatEditableNumber(newTokens) : "";
-      row.investment = newTokens > 0 ? formatEditableNumber(newTokens * avgCost) : "";
-      row.entryPrice = newTokens > 0 ? formatEditableNumber(avgCost) : "";
-    }
-    row.derivedField = "";
-  });
-  persistState(true);
-  renderAll();
-  pushActivity(t("plan.fullAppliedTitle"), t("plan.fullAppliedText"), "neutral");
-  showToast(t("plan.fullAppliedTitle"), t("plan.fullAppliedText"), "positive");
-  planFullResult = null;
-  renderPlan();
-}
-
-function renderFullResult(result) {
-  const box = document.getElementById("planFullResult");
-  if (!box) return;
-  if (result.error === "no-strategy") { box.innerHTML = `<p class="plan-hint">${escapeHtml(t("plan.needStrategy"))}</p>`; return; }
-  if (result.error === "no-value") { box.innerHTML = `<p class="plan-hint">${escapeHtml(t("plan.needValue"))}</p>`; return; }
-
-  const line = (p, sign) => `
-    <div class="plan-alloc">
-      <div class="plan-alloc-top">
-        <span class="asset-avatar">${renderAssetAvatar(p.row)}</span>
-        <strong class="plan-alloc-name">${escapeHtml(p.name)}</strong>
-        <strong class="plan-alloc-amount ${sign === "buy" ? "positive" : "negative"}">${sign === "buy" ? "+" : "-"}${formatCurrency(Math.abs(p.delta))}</strong>
-      </div>
-      <div class="plan-alloc-weights"><span>${p.currentW.toFixed(1)}%</span><span>→ ${p.afterW.toFixed(1)}%</span><span class="plan-alloc-target">${escapeHtml(t("plan.target"))} ${p.targetW.toFixed(1)}%</span></div>
-    </div>`;
-
-  const nothing = !result.buys.length && !result.sells.length;
-  box.innerHTML = nothing
-    ? `<p class="plan-hint">${escapeHtml(t("plan.fullBalanced"))}</p>`
-    : `
-      ${result.sells.length ? `<h3 class="home-section-title">${escapeHtml(t("plan.sells"))}</h3><div class="plan-alloc-list">${result.sells.map((p) => line(p, "sell")).join("")}</div>` : ""}
-      ${result.buys.length ? `<h3 class="home-section-title">${escapeHtml(t("plan.buys"))}</h3><div class="plan-alloc-list">${result.buys.map((p) => line(p, "buy")).join("")}</div>` : ""}
-      <div class="plan-summary">
-        <div><span>${escapeHtml(t("plan.totalSells"))}</span><strong>${formatCurrency(result.sellTotal)}</strong></div>
-        <div><span>${escapeHtml(t("plan.totalBuys"))}</span><strong>${formatCurrency(result.buyTotal)}</strong></div>
-        ${Math.abs(result.netCash) > 0.5 ? `<div><span>${escapeHtml(result.netCash > 0 ? t("plan.netNeeded") : t("plan.netFreed"))}</span><strong class="${result.netCash > 0 ? "warning" : "positive"}">${formatCurrency(Math.abs(result.netCash))}</strong></div>` : ""}
-        <div><span>${escapeHtml(t("plan.balanceImprove"))}</span><strong class="positive">-${Math.abs(result.improvement).toFixed(1)} pp</strong></div>
-        ${result.fee > 0 ? `<div><span>${escapeHtml(t("plan.feeEst"))}</span><strong>${formatCurrency(result.fee)}</strong></div>` : ""}
-      </div>
-      <p class="plan-hint">${escapeHtml(t("plan.taxNote"))}</p>
-      <div class="plan-result-actions">
-        <button class="ghost-btn" type="button" data-plan-action="fullcopy">${escapeHtml(t("plan.copy"))}</button>
-        <button class="primary-btn" type="button" data-plan-action="fullapply">${escapeHtml(t("plan.fullApply"))}</button>
-      </div>
-      <p class="plan-disclaimer small">${escapeHtml(PLAN_DISCLAIMER)}</p>`;
-}
-
-function fullResultToText(result) {
-  const lines = [t("plan.fullTitle"), ""];
-  result.sells.forEach((p) => lines.push(`${t("plan.sell1")} ${p.name}: ${formatCurrency(Math.abs(p.delta))} (${p.currentW.toFixed(1)}% → ${p.afterW.toFixed(1)}%)`));
-  result.buys.forEach((p) => lines.push(`${t("plan.buy1")} ${p.name}: ${formatCurrency(p.delta)} (${p.currentW.toFixed(1)}% → ${p.afterW.toFixed(1)}%)`));
-  lines.push("", PLAN_DISCLAIMER);
-  return lines.join("\n");
-}
-
-/* ── Simulador de escenarios (no modifica datos hasta aplicar) ── */
-function runSimulator() {
-  const box = document.getElementById("simResult");
-  if (!box) return;
-  const type = document.getElementById("simType")?.value;
-  const snapshot = buildSnapshot();
-  const currentTotal = snapshot.totals.currentValue;
-
-  if (type === "contrib") {
-    const amount = parseDecimal(document.getElementById("simAmount")?.value);
-    if (!(amount > 0)) { box.innerHTML = `<p class="plan-hint">${escapeHtml(t("plan.needAmount"))}</p>`; return; }
-    const newTotal = currentTotal + amount;
-    box.innerHTML = `
-      <div class="plan-summary">
-        <div><span>${escapeHtml(t("home.totalValue"))}</span><strong>${maskedCurrency(currentTotal)} → ${maskedCurrency(newTotal)}</strong></div>
-        <div><span>${escapeHtml(t("sim.contribApplied"))}</span><strong class="positive">+${formatCurrency(amount)}</strong></div>
-      </div>
-      <p class="plan-hint">${escapeHtml(t("sim.contribHint"))}</p>`;
-    return;
-  }
-
-  if (type === "sell") {
-    const rowId = document.getElementById("simAsset")?.value;
-    const pct = parseDecimal(document.getElementById("simPct")?.value);
-    const row = getRowById(rowId);
-    if (!row || !(pct > 0)) { box.innerHTML = `<p class="plan-hint">${escapeHtml(t("sim.needSell"))}</p>`; return; }
-    const m = computeRowMetrics(row);
-    const freed = m.currentValue * Math.min(100, pct) / 100;
-    const newValue = m.currentValue - freed;
-    const newTotal = currentTotal - freed;
-    box.innerHTML = `
-      <div class="plan-summary">
-        <div><span>${escapeHtml(assetDisplayName(row))}</span><strong>${maskedCurrency(m.currentValue)} → ${maskedCurrency(newValue)}</strong></div>
-        <div><span>${escapeHtml(t("sim.freed"))}</span><strong class="positive">${formatCurrency(freed)}</strong></div>
-        <div><span>${escapeHtml(t("home.totalValue"))}</span><strong>${maskedCurrency(currentTotal)} → ${maskedCurrency(newTotal)}</strong></div>
-      </div>
-      <div class="plan-result-actions">
-        <button class="primary-btn" type="button" data-plan-action="simApplySell" data-row-id="${rowId}" data-pct="${pct}">${escapeHtml(t("sim.applySell"))}</button>
-      </div>`;
-    return;
-  }
-
-  if (type === "goal") {
-    const goal = Number(state.plan.goalTotal) || 0;
-    const monthly = Number(state.plan.monthlyContribution) || 0;
-    if (!(goal > 0)) { box.innerHTML = `<p class="plan-hint">${escapeHtml(t("sim.needGoal"))}</p>`; return; }
-    const pending = Math.max(0, goal - currentTotal);
-    const months = monthly > 0 ? Math.ceil(pending / monthly) : null;
-    box.innerHTML = `
-      <div class="plan-summary">
-        <div><span>${escapeHtml(t("plan.pending"))}</span><strong>${maskedCurrency(pending)}</strong></div>
-        ${months ? `<div><span>${escapeHtml(t("sim.months"))}</span><strong>${months}</strong></div>` : ""}
-      </div>
-      <p class="plan-hint">${escapeHtml(t("plan.monthsToGoal", { n: months || 0 }))}</p>`;
-    return;
-  }
-}
-
-/* ── Planes DCA (aportaciones periódicas, fija o dinámica) ── */
-const DCA_INTERVALS = { weekly: 7, biweekly: 14, monthly: 30 };
-
-function dcaAdvance(dateStr, freq) {
-  const base = dateStr ? new Date(dateStr) : new Date();
-  const next = new Date(base);
-  if (freq === "monthly") {
-    next.setMonth(next.getMonth() + 1);
-  } else {
-    next.setDate(next.getDate() + (DCA_INTERVALS[freq] || 30));
-  }
-  return next.toISOString();
-}
-
-function getDuePlans() {
-  const now = Date.now();
-  return (state.plan.dca || []).filter((p) => new Date(p.nextDate).getTime() <= now);
-}
-
-function createDcaPlan(amount, freq, mode) {
-  const plan = {
-    id: `dca-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-    amount,
-    freq,
-    mode,
-    nextDate: dcaAdvance(new Date().toISOString(), freq),
-    history: []
-  };
-  state.plan.dca.push(plan);
-  savePlan();
-  renderPlan();
-}
-
-function executeDca(id) {
-  const plan = (state.plan.dca || []).find((p) => p.id === id);
-  if (!plan) return;
-  // Modo dinámico → equilibra según desviación; fijo → mantiene la estrategia.
-  const result = computeContributionPlan(plan.amount, plan.mode === "dynamic" ? "balance" : "maintain");
-  if (result.error) {
-    showToast(t("plan.needStrategy"), t("plan.needStrategy"), "warning");
-    return;
-  }
-  planLastResult = result;
-  applyContributionPlan();
-  plan.history.unshift({ at: new Date().toISOString(), amount: plan.amount });
-  plan.history = plan.history.slice(0, 24);
-  plan.nextDate = dcaAdvance(new Date().toISOString(), plan.freq);
-  savePlan();
-  renderPlan();
-}
-
-function skipDca(id) {
-  const plan = (state.plan.dca || []).find((p) => p.id === id);
-  if (!plan) return;
-  plan.nextDate = dcaAdvance(new Date().toISOString(), plan.freq);
-  savePlan();
-  renderPlan();
-}
-
-function deleteDca(id) {
-  state.plan.dca = (state.plan.dca || []).filter((p) => p.id !== id);
-  savePlan();
-  renderPlan();
-}
-
-function renderDcaSection() {
-  const plans = state.plan.dca || [];
-  const freqLabel = { weekly: t("dca.weekly"), biweekly: t("dca.biweekly"), monthly: t("dca.monthly") };
-  const list = plans.length ? plans.map((p) => {
-    const due = new Date(p.nextDate).getTime() <= Date.now();
-    return `
-      <div class="dca-plan ${due ? "is-due" : ""}">
-        <div class="dca-plan-main">
-          <strong>${formatCurrency(p.amount)} · ${escapeHtml(freqLabel[p.freq] || p.freq)}</strong>
-          <small>${escapeHtml(p.mode === "dynamic" ? t("dca.dynamic") : t("dca.fixed"))} · ${escapeHtml(due ? t("dca.due") : t("dca.next", { date: formatDateTime(new Date(p.nextDate)) }))}</small>
-        </div>
-        <div class="dca-plan-actions">
-          <button class="ghost-btn" type="button" data-dca-run="${p.id}">${escapeHtml(t("dca.run"))}</button>
-          <button class="icon-btn" type="button" data-dca-skip="${p.id}" title="${escapeHtml(t("dca.skip"))}">⤼</button>
-          <button class="icon-btn" type="button" data-dca-del="${p.id}" title="${escapeHtml(t("menu.delete"))}">✕</button>
-        </div>
-      </div>`;
-  }).join("") : `<p class="plan-hint">${escapeHtml(t("dca.empty"))}</p>`;
-
-  return `
-    <section class="panel plan-dca-card">
-      <div class="panel-heading compact-heading">
-        <h2 class="home-section-title" data-i18n="dca.title">Aportaciones periodicas (DCA)</h2>
-      </div>
-      <div class="dca-list">${list}</div>
-      <div class="dca-form">
-        <label class="editor-field"><span>${escapeHtml(t("plan.amount"))}</span><input type="text" inputmode="decimal" id="dcaAmount" placeholder="100" /></label>
-        <div class="plan-adv">
-          <label class="editor-field"><span>${escapeHtml(t("dca.freq"))}</span>
-            <select id="dcaFreq">
-              <option value="weekly">${escapeHtml(t("dca.weekly"))}</option>
-              <option value="biweekly">${escapeHtml(t("dca.biweekly"))}</option>
-              <option value="monthly" selected>${escapeHtml(t("dca.monthly"))}</option>
-            </select>
-          </label>
-          <label class="editor-field"><span>${escapeHtml(t("dca.mode"))}</span>
-            <select id="dcaMode">
-              <option value="dynamic">${escapeHtml(t("dca.dynamic"))}</option>
-              <option value="fixed">${escapeHtml(t("dca.fixed"))}</option>
-            </select>
-          </label>
-        </div>
-        <button class="ghost-btn" type="button" data-plan-action="dcaCreate">${escapeHtml(t("dca.create"))}</button>
-      </div>
-    </section>`;
-}
 
 /* ── Compra/venta simplificada (sin libro de operaciones) ──
    Compra: suma tokens e inversión y recalcula el coste medio.
@@ -2752,7 +2289,7 @@ function loadState() {
     state.filters = { ...state.filters, ...state.prefs.filters };
   }
   if (state.prefs.plan && typeof state.prefs.plan === "object") {
-    state.plan = { ...state.plan, ...state.prefs.plan, targets: state.prefs.plan.targets || {}, dca: Array.isArray(state.prefs.plan.dca) ? state.prefs.plan.dca : [] };
+    state.plan = { ...state.plan, ...state.prefs.plan, tp: state.prefs.plan.tp || {} };
   }
   // Migración segura: la pestaña activa "portfolio" antigua ya no existe.
   if (state.prefs.activeTab === "portfolio") {
