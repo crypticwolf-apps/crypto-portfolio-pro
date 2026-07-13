@@ -2250,88 +2250,8 @@ body {
 /* ── Mobile card layout ── */
 
 @media (max-width: 768px) {
-  .table-wrap {
-    overflow: visible;
-    border: none;
-    background: none;
-  }
-
-  .table-wrap table,
-  .table-wrap thead,
-  .table-wrap tbody,
-  .table-wrap tfoot,
-  .table-wrap tr,
-  .table-wrap th,
-  .table-wrap td {
-    display: block;
-    width: 100% !important;
-  }
-
-  .table-wrap thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0,0,0,0);
-    border: 0;
-  }
-
-  .table-wrap .portfolio-row {
-    border: 1px solid var(--line);
-    border-radius: var(--radius-md);
-    margin-bottom: 8px;
-    padding: 12px;
-    background: var(--panel);
-    box-shadow: var(--shadow-sm);
-  }
-
-  .table-wrap .portfolio-row td {
-    padding: 4px 0;
-    border-bottom: none;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .table-wrap .portfolio-row td::before {
-    content: attr(data-label);
-    font-family: var(--font-mono);
-    font-size: 0.62rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-weight: 700;
-    color: var(--muted);
-    flex-shrink: 0;
-    min-width: 70px;
-  }
-
-  .table-wrap .portfolio-row td:first-child {
-    box-shadow: none !important;
-  }
-
-  .table-wrap .totals-row {
-    border-radius: var(--radius-md);
-    background:
-      linear-gradient(90deg, rgba(62, 255, 168, 0.08), rgba(90, 171, 255, 0.06)),
-      var(--panel);
-    padding: 12px;
-    margin-bottom: 8px;
-    border: 1px solid var(--line-accent);
-  }
-
-  .table-wrap .totals-row td {
-    position: static;
-    background: none !important;
-    border: none;
-    padding: 3px 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
+  /* En móvil la tabla de escritorio se sustituye por la lista de tarjetas
+     (ver sección "MÓVIL — tarjetas de activo y mercado" al final del archivo). */
   .column-toggles {
     flex-wrap: wrap;
   }
@@ -2612,217 +2532,8 @@ body {
     height: clamp(200px, 58vw, 260px);
   }
 
-  /* ── Tarjetas de posición: resumen compacto + acordeón "Ver detalles" ── */
-
-  .table-wrap .portfolio-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: stretch;
-    gap: 6px 10px;
-    padding: 10px 12px;
-  }
-
-  .table-wrap .portfolio-row td {
-    padding: 0;
-  }
-
-  /* Orden visual: activo → (mercado | rendimiento) → señal + toggle →
-     (detalles: posición, objetivos, prioridad, acciones) */
-  .table-wrap .portfolio-row .asset-cell       { order: 1; flex: 1 1 100%; }
-  .table-wrap .portfolio-row .market-cell      { order: 2; flex: 1 1 calc(50% - 5px); }
-  .table-wrap .portfolio-row .performance-cell { order: 3; flex: 1 1 calc(50% - 5px); }
-  .table-wrap .portfolio-row .signal-cell      { order: 4; flex: 1 1 auto; min-width: 0; }
-  .table-wrap .portfolio-row .card-toggle-cell { order: 5; flex: 0 1 auto; margin-left: auto; }
-  .table-wrap .portfolio-row .position-cell    { order: 6; flex: 1 1 100%; }
-  .table-wrap .portfolio-row .targets-cell     { order: 7; flex: 1 1 100%; }
-  .table-wrap .portfolio-row .priority-cell    { order: 8; flex: 1 1 100%; }
-  .table-wrap .portfolio-row .actions-cell     { order: 9; flex: 1 1 100%; }
-
-  /* Colapsado: los datos secundarios/edición viven en el acordeón.
-     La hora de sync por fila y el ROI también se pliegan (la última
-     sincronización global ya se muestra en la tarjeta de estado). */
-  .table-wrap .portfolio-row:not(.is-expanded) .position-cell,
-  .table-wrap .portfolio-row:not(.is-expanded) .targets-cell,
-  .table-wrap .portfolio-row:not(.is-expanded) .priority-cell,
-  .table-wrap .portfolio-row:not(.is-expanded) .actions-cell,
-  .table-wrap .portfolio-row:not(.is-expanded) .validation-meta,
-  .table-wrap .portfolio-row:not(.is-expanded) .price-subline,
-  .table-wrap .portfolio-row:not(.is-expanded) [data-role="roiPct"] {
-    display: none;
-  }
-
-  .table-wrap .portfolio-row .card-toggle-cell {
-    display: flex;
-    align-items: center;
-  }
-
-  /* El resumen se explica solo: sin etiquetas que gasten espacio */
-  .table-wrap .portfolio-row .asset-cell::before,
-  .table-wrap .portfolio-row .market-cell::before,
-  .table-wrap .portfolio-row .performance-cell::before,
-  .table-wrap .portfolio-row .signal-cell::before,
-  .table-wrap .portfolio-row .card-toggle-cell::before {
-    display: none;
-    content: none;
-  }
-
-  /* Celdas del acordeón: etiqueta arriba, contenido en bloque */
-  .table-wrap .portfolio-row .position-cell,
-  .table-wrap .portfolio-row .targets-cell,
-  .table-wrap .portfolio-row .priority-cell,
-  .table-wrap .portfolio-row .actions-cell {
-    display: block;
-    padding-top: 4px;
-  }
-
-  .table-wrap .portfolio-row.is-expanded .position-cell,
-  .table-wrap .portfolio-row.is-expanded .targets-cell,
-  .table-wrap .portfolio-row.is-expanded .priority-cell,
-  .table-wrap .portfolio-row.is-expanded .actions-cell {
-    display: block;
-  }
-
-  .table-wrap .portfolio-row .position-cell::before,
-  .table-wrap .portfolio-row .targets-cell::before,
-  .table-wrap .portfolio-row .priority-cell::before,
-  .table-wrap .portfolio-row .actions-cell::before {
-    display: block;
-    margin-bottom: 6px;
-  }
-
-  /* Activo: avatar + nombre en línea, alineado a la izquierda */
-  .table-wrap .portfolio-row .asset-cell { display: block; }
-
-  .table-wrap .portfolio-row .asset-avatar {
-    width: 28px;
-    height: 28px;
-  }
-
-  .table-wrap .portfolio-row .asset-field {
-    justify-content: flex-start;
-    text-align: left;
-    gap: 8px;
-  }
-
-  .table-wrap .portfolio-row .field-stack {
-    align-items: flex-start;
-    text-align: left;
-    gap: 2px;
-  }
-
-  .table-wrap .portfolio-row .asset-meta {
-    justify-content: flex-start;
-  }
-
-  .table-wrap .portfolio-row .asset-input {
-    text-align: left;
-    padding: 0 8px;
-  }
-
-  /* Mercado a la izquierda, rendimiento alineado a la derecha */
-  .table-wrap .portfolio-row .market-cell { display: block; }
-
-  .table-wrap .portfolio-row .market-metrics,
-  .table-wrap .portfolio-row .price-stack {
-    align-items: flex-start;
-    text-align: left;
-    gap: 2px;
-  }
-
-  .table-wrap .portfolio-row .market-metrics strong {
-    font-size: 0.92rem;
-  }
-
-  .table-wrap .portfolio-row .performance-cell { display: block; }
-
-  .table-wrap .portfolio-row .performance-metrics {
-    align-items: flex-end;
-    text-align: right;
-    gap: 2px;
-  }
-
-  .table-wrap .portfolio-row .signal-cell {
-    display: flex;
-    align-items: center;
-  }
-
-  .table-wrap .portfolio-row .details-toggle-btn {
-    min-height: 40px;
-    width: auto;
-    padding: 0 14px;
-    white-space: nowrap;
-  }
-
-  .table-wrap .portfolio-row .compact-grid,
-  .table-wrap .portfolio-row .tp-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .table-wrap .portfolio-row .flag-stack,
-  .table-wrap .portfolio-row .action-stack {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
-  /* Las sugerencias de búsqueda no deben desbordar la tarjeta */
-  .table-wrap .portfolio-row .suggestions {
-    max-width: calc(100vw - 48px);
-  }
-
-  /* ── Totales compactos: rejilla de dos columnas ── */
-
-  .table-wrap .totals-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px 14px;
-    padding: 12px 14px;
-  }
-
-  .table-wrap .totals-row td {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1px;
-    padding: 2px 0;
-    font-size: 0.8rem;
-  }
-
-  .table-wrap .totals-row td[data-label]::before {
-    content: attr(data-label);
-    font-family: var(--font-mono);
-    font-size: 0.6rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-weight: 700;
-    color: var(--muted);
-  }
-
-  .table-wrap .totals-row td:first-child,
-  .table-wrap .totals-row .totals-tp-cell {
-    grid-column: 1 / -1;
-  }
-
-  .table-wrap .totals-row .totals-tp-inline {
-    gap: 6px;
-  }
-
-  .table-wrap .totals-row .totals-inline-meta {
-    margin-top: 0;
-    display: inline;
-    margin-left: 6px;
-  }
-
-  .table-wrap .totals-row .totals-label-cell {
-    padding: 0;
-    font-size: 0.68rem;
-  }
-
-  .table-wrap .totals-row .totals-tp-chip {
-    font-size: 0.68rem;
-    padding: 2px 7px;
-  }
+  /* La tabla de posiciones se oculta en móvil (ver .portfolio-mobile-list).
+     Las reglas legacy de conversión tabla→tarjeta se retiraron. */
 }
 
 /* ── Pantallas muy estrechas (320–360px) ── */
@@ -3397,19 +3108,12 @@ select {
     height: clamp(220px, 64vw, 260px);
   }
 
-  /* Chips de rango: una sola fila con scroll suave y sin barra visible */
+  /* Chips de rango: envuelven en varias filas (sin scroll lateral) */
   .chart-range-control {
     flex-direction: row;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    flex-wrap: wrap;
     max-width: 100%;
     padding-bottom: 2px;
-  }
-
-  .chart-range-control::-webkit-scrollbar {
-    display: none;
   }
 
   .range-chip {
@@ -6282,4 +5986,169 @@ body.filters-open { overflow: hidden; }
   /* Bloque 3: matriz activo×TP con scroll horizontal y columnas de ancho fijo */
   .tp-table-compare { align-items: flex-start; }
   .tp-table-compare .tpg-row { grid-template-columns: 48px repeat(calc(var(--tp-cols, 5) - 1), 82px); width: max-content; min-width: 100%; font-size: 0.66rem; white-space: nowrap; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   MÓVIL — tarjetas de activo y de mercado (≤768px)
+   Fuente ÚNICA de datos: mismos cálculos que la tabla de
+   escritorio. Sin scroll horizontal. Objetivos táctiles ≥44px.
+   Esta es la sección responsive canónica: no depende del
+   orden accidental de la cascada.
+   ═══════════════════════════════════════════════════════ */
+
+/* Visibilidad escritorio/móvil (una sola fuente de verdad) */
+.portfolio-mobile-list,
+.market-mobile-list,
+.market-mobile-sort,
+.markets-load-more { display: none; }
+
+@media (max-width: 768px) {
+  /* Portafolio: se oculta la tabla y se muestran las tarjetas */
+  .portfolio-desktop-table { display: none; }
+  .portfolio-mobile-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+  /* Mercado: se oculta la tabla; tarjetas + orden + "Cargar más" */
+  .market-desktop-table { display: none; }
+  .market-mobile-list { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .market-mobile-sort { display: flex; }
+  .markets-load-more { display: block; }
+  .markets-pagination { display: none; }
+
+  /* Ningún panel/contenedor puede exceder el viewport */
+  .panel,
+  .table-panel,
+  .markets-ranking-panel,
+  .markets-ranking,
+  .table-wrap { min-width: 0; max-width: 100%; }
+}
+
+/* ── Tarjeta de activo del portafolio ── */
+.asset-mobile-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  min-width: 0;
+}
+.asset-mobile-card.row-profit { border-left: 3px solid var(--positive); }
+.asset-mobile-card.row-loss { border-left: 3px solid var(--negative); }
+
+.amc-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.amc-head:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
+.amc-avatar { width: 34px; height: 34px; flex: 0 0 auto; }
+.amc-id { min-width: 0; display: flex; flex-direction: column; }
+.amc-name { font-size: 0.95rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.amc-sym { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; }
+.amc-value { text-align: right; display: flex; flex-direction: column; min-width: 0; }
+.amc-value .money { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.95rem; white-space: nowrap; }
+.amc-pnl { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.72rem; white-space: nowrap; }
+.amc-pnl.positive { color: var(--positive); }
+.amc-pnl.negative { color: var(--negative); }
+.amc-pnl.neutral { color: var(--muted); }
+.amc-chevron { width: 20px; height: 20px; color: var(--muted); transition: transform .25s ease; flex: 0 0 auto; }
+.asset-mobile-card.is-expanded .amc-chevron { transform: rotate(180deg); }
+
+.amc-subline {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 10px; padding: 0 12px 10px;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.82rem;
+}
+.amc-price { color: var(--text-2); }
+.amc-24h.positive { color: var(--positive); }
+.amc-24h.negative { color: var(--negative); }
+.amc-24h.neutral { color: var(--muted); }
+.amc-24h small { color: var(--muted); font-size: 0.72em; }
+
+/* Acordeón suave sin medir alturas por JS */
+.amc-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .25s ease; }
+.asset-mobile-card.is-expanded .amc-body { grid-template-rows: 1fr; }
+.amc-body-inner { overflow: hidden; min-height: 0; }
+
+.amc-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px;
+  padding: 10px 12px; margin: 0; border-top: 1px solid var(--line);
+}
+.amc-grid > div { min-width: 0; }
+.amc-grid dt { font-size: 0.64rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0; }
+.amc-grid dd { margin: 2px 0 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.86rem; overflow-wrap: anywhere; }
+
+.amc-tps { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px; }
+.amc-tp { font-size: 0.7rem; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--text-2); font-family: var(--font-mono); }
+.amc-tp.reached { color: var(--positive); border-color: var(--line-accent); background: var(--positive-bg); }
+.amc-tp.empty { color: var(--muted); }
+
+.amc-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 12px 12px; }
+.amc-btn { min-height: 44px; width: 100%; }
+.amc-actions .amc-sell { background: var(--negative); border-color: var(--negative); color: #0a0f16; }
+.amc-actions .amc-delete { color: var(--negative); border-color: rgba(255, 85, 85, 0.35); }
+
+/* ── Tarjeta de mercado (móvil) ── */
+.market-mobile-item {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.market-mobile-item:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
+.mmi-rank { grid-row: 1 / 3; font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
+.market-mobile-item > .asset-avatar { grid-row: 1 / 3; width: 32px; height: 32px; }
+.mmi-id { min-width: 0; display: flex; flex-direction: column; }
+.mmi-id strong { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mmi-id small { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; }
+.mmi-price { text-align: right; }
+.mmi-price strong { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.9rem; white-space: nowrap; }
+.mmi-changes { grid-column: 3; display: flex; gap: 10px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.72rem; }
+.mmi-caps { grid-column: 4; display: flex; flex-direction: column; align-items: flex-end; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 0.66rem; color: var(--muted); white-space: nowrap; }
+.mmi-changes .positive, .mmi-caps .positive { color: var(--positive); }
+.mmi-changes .negative, .mmi-caps .negative { color: var(--negative); }
+.mmi-changes .neutral { color: var(--muted); }
+
+/* ── Control de orden móvil ── */
+.market-mobile-sort { align-items: flex-end; gap: 8px; margin-bottom: 4px; min-width: 0; }
+.mms-field { flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mms-field > span { font-size: 0.64rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.mms-field select { min-height: 44px; width: 100%; }
+.mms-dir { min-width: 44px; min-height: 44px; flex: 0 0 auto; font-size: 1.1rem; }
+
+.markets-load-more { padding-top: 8px; }
+.markets-loadmore-btn { width: 100%; min-height: 44px; }
+
+/* ── Toast con acción "Deshacer" ── */
+.toast-undo { display: flex; align-items: center; gap: 12px; }
+.toast-undo .toast-content { flex: 1 1 auto; min-width: 0; }
+.toast-undo-btn {
+  flex: 0 0 auto; min-height: 40px; padding: 0 16px; border-radius: 10px;
+  border: 1px solid var(--accent); color: var(--accent);
+  background: transparent; font-weight: 700; cursor: pointer;
+}
+.toast-undo-btn:hover { background: var(--accent-dim); }
+
+@media (prefers-reduced-motion: reduce) {
+  .amc-body,
+  .amc-chevron { transition: none; }
 }

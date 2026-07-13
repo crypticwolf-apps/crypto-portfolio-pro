@@ -275,6 +275,12 @@ const state = {
   marketsLoading: false,
   // Orden de la tabla de mercado (columna + dirección).
   marketsSort: { key: "marketCap", dir: "desc" },
+  // Nº de tarjetas visibles en la lista móvil de mercado ("Cargar más").
+  marketsMobileLimit: 20,
+  // Ids de tarjetas de activo desplegadas en la vista móvil del portafolio.
+  expandedCards: new Set(),
+  // Última posición eliminada (para "Deshacer").
+  lastDeleted: null,
   lastRefreshAt: 0,
   market: {
     btc: null,
@@ -1237,6 +1243,7 @@ function openTradeSheet(mode, preselectRowId = null) {
   // Compra/venta por IMPORTE de dinero: los tokens se calculan solos con el
   // precio de la operación y se muestran únicamente como dato informativo.
   const amountLabel = mode === "sell" ? t("trade.amountSell") : t("trade.amountBuy");
+  const today = new Date().toISOString().slice(0, 10);
   const amountBlock = mode === "alert"
     ? ""
     : `
@@ -1248,6 +1255,16 @@ function openTradeSheet(mode, preselectRowId = null) {
         <label class="editor-field">
           <span>${escapeHtml(t("trade.price"))}</span>
           <input type="text" inputmode="decimal" data-trade-field="price" placeholder="0.00" />
+        </label>
+      </div>
+      <div class="editor-grid-2">
+        <label class="editor-field">
+          <span>${escapeHtml(t("trade.date"))}</span>
+          <input type="date" data-trade-field="date" value="${today}" max="${today}" />
+        </label>
+        <label class="editor-field">
+          <span>${escapeHtml(t("trade.fee"))}</span>
+          <input type="text" inputmode="decimal" data-trade-field="fee" placeholder="0.00" />
         </label>
       </div>
       <p class="editor-secondary trade-calc" data-trade-role="preview"></p>
@@ -1416,8 +1433,17 @@ function confirmTrade(sheet) {
   }
 
   // Entrada única: IMPORTE de dinero. Los tokens se derivan con el precio.
+  // Se admite además comisión opcional y fecha de la operación.
   const amount = parseDecimal(sheet.querySelector("[data-trade-field='amount']").value);
   const price = parseDecimal(sheet.querySelector("[data-trade-field='price']").value);
+  const fee = parseDecimal(sheet.querySelector("[data-trade-field='fee']")?.value);
+  const dateStr = sheet.querySelector("[data-trade-field='date']")?.value;
+  // Fecha válida (no futura); si falta o es inválida se usa el momento actual.
+  let at = Date.now();
+  if (dateStr) {
+    const parsed = new Date(dateStr + "T12:00:00").getTime();
+    if (Number.isFinite(parsed)) at = Math.min(parsed, Date.now());
+  }
   if (!(amount > 0)) {
     showToast(t("trade.invalidTitle"), t("trade.invalidText"), "warning");
     return;
@@ -1432,33 +1458,35 @@ function confirmTrade(sheet) {
 
   if (mode === "buy") {
     // Dinero invertido → tokens comprados = importe / precio.
-    const unitPrice = price;
-    const addInvestment = amount;
-    const addTokens = addInvestment / unitPrice;
+    // La comisión se suma al coste (base de inversión), no compra tokens.
+    const addTokens = amount / price;
+    const addInvestment = amount + fee;
     const newTokens = curTokens + addTokens;
     const newInvestment = curInvestment + addInvestment;
     row.tokens = formatEditableNumber(newTokens);
     row.investment = formatEditableNumber(newInvestment);
     row.entryPrice = newTokens > 0 ? formatEditableNumber(newInvestment / newTokens) : "";
     row.derivedField = "";
-    recordTrade({ type: "buy", rowId: row.id, symbol: row.symbol || row.crypto, tokens: addTokens, price: unitPrice, amount: addInvestment });
+    if (!row.purchaseDate && dateStr) row.purchaseDate = dateStr;
+    recordTrade({ type: "buy", rowId: row.id, symbol: row.symbol || row.crypto, tokens: addTokens, price, amount: addInvestment, fee, at });
     finishTrade(row, t("trade.buySaved", { tokens: formatNumber(addTokens, 6), asset: assetDisplayName(row) }));
   } else {
-    // Venta: dinero retirado → tokens vendidos = importe / precio de venta.
-    // Mantiene el coste medio y reduce la base proporcionalmente.
+    // Venta: dinero recibido → tokens vendidos = importe / precio de venta.
+    // No se puede vender más de lo disponible. La comisión reduce lo realizado.
     const avgCost = curTokens > 0 ? curInvestment / curTokens : 0;
     const sellPrice = price;
     let soldTokens = amount / sellPrice;
-    if (soldTokens > curTokens) soldTokens = curTokens; // no se puede vender más de lo que se tiene
+    if (soldTokens > curTokens) soldTokens = curTokens;
     const newTokens = Math.max(0, curTokens - soldTokens);
     row.tokens = newTokens > 0 ? formatEditableNumber(newTokens) : "";
     row.investment = newTokens > 0 ? formatEditableNumber(newTokens * avgCost) : "";
     row.entryPrice = newTokens > 0 ? formatEditableNumber(avgCost) : "";
     row.derivedField = "";
+    const grossProceeds = soldTokens * sellPrice;
     recordTrade({
       type: "sell", rowId: row.id, symbol: row.symbol || row.crypto,
-      tokens: soldTokens, price: sellPrice, amount: soldTokens * sellPrice,
-      realized: sellPrice > 0 && avgCost > 0 ? soldTokens * (sellPrice - avgCost) : null
+      tokens: soldTokens, price: sellPrice, amount: grossProceeds, fee, at,
+      realized: sellPrice > 0 && avgCost > 0 ? soldTokens * (sellPrice - avgCost) - fee : null
     });
     finishTrade(row, t("trade.sellSaved", { tokens: formatNumber(soldTokens, 6), asset: assetDisplayName(row) }));
   }
@@ -2028,35 +2056,51 @@ function marketSparkline(spark, tone) {
   return `<svg class="mk-spark ${tone}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${points}" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>`;
 }
 
+// Etiquetas de las columnas/criterios ordenables (compartidas escritorio+móvil).
+const MARKET_SORT_KEYS = [
+  { key: "marketCap", labelKey: "markets.colCap" },
+  { key: "price", labelKey: "markets.colPrice" },
+  { key: "change24h", labelKey: "markets.col24h" },
+  { key: "change7d", labelKey: "markets.col7d" },
+  { key: "volume", labelKey: "markets.colVol" }
+];
+
 function renderMarketsRanking() {
   const box = document.getElementById("marketsRanking");
   const pag = document.getElementById("marketsPagination");
+  const loadMore = document.getElementById("marketsLoadMore");
+  const sortBox = document.getElementById("marketsMobileSort");
   if (!box) {
     return;
   }
+  renderMarketsMobileSort(sortBox);
 
   if (!state.marketsList.length) {
     box.innerHTML = state.marketsLoading
       ? `<div class="markets-skeleton">${Array.from({ length: 8 }).map(() => '<span class="skeleton-line w70"></span>').join("")}</div>`
       : `<div class="detail-empty">${escapeHtml(isOffline() ? t("status.offlineMeta") : t("home.noData"))}</div>`;
     if (pag) pag.innerHTML = "";
+    if (loadMore) loadMore.innerHTML = "";
     return;
   }
 
   const view = getMarketsView();
+  const ownedIds = new Set(state.rows.map((r) => r.coinId).filter(Boolean));
+
+  if (!view.length) {
+    box.innerHTML = `<div class="detail-empty">${escapeHtml(t("markets.noResults"))}</div>`;
+    if (pag) pag.innerHTML = "";
+    if (loadMore) loadMore.innerHTML = "";
+    return;
+  }
+
+  // ── Escritorio: tabla paginada ──
   const totalPages = Math.max(1, Math.ceil(view.length / MARKETS_PAGE_SIZE));
   if (state.marketsPage > totalPages) {
     state.marketsPage = 1;
   }
   const start = (state.marketsPage - 1) * MARKETS_PAGE_SIZE;
   const pageItems = view.slice(start, start + MARKETS_PAGE_SIZE);
-  const ownedIds = new Set(state.rows.map((r) => r.coinId).filter(Boolean));
-
-  if (!pageItems.length) {
-    box.innerHTML = `<div class="detail-empty">${escapeHtml(t("markets.noResults"))}</div>`;
-    if (pag) pag.innerHTML = "";
-    return;
-  }
 
   const { key: sortKey, dir: sortDir } = state.marketsSort;
   const arrow = sortDir === "asc" ? "▲" : "▼";
@@ -2064,8 +2108,7 @@ function renderMarketsRanking() {
     const active = key === sortKey;
     return `<th class="${cls} mk-sortable${active ? " is-sorted" : ""}" data-market-sort="${key}"${active ? ` aria-sort="${sortDir === "asc" ? "ascending" : "descending"}"` : ""}><span>${escapeHtml(label)}${active ? ` <em class="mk-arrow">${arrow}</em>` : ""}</span></th>`;
   };
-
-  const rows = pageItems.map((c) => {
+  const tableRows = pageItems.map((c) => {
     const tone24 = toneClass(c.change24h);
     const tone7 = toneClass(c.change7d);
     const perfTone = Number.isFinite(c.change7d) ? tone7 : tone24;
@@ -2073,7 +2116,7 @@ function renderMarketsRanking() {
     <tr class="mk-row" data-market-coin="${escapeHtml(c.id)}" tabindex="0">
       <td class="mk-rank">${Number.isFinite(c.rank) ? c.rank : "–"}</td>
       <td class="mk-asset">
-        <span class="asset-avatar">${c.image ? `<img src="${escapeHtml(c.image)}" alt="" loading="lazy" />` : `<span>${escapeHtml(c.symbol.slice(0, 3))}</span>`}</span>
+        <span class="asset-avatar">${c.image ? `<img src="${escapeHtml(c.image)}" alt="" width="28" height="28" loading="lazy" />` : `<span>${escapeHtml(c.symbol.slice(0, 3))}</span>`}</span>
         <span class="mk-name"><strong>${escapeHtml(c.name)}${ownedIds.has(c.id) ? ' <em class="rank-owned">●</em>' : ""}</strong><small>${escapeHtml(c.symbol)}</small></span>
       </td>
       <td class="mk-price num">${escapeHtml(formatCurrency(c.price, getPriceDigits(c.price)))}</td>
@@ -2085,8 +2128,13 @@ function renderMarketsRanking() {
     </tr>`;
   }).join("");
 
+  // ── Móvil: tarjetas con "Cargar más" (misma vista ordenada) ──
+  const mobileCount = Math.min(state.marketsMobileLimit, view.length);
+  const mobileItems = view.slice(0, mobileCount);
+  const cards = mobileItems.map((c) => marketCardHtml(c, ownedIds)).join("");
+
   box.innerHTML = `
-    <div class="markets-table-wrap">
+    <div class="markets-table-wrap market-desktop-table">
       <table class="markets-table">
         <thead>
           <tr>
@@ -2100,21 +2148,69 @@ function renderMarketsRanking() {
             <th class="mk-perf">${escapeHtml(t("markets.colPerf"))}</th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>${tableRows}</tbody>
       </table>
-    </div>`;
+    </div>
+    <div class="market-mobile-list">${cards}</div>`;
 
+  // Paginación de escritorio.
   if (pag) {
-    if (totalPages <= 1) {
-      pag.innerHTML = "";
-    } else {
-      pag.innerHTML = `
-        <button class="pag-btn" type="button" data-markets-page="prev" ${state.marketsPage <= 1 ? "disabled" : ""}>‹</button>
-        <span class="pag-info">${state.marketsPage} / ${totalPages}</span>
-        <button class="pag-btn" type="button" data-markets-page="next" ${state.marketsPage >= totalPages ? "disabled" : ""}>›</button>
-      `;
-    }
+    pag.innerHTML = totalPages <= 1 ? "" : `
+      <button class="pag-btn" type="button" data-markets-page="prev" ${state.marketsPage <= 1 ? "disabled" : ""} aria-label="${escapeHtml(t("markets.prevPage"))}">‹</button>
+      <span class="pag-info">${state.marketsPage} / ${totalPages}</span>
+      <button class="pag-btn" type="button" data-markets-page="next" ${state.marketsPage >= totalPages ? "disabled" : ""} aria-label="${escapeHtml(t("markets.nextPage"))}">›</button>`;
   }
+  // "Cargar más" de móvil.
+  if (loadMore) {
+    loadMore.innerHTML = mobileCount < view.length
+      ? `<button class="ghost-btn markets-loadmore-btn" type="button" data-markets-loadmore>${escapeHtml(t("markets.loadMore"))} (${mobileCount}/${view.length})</button>`
+      : "";
+  }
+}
+
+// Tarjeta de mercado para móvil (mismo dato que la fila de escritorio).
+function marketCardHtml(c, ownedIds) {
+  const tone24 = toneClass(c.change24h);
+  const tone7 = toneClass(c.change7d);
+  return `
+    <button class="market-mobile-item" type="button" data-market-coin="${escapeHtml(c.id)}">
+      <span class="mmi-rank">${Number.isFinite(c.rank) ? "#" + c.rank : "–"}</span>
+      <span class="asset-avatar">${c.image ? `<img src="${escapeHtml(c.image)}" alt="" width="30" height="30" loading="lazy" />` : `<span>${escapeHtml(c.symbol.slice(0, 3))}</span>`}</span>
+      <span class="mmi-id"><strong>${escapeHtml(c.name)}${ownedIds.has(c.id) ? ' <em class="rank-owned">●</em>' : ""}</strong><small>${escapeHtml(c.symbol)}</small></span>
+      <span class="mmi-price"><strong class="num">${escapeHtml(formatCurrency(c.price, getPriceDigits(c.price)))}</strong></span>
+      <span class="mmi-changes">
+        <span class="num ${tone24}">24h ${Number.isFinite(c.change24h) ? formatSignedPercent(c.change24h) : "--"}</span>
+        <span class="num ${tone7}">7d ${Number.isFinite(c.change7d) ? formatSignedPercent(c.change7d) : "--"}</span>
+      </span>
+      <span class="mmi-caps">
+        <span class="num">${escapeHtml(t("markets.colCap"))} ${Number.isFinite(c.marketCap) ? formatCompactCurrency(c.marketCap) : "--"}</span>
+        <span class="num">${escapeHtml(t("markets.colVol"))} ${Number.isFinite(c.volume) ? formatCompactCurrency(c.volume) : "--"}</span>
+      </span>
+    </button>`;
+}
+
+// Control de orden para móvil (mismos criterios y estado que las cabeceras).
+function renderMarketsMobileSort(sortBox) {
+  if (!sortBox) return;
+  const { key, dir } = state.marketsSort || { key: "marketCap", dir: "desc" };
+  const options = MARKET_SORT_KEYS
+    .map((o) => `<option value="${o.key}" ${o.key === key ? "selected" : ""}>${escapeHtml(t(o.labelKey))}</option>`)
+    .join("");
+  sortBox.innerHTML = `
+    <label class="mms-field" for="marketsSortSelect">
+      <span>${escapeHtml(t("table.sortBy"))}</span>
+      <select id="marketsSortSelect">${options}</select>
+    </label>
+    <button type="button" class="ghost-btn mms-dir" id="marketsSortDir" aria-label="${escapeHtml(dir === "desc" ? t("table.sortDesc") : t("table.sortAsc"))}" title="${escapeHtml(dir === "desc" ? t("table.sortDesc") : t("table.sortAsc"))}">${dir === "desc" ? "↓" : "↑"}</button>`;
+}
+
+function setMarketsSort(key, dir) {
+  const cur = state.marketsSort || { key: "marketCap", dir: "desc" };
+  state.marketsSort = key
+    ? { key, dir: dir || (cur.key === key ? (cur.dir === "asc" ? "desc" : "asc") : (key === "asset" ? "asc" : "desc")) }
+    : { key: cur.key, dir };
+  state.marketsPage = 1;
+  renderMarketsRanking();
 }
 
 function bindMarkets() {
@@ -2123,6 +2219,7 @@ function bindMarkets() {
     search.addEventListener("input", (event) => {
       state.marketsQuery = event.target.value;
       state.marketsPage = 1;
+      state.marketsMobileLimit = 20;
       renderMarketsRanking();
     });
   }
@@ -2136,19 +2233,39 @@ function bindMarkets() {
       document.getElementById("marketsRanking")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
+  // Cargar más (móvil).
+  const loadMore = document.getElementById("marketsLoadMore");
+  if (loadMore) {
+    loadMore.addEventListener("click", (event) => {
+      if (event.target.closest("[data-markets-loadmore]")) {
+        state.marketsMobileLimit += 20;
+        renderMarketsRanking();
+      }
+    });
+  }
+  // Control de orden móvil (delegado, el contenido se re-renderiza).
+  const sortBox = document.getElementById("marketsMobileSort");
+  if (sortBox) {
+    sortBox.addEventListener("change", (event) => {
+      if (event.target.id === "marketsSortSelect") {
+        // Cambiar de criterio arranca en descendente (numérico).
+        setMarketsSort(event.target.value, "desc");
+      }
+    });
+    sortBox.addEventListener("click", (event) => {
+      if (event.target.closest("#marketsSortDir")) {
+        const cur = state.marketsSort;
+        setMarketsSort(cur.key, cur.dir === "asc" ? "desc" : "asc");
+      }
+    });
+  }
   const ranking = document.getElementById("marketsRanking");
   if (ranking) {
     ranking.addEventListener("click", (event) => {
-      // Orden por columna: alterna asc/desc en la columna pulsada.
+      // Orden por columna (escritorio): alterna asc/desc en la columna pulsada.
       const sortCell = event.target.closest("[data-market-sort]");
       if (sortCell) {
-        const key = sortCell.dataset.marketSort;
-        const cur = state.marketsSort || { key: "marketCap", dir: "desc" };
-        state.marketsSort = cur.key === key
-          ? { key, dir: cur.dir === "asc" ? "desc" : "asc" }
-          : { key, dir: key === "asset" ? "asc" : "desc" };
-        state.marketsPage = 1;
-        renderMarketsRanking();
+        setMarketsSort(sortCell.dataset.marketSort);
         return;
       }
       const coinRow = event.target.closest("[data-market-coin]");
@@ -2322,6 +2439,7 @@ function bindEvents() {
   dom.tableHead.addEventListener("click", handleHeaderClick);
   dom.tableBody.addEventListener("keydown", handleTableKeyDown);
   dom.tableBody.addEventListener("click", handleTableClick);
+  bindPortfolioMobile();
   bindPositionEditor();
   bindFab();
   bindAssetDetail();
@@ -2748,23 +2866,116 @@ function renderTableBody() {
   });
 
   if (!meaningful.length) {
-    dom.tableBody.innerHTML = `
-      <tr>
-        <td colspan="${TABLE_COLUMNS.length}">
-          <div class="empty-state empty-positions">
-            <strong>${escapeHtml(t("table.emptyTitle"))}</strong>
-            <p>${escapeHtml(t("table.emptyText"))}</p>
-            <button class="primary-btn" type="button" data-action="empty-add">${escapeHtml(t("buttons.newPosition"))}</button>
-          </div>
-        </td>
-      </tr>
-    `;
+    const emptyHtml = `
+      <div class="empty-state empty-positions">
+        <strong>${escapeHtml(t("table.emptyTitle"))}</strong>
+        <p>${escapeHtml(t("table.emptyText"))}</p>
+        <button class="primary-btn" type="button" data-action="empty-add">${escapeHtml(t("buttons.newPosition"))}</button>
+      </div>`;
+    dom.tableBody.innerHTML = `<tr><td colspan="${TABLE_COLUMNS.length}">${emptyHtml}</td></tr>`;
+    const mobileBox = document.getElementById("portfolioMobileList");
+    if (mobileBox) mobileBox.innerHTML = emptyHtml;
     applyPositionFilter();
     return;
   }
 
   dom.tableBody.innerHTML = rows.map((row) => renderRow(row, totalValue)).join("");
+  renderPortfolioMobile(rows, totalValue);
   applyPositionFilter();
+}
+
+// ── Vista móvil del portafolio: cada activo es una tarjeta expandible ──
+// Usa exactamente las mismas métricas que la tabla de escritorio.
+function renderPortfolioMobile(rows, totalValue = 0) {
+  const box = document.getElementById("portfolioMobileList");
+  if (!box) {
+    return;
+  }
+  box.innerHTML = rows.map((row) => portfolioMobileCardHtml(row, totalValue)).join("");
+}
+
+function portfolioMobileCardHtml(row, totalValue = 0) {
+  const metrics = computeRowMetrics(row);
+  const rowTone = metrics.pnlUsd > 0 ? "row-profit" : metrics.pnlUsd < 0 ? "row-loss" : "";
+  const weight = totalValue > 0 && metrics.currentValue > 0
+    ? (metrics.currentValue / totalValue) * 100
+    : null;
+  const change = row.priceChange24h;
+  const changeText = Number.isFinite(change) ? formatSignedPercent(change) : "--";
+  const priceText = metrics.currentPrice > 0
+    ? formatCurrency(metrics.currentPrice, getPriceDigits(metrics.currentPrice))
+    : "--";
+  const expanded = state.expandedCards.has(row.id);
+  const bodyId = `amc-body-${row.id}`;
+
+  // Objetivos TP + distancia al siguiente.
+  const tps = [metrics.tp1, metrics.tp2, metrics.tp3]
+    .map((value, i) => ({ label: `TP${i + 1}`, value }))
+    .filter((tp) => tp.value > 0);
+  const tpChips = tps.length
+    ? tps.map((tp) => {
+        const reached = metrics.currentPrice > 0 && metrics.currentPrice >= tp.value;
+        return `<span class="amc-tp ${reached ? "reached" : ""}">${tp.label} ${formatCurrency(tp.value, getPriceDigits(tp.value))}</span>`;
+      }).join("")
+    : `<span class="amc-tp empty">${escapeHtml(t("row.noTarget"))}</span>`;
+  const nextTp = metrics.currentPrice > 0 ? tps.find((tp) => metrics.currentPrice < tp.value) : null;
+  const nextTpText = nextTp
+    ? `${nextTp.label} · +${((nextTp.value / metrics.currentPrice - 1) * 100).toFixed(1)}%`
+    : (tps.length ? t("row.targetReachedShort") : "--");
+
+  const tokensText = metrics.tokens > 0 ? formatNumber(metrics.tokens, metrics.tokens >= 1 ? 4 : 8) : "--";
+
+  return `
+    <div class="asset-mobile-card ${rowTone} ${row.favorite ? "is-fav" : ""} ${expanded ? "is-expanded" : ""}" role="listitem" data-card-row="${row.id}">
+      <button class="amc-head" type="button" data-card-toggle="${row.id}" aria-expanded="${expanded ? "true" : "false"}" aria-controls="${bodyId}">
+        <span class="amc-avatar asset-avatar">${renderAssetAvatar(row)}</span>
+        <span class="amc-id">
+          <strong class="amc-name">${escapeHtml(assetDisplayName(row))}</strong>
+          <small class="amc-sym">${escapeHtml(row.symbol || t("row.noAsset"))}</small>
+        </span>
+        <span class="amc-value">
+          <strong class="money" data-role="rowValue">${maskedCurrency(metrics.currentValue)}</strong>
+          <span class="amc-pnl ${toneClass(metrics.pnlUsd)}"><span data-role="rowPnlAbs">${maskedSignedCurrency(metrics.pnlUsd)}</span> · <span data-role="rowPnlPct">${formatPercent(metrics.pnlPct)}</span></span>
+        </span>
+        <svg class="amc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="amc-subline">
+        <span class="amc-price money" data-role="rowPrice">${priceText}</span>
+        <span class="amc-24h ${toneClass(change || 0)}" data-role="rowChange">${changeText}<small> 24h</small></span>
+      </div>
+      <div class="amc-body" id="${bodyId}">
+        <div class="amc-body-inner">
+          <dl class="amc-grid">
+            <div><dt>${escapeHtml(t("table.columns.invested"))}</dt><dd>${maskedCurrency(metrics.investment)}</dd></div>
+            <div><dt>${escapeHtml(t("editor.tokens"))}</dt><dd>${tokensText}</dd></div>
+            <div><dt>${escapeHtml(t("reb.weight"))}</dt><dd>${weight != null ? weight.toFixed(1) + "%" : "--"}</dd></div>
+            <div><dt>${escapeHtml(t("amc.nextTp"))}</dt><dd>${escapeHtml(nextTpText)}</dd></div>
+          </dl>
+          <div class="amc-tps">${tpChips}</div>
+          <div class="amc-actions">
+            <button class="primary-btn amc-btn" type="button" data-card-action="buy" data-row-id="${row.id}">${escapeHtml(t("quick.buy"))}</button>
+            <button class="primary-btn amc-btn amc-sell" type="button" data-card-action="sell" data-row-id="${row.id}">${escapeHtml(t("quick.sell"))}</button>
+            <button class="ghost-btn amc-btn" type="button" data-card-action="edit" data-row-id="${row.id}">${escapeHtml(t("buttons.edit"))}</button>
+            <button class="ghost-btn amc-btn amc-delete" type="button" data-card-action="delete" data-row-id="${row.id}">${escapeHtml(t("menu.delete"))}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Actualiza una sola tarjeta móvil (refresco de precios) conservando su estado.
+function updateMobileCard(rowId) {
+  const box = document.getElementById("portfolioMobileList");
+  if (!box) return;
+  const card = box.querySelector(`[data-card-row="${rowId}"]`);
+  const row = getRowById(rowId);
+  if (!card || !row) return;
+  const totalValue = state.rows.reduce((sum, item) => {
+    const value = computeRowMetrics(item).currentValue;
+    return sum + (value > 0 ? value : 0);
+  }, 0);
+  card.outerHTML = portfolioMobileCardHtml(row, totalValue);
 }
 
 // Filtro combinado: búsqueda + categoría + rentabilidad + peso/cap mínimos +
@@ -4242,6 +4453,9 @@ function updateLiveRowUi(rowId) {
     node.className = `numeric ${toneClass(metrics.pnlPct)}`;
   });
 
+  // Mantiene sincronizada la tarjeta equivalente de la vista móvil.
+  updateMobileCard(rowId);
+
   scheduleDashboardRefresh();
 }
 
@@ -4376,6 +4590,115 @@ function handleTableKeyDown(event) {
     event.preventDefault();
     openAssetDetail(rowElement.dataset.rowId);
   }
+}
+
+// ── Interacciones de la lista móvil de activos ──
+function bindPortfolioMobile() {
+  const box = document.getElementById("portfolioMobileList");
+  if (!box) {
+    return;
+  }
+  box.addEventListener("click", (event) => {
+    const emptyAdd = event.target.closest('[data-action="empty-add"]');
+    if (emptyAdd) {
+      handleAddRow();
+      return;
+    }
+    const toggle = event.target.closest("[data-card-toggle]");
+    if (toggle) {
+      toggleMobileCard(toggle.dataset.cardToggle, toggle);
+      return;
+    }
+    const actionBtn = event.target.closest("[data-card-action]");
+    if (actionBtn) {
+      const rowId = actionBtn.dataset.rowId;
+      switch (actionBtn.dataset.cardAction) {
+        case "buy": openTradeSheet("buy", rowId); break;
+        case "sell": openTradeSheet("sell", rowId); break;
+        case "edit": openPositionEditor(rowId); break;
+        case "delete": deletePositionWithUndo(rowId); break;
+        default: break;
+      }
+    }
+  });
+}
+
+function toggleMobileCard(rowId, toggleBtn) {
+  const card = document.querySelector(`.asset-mobile-card[data-card-row="${rowId}"]`);
+  if (!card) return;
+  const expanded = card.classList.toggle("is-expanded");
+  if (expanded) {
+    state.expandedCards.add(rowId);
+  } else {
+    state.expandedCards.delete(rowId);
+  }
+  toggleBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
+}
+
+// Eliminar posición con confirmación + opción de deshacer.
+function deletePositionWithUndo(rowId) {
+  const row = getRowById(rowId);
+  if (!row) return;
+  if (!window.confirm(t("menu.deleteConfirm", { asset: assetDisplayName(row) }))) {
+    return;
+  }
+  const index = state.rows.findIndex((item) => item.id === rowId);
+  state.lastDeleted = { row: { ...row }, index };
+  state.rows = state.rows.filter((item) => item.id !== rowId);
+  state.expandedCards.delete(rowId);
+  clearTimersForRow(rowId);
+  if (state.detailRowId === rowId) {
+    closeAssetDetail();
+  }
+  // Mantiene al menos una fila editable si el portafolio queda vacío.
+  const addedPlaceholder = !state.rows.length;
+  if (addedPlaceholder) {
+    state.rows.push(createRow());
+    state.lastDeleted = null; // no hay deshacer limpio si se recreó placeholder
+  }
+  renderAll();
+  scheduleAutosave();
+  pushActivity(
+    t("alerts.rowDeletedTitle"),
+    t("alerts.rowDeletedText", { asset: assetDisplayName(row) }),
+    "negative"
+  );
+  if (state.lastDeleted) {
+    showUndoToast(t("alerts.rowDeletedText", { asset: assetDisplayName(row) }), () => undoDelete());
+  } else {
+    showToast(t("alerts.rowDeletedTitle"), t("alerts.rowDeletedText", { asset: assetDisplayName(row) }), "warning");
+  }
+}
+
+function undoDelete() {
+  if (!state.lastDeleted) return;
+  const { row, index } = state.lastDeleted;
+  state.rows.splice(Math.min(index, state.rows.length), 0, row);
+  state.lastDeleted = null;
+  renderAll();
+  scheduleAutosave();
+  showToast(t("undo.restoredTitle"), t("undo.restoredText", { asset: assetDisplayName(row) }), "positive");
+}
+
+// Toast con acción "Deshacer" (temporizador más largo).
+function showUndoToast(detail, onUndo) {
+  if (!dom.toastStack) return;
+  const toast = document.createElement("article");
+  toast.className = "toast warning toast-undo";
+  toast.innerHTML = `
+    <div class="toast-content">
+      <strong>${escapeHtml(t("alerts.rowDeletedTitle"))}</strong>
+      <p>${escapeHtml(detail)}</p>
+    </div>
+    <button type="button" class="toast-undo-btn">${escapeHtml(t("undo.action"))}</button>
+  `;
+  const remove = () => { toast.style.opacity = "0"; window.setTimeout(() => toast.remove(), 200); };
+  toast.querySelector(".toast-undo-btn").addEventListener("click", () => {
+    onUndo();
+    remove();
+  });
+  dom.toastStack.appendChild(toast);
+  window.setTimeout(remove, 6500);
 }
 
 function handleAddRow() {

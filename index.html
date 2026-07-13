@@ -353,13 +353,17 @@
           </div>
         </div>
 
-        <div class="table-wrap">
+        <!-- Escritorio: tabla tradicional -->
+        <div class="table-wrap portfolio-desktop-table">
           <table aria-label="Tabla de inversion crypto" data-i18n-aria-label="table.ariaLabel">
             <thead id="tableHead"></thead>
             <tbody id="tableBody"></tbody>
             <tfoot id="totalsFoot"></tfoot>
           </table>
         </div>
+
+        <!-- Movil: lista de tarjetas de activo (misma fuente de datos) -->
+        <div id="portfolioMobileList" class="portfolio-mobile-list" role="list"></div>
       </section>
 
       </section>
@@ -379,8 +383,12 @@
             <input id="marketsSearchInput" type="search" autocomplete="off" placeholder="Buscar activo..." data-i18n-placeholder="markets.search" aria-label="Buscar activo" data-i18n-aria-label="markets.search" />
           </div>
 
+          <!-- Movil: control de orden (sin cabeceras de tabla) -->
+          <div id="marketsMobileSort" class="market-mobile-sort" role="group" aria-label="Ordenar mercado" data-i18n-aria-label="markets.sortAria"></div>
+
           <div id="marketsRanking" class="markets-ranking"></div>
           <div id="marketsPagination" class="markets-pagination"></div>
+          <div id="marketsLoadMore" class="markets-load-more"></div>
         </section>
       </section>
 
