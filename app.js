@@ -79,7 +79,7 @@ const MAX_ROW_HISTORY_POINTS = 240;
 const AUTO_REFRESH_OPTIONS = [300, 1800, 3600, 86400];
 // Datos de mercado globales (widgets de Inicio)
 const MARKET_CACHE_KEY = "crypto-dashboard-market-v1";
-const MARKETS_LIST_KEY = "crypto-dashboard-markets-list-v3";
+const MARKETS_LIST_KEY = "crypto-dashboard-markets-list-v4";
 const MARKETS_LIST_TTL = 5 * 60 * 1000;
 const MARKETS_PAGE_SIZE = 25;
 const DOMINANCE_TTL = 60 * 1000;
@@ -279,6 +279,8 @@ const state = {
   marketsMobileLimit: 20,
   // Ids de tarjetas de activo desplegadas en la vista móvil del portafolio.
   expandedCards: new Set(),
+  // Ids de tarjetas de mercado desplegadas en la vista móvil.
+  expandedMarket: new Set(),
   // Última posición eliminada (para "Deshacer").
   lastDeleted: null,
   lastRefreshAt: 0,
@@ -1244,6 +1246,12 @@ function openTradeSheet(mode, preselectRowId = null) {
   // precio de la operación y se muestran únicamente como dato informativo.
   const amountLabel = mode === "sell" ? t("trade.amountSell") : t("trade.amountBuy");
   const today = new Date().toISOString().slice(0, 10);
+  // En venta: atajos para retirar un % del valor de la posición o venderla entera.
+  const sellQuick = mode === "sell"
+    ? `<div class="trade-quick" role="group" aria-label="${escapeHtml(t("trade.sellQuickAria"))}">
+         ${[25, 50, 100].map((p) => `<button type="button" class="chip-preset" data-trade-pct="${p}">${p === 100 ? escapeHtml(t("trade.sellAll")) : p + "%"}</button>`).join("")}
+       </div>`
+    : "";
   const amountBlock = mode === "alert"
     ? ""
     : `
@@ -1257,6 +1265,7 @@ function openTradeSheet(mode, preselectRowId = null) {
           <input type="text" inputmode="decimal" data-trade-field="price" placeholder="0.00" />
         </label>
       </div>
+      ${sellQuick}
       <div class="editor-grid-2">
         <label class="editor-field">
           <span>${escapeHtml(t("trade.date"))}</span>
@@ -1267,6 +1276,10 @@ function openTradeSheet(mode, preselectRowId = null) {
           <input type="text" inputmode="decimal" data-trade-field="fee" placeholder="0.00" />
         </label>
       </div>
+      <label class="editor-field">
+        <span>${escapeHtml(t("trade.notes"))}</span>
+        <input type="text" data-trade-field="note" maxlength="140" placeholder="${escapeHtml(t("trade.notesPlaceholder"))}" />
+      </label>
       <p class="editor-secondary trade-calc" data-trade-role="preview"></p>
     `;
 
@@ -1328,6 +1341,20 @@ function openTradeSheet(mode, preselectRowId = null) {
   sheet.addEventListener("click", (event) => {
     if (event.target.closest("[data-trade-close]")) {
       closeTradeSheet();
+      return;
+    }
+    // Venta rápida: rellena el importe con un % del valor actual de la posición.
+    const pctBtn = event.target.closest("[data-trade-pct]");
+    if (pctBtn) {
+      const row = getRowById(select.value);
+      const price = parseDecimal(priceInput?.value) || (row && row.currentPrice > 0 ? row.currentPrice : 0);
+      const held = row ? parseDecimal(row.tokens) : 0;
+      const pct = Number(pctBtn.dataset.tradePct) / 100;
+      const amountField = sheet.querySelector("[data-trade-field='amount']");
+      if (amountField && held > 0 && price > 0) {
+        amountField.value = formatEditableNumber(held * pct * price);
+        updateTradePreview(sheet);
+      }
     }
   });
   sheet.addEventListener("input", () => updateTradePreview(sheet));
@@ -1345,22 +1372,33 @@ function updateTradePreview(sheet) {
   const mode = sheet.querySelector("form")?.dataset.tradeMode;
   const amount = parseDecimal(sheet.querySelector("[data-trade-field='amount']")?.value);
   const price = parseDecimal(sheet.querySelector("[data-trade-field='price']")?.value);
+  const fee = parseDecimal(sheet.querySelector("[data-trade-field='fee']")?.value);
   const row = getRowById(sheet.querySelector("[data-trade-field='rowId']")?.value);
   const symbol = row ? String(row.symbol || row.crypto || "").toUpperCase() : "";
-  if (amount > 0 && price > 0) {
-    let tokens = amount / price;
-    let note = "";
-    if (mode === "sell" && row) {
-      const held = parseDecimal(row.tokens);
-      if (tokens > held + 1e-9) {
-        tokens = held;
-        note = ` · ${t("trade.sellCapped")}`;
-      }
-    }
-    preview.innerHTML = `${escapeHtml(t("trade.calcTokens"))}: <strong>${escapeHtml(formatNumber(tokens, tokens >= 1 ? 6 : 8))} ${escapeHtml(symbol)}</strong>${escapeHtml(note)}`;
-  } else {
+  if (!(amount > 0 && price > 0)) {
     preview.textContent = "";
+    return;
   }
+  let tokens = amount / price;
+  let capped = "";
+  const parts = [];
+  if (mode === "sell" && row) {
+    const held = parseDecimal(row.tokens);
+    const invested = parseDecimal(row.investment);
+    const avgCost = held > 0 ? invested / held : 0;
+    if (tokens > held + 1e-9) {
+      tokens = held;
+      capped = ` · ${t("trade.sellCapped")}`;
+    }
+    const pctOfPos = held > 0 ? (tokens / held) * 100 : 0;
+    const realized = avgCost > 0 ? tokens * (price - avgCost) - fee : null;
+    parts.push(`${t("trade.pctOfPosition")}: <strong>${pctOfPos.toFixed(1)}%</strong>`);
+    if (realized != null) {
+      parts.push(`${t("trade.realizedEst")}: <strong class="${toneClass(realized)}">${escapeHtml(maskedSignedCurrency(realized))}</strong>`);
+    }
+  }
+  const tokensLine = `${escapeHtml(t("trade.calcTokens"))}: <strong>${escapeHtml(formatNumber(tokens, tokens >= 1 ? 6 : 8))} ${escapeHtml(symbol)}</strong>${escapeHtml(capped)}`;
+  preview.innerHTML = [tokensLine, ...parts].join(" · ");
 }
 
 function closeTradeSheet() {
@@ -1438,6 +1476,7 @@ function confirmTrade(sheet) {
   const price = parseDecimal(sheet.querySelector("[data-trade-field='price']").value);
   const fee = parseDecimal(sheet.querySelector("[data-trade-field='fee']")?.value);
   const dateStr = sheet.querySelector("[data-trade-field='date']")?.value;
+  const note = String(sheet.querySelector("[data-trade-field='note']")?.value || "").slice(0, 140);
   // Fecha válida (no futura); si falta o es inválida se usa el momento actual.
   let at = Date.now();
   if (dateStr) {
@@ -1468,7 +1507,7 @@ function confirmTrade(sheet) {
     row.entryPrice = newTokens > 0 ? formatEditableNumber(newInvestment / newTokens) : "";
     row.derivedField = "";
     if (!row.purchaseDate && dateStr) row.purchaseDate = dateStr;
-    recordTrade({ type: "buy", rowId: row.id, symbol: row.symbol || row.crypto, tokens: addTokens, price, amount: addInvestment, fee, at });
+    recordTrade({ type: "buy", rowId: row.id, symbol: row.symbol || row.crypto, tokens: addTokens, price, amount: addInvestment, fee, at, note });
     finishTrade(row, t("trade.buySaved", { tokens: formatNumber(addTokens, 6), asset: assetDisplayName(row) }));
   } else {
     // Venta: dinero recibido → tokens vendidos = importe / precio de venta.
@@ -1485,7 +1524,7 @@ function confirmTrade(sheet) {
     const grossProceeds = soldTokens * sellPrice;
     recordTrade({
       type: "sell", rowId: row.id, symbol: row.symbol || row.crypto,
-      tokens: soldTokens, price: sellPrice, amount: grossProceeds, fee, at,
+      tokens: soldTokens, price: sellPrice, amount: grossProceeds, fee, at, note,
       realized: sellPrice > 0 && avgCost > 0 ? soldTokens * (sellPrice - avgCost) - fee : null
     });
     finishTrade(row, t("trade.sellSaved", { tokens: formatNumber(soldTokens, 6), asset: assetDisplayName(row) }));
@@ -1949,8 +1988,8 @@ async function fetchTopMarkets(force = false) {
   renderMarketsRanking();
   try {
     const currency = state.prefs.currency;
-    // 250 activos, con variación 24h y 7d y sparkline de 7 días (rendimiento).
-    const url = `${COINGECKO_BASE}coins/markets?vs_currency=${encodeURIComponent(currency)}&order=market_cap_desc&per_page=250&page=1&sparkline=true&price_change_percentage=24h,7d`;
+    // 250 activos, con variación 1h/24h/7d, sparkline 7d y máximo histórico.
+    const url = `${COINGECKO_BASE}coins/markets?vs_currency=${encodeURIComponent(currency)}&order=market_cap_desc&per_page=250&page=1&sparkline=true&price_change_percentage=1h,24h,7d`;
     const payload = await fetchJson(url);
     const rows = Array.isArray(payload) ? payload : [];
     if (rows.length && !payload.__swFallback) {
@@ -1960,11 +1999,14 @@ async function fetchTopMarkets(force = false) {
         name: item.name,
         image: item.image || "",
         price: Number(item.current_price),
+        change1h: saneChangePct(item.price_change_percentage_1h_in_currency),
         change24h: saneChangePct(item.price_change_percentage_24h_in_currency ?? item.price_change_percentage_24h),
         change7d: saneChangePct(item.price_change_percentage_7d_in_currency),
         marketCap: Number(item.market_cap),
         volume: Number(item.total_volume),
         rank: Number(item.market_cap_rank),
+        ath: Number(item.ath),
+        athChangePct: saneChangePct(item.ath_change_percentage),
         spark: Array.isArray(item.sparkline_in_7d?.price) ? item.sparkline_in_7d.price : null
       }));
       state.marketsListAt = Date.now();
@@ -2060,9 +2102,11 @@ function marketSparkline(spark, tone) {
 const MARKET_SORT_KEYS = [
   { key: "marketCap", labelKey: "markets.colCap" },
   { key: "price", labelKey: "markets.colPrice" },
+  { key: "change1h", labelKey: "markets.col1h" },
   { key: "change24h", labelKey: "markets.col24h" },
   { key: "change7d", labelKey: "markets.col7d" },
-  { key: "volume", labelKey: "markets.colVol" }
+  { key: "volume", labelKey: "markets.colVol" },
+  { key: "athChangePct", labelKey: "markets.colAthDist" }
 ];
 
 function renderMarketsRanking() {
@@ -2074,6 +2118,7 @@ function renderMarketsRanking() {
     return;
   }
   renderMarketsMobileSort(sortBox);
+  renderMarketsMeta();
 
   if (!state.marketsList.length) {
     box.innerHTML = state.marketsLoading
@@ -2109,9 +2154,12 @@ function renderMarketsRanking() {
     return `<th class="${cls} mk-sortable${active ? " is-sorted" : ""}" data-market-sort="${key}"${active ? ` aria-sort="${sortDir === "asc" ? "ascending" : "descending"}"` : ""}><span>${escapeHtml(label)}${active ? ` <em class="mk-arrow">${arrow}</em>` : ""}</span></th>`;
   };
   const tableRows = pageItems.map((c) => {
+    const tone1 = toneClass(c.change1h);
     const tone24 = toneClass(c.change24h);
     const tone7 = toneClass(c.change7d);
     const perfTone = Number.isFinite(c.change7d) ? tone7 : tone24;
+    // Distancia al máximo histórico (ath_change_percentage es negativo o 0).
+    const athDist = Number.isFinite(c.athChangePct) ? c.athChangePct : null;
     return `
     <tr class="mk-row" data-market-coin="${escapeHtml(c.id)}" tabindex="0">
       <td class="mk-rank">${Number.isFinite(c.rank) ? c.rank : "–"}</td>
@@ -2120,10 +2168,12 @@ function renderMarketsRanking() {
         <span class="mk-name"><strong>${escapeHtml(c.name)}${ownedIds.has(c.id) ? ' <em class="rank-owned">●</em>' : ""}</strong><small>${escapeHtml(c.symbol)}</small></span>
       </td>
       <td class="mk-price num">${escapeHtml(formatCurrency(c.price, getPriceDigits(c.price)))}</td>
+      <td class="mk-1h num ${tone1}">${Number.isFinite(c.change1h) ? formatSignedPercent(c.change1h) : "--"}</td>
       <td class="mk-24 num ${tone24}">${Number.isFinite(c.change24h) ? formatSignedPercent(c.change24h) : "--"}</td>
       <td class="mk-7d num ${tone7}">${Number.isFinite(c.change7d) ? formatSignedPercent(c.change7d) : "--"}</td>
       <td class="mk-cap num">${Number.isFinite(c.marketCap) ? formatCompactCurrency(c.marketCap) : "--"}</td>
       <td class="mk-vol num">${Number.isFinite(c.volume) ? formatCompactCurrency(c.volume) : "--"}</td>
+      <td class="mk-ath num" title="${Number.isFinite(c.ath) ? escapeHtml(formatCurrency(c.ath, getPriceDigits(c.ath))) : ""}">${athDist != null ? formatSignedPercent(athDist) : "--"}</td>
       <td class="mk-perf">${marketSparkline(c.spark, perfTone)}</td>
     </tr>`;
   }).join("");
@@ -2141,10 +2191,12 @@ function renderMarketsRanking() {
             <th class="mk-rank">#</th>
             ${th(t("markets.colAsset"), "asset", "mk-asset")}
             ${th(t("markets.colPrice"), "price", "mk-price")}
+            ${th(t("markets.col1h"), "change1h", "mk-1h")}
             ${th(t("markets.col24h"), "change24h", "mk-24")}
             ${th(t("markets.col7d"), "change7d", "mk-7d")}
             ${th(t("markets.colCap"), "marketCap", "mk-cap")}
             ${th(t("markets.colVol"), "volume", "mk-vol")}
+            ${th(t("markets.colAthDist"), "athChangePct", "mk-ath")}
             <th class="mk-perf">${escapeHtml(t("markets.colPerf"))}</th>
           </tr>
         </thead>
@@ -2168,25 +2220,43 @@ function renderMarketsRanking() {
   }
 }
 
-// Tarjeta de mercado para móvil (mismo dato que la fila de escritorio).
+// Tarjeta de mercado para móvil: cabecera compacta + detalle desplegable.
+// Cerrada muestra lo esencial (ranking, logo, nombre, precio, 24h, cap).
+// Al tocar se despliega el resto (1h, 7d, volumen, ATH y distancia).
 function marketCardHtml(c, ownedIds) {
   const tone24 = toneClass(c.change24h);
+  const tone1 = toneClass(c.change1h);
   const tone7 = toneClass(c.change7d);
+  const owned = ownedIds.has(c.id);
+  const expanded = state.expandedMarket.has(c.id);
+  const bodyId = `mmc-${c.id}`;
+  const athDist = Number.isFinite(c.athChangePct) ? formatSignedPercent(c.athChangePct) : "--";
+  const athPrice = Number.isFinite(c.ath) ? formatCurrency(c.ath, getPriceDigits(c.ath)) : "--";
   return `
-    <button class="market-mobile-item" type="button" data-market-coin="${escapeHtml(c.id)}">
-      <span class="mmi-rank">${Number.isFinite(c.rank) ? "#" + c.rank : "–"}</span>
-      <span class="asset-avatar">${c.image ? `<img src="${escapeHtml(c.image)}" alt="" width="30" height="30" loading="lazy" />` : `<span>${escapeHtml(c.symbol.slice(0, 3))}</span>`}</span>
-      <span class="mmi-id"><strong>${escapeHtml(c.name)}${ownedIds.has(c.id) ? ' <em class="rank-owned">●</em>' : ""}</strong><small>${escapeHtml(c.symbol)}</small></span>
-      <span class="mmi-price"><strong class="num">${escapeHtml(formatCurrency(c.price, getPriceDigits(c.price)))}</strong></span>
-      <span class="mmi-changes">
-        <span class="num ${tone24}">24h ${Number.isFinite(c.change24h) ? formatSignedPercent(c.change24h) : "--"}</span>
-        <span class="num ${tone7}">7d ${Number.isFinite(c.change7d) ? formatSignedPercent(c.change7d) : "--"}</span>
-      </span>
-      <span class="mmi-caps">
-        <span class="num">${escapeHtml(t("markets.colCap"))} ${Number.isFinite(c.marketCap) ? formatCompactCurrency(c.marketCap) : "--"}</span>
-        <span class="num">${escapeHtml(t("markets.colVol"))} ${Number.isFinite(c.volume) ? formatCompactCurrency(c.volume) : "--"}</span>
-      </span>
-    </button>`;
+    <div class="market-mobile-item ${expanded ? "is-expanded" : ""}" data-market-card="${escapeHtml(c.id)}">
+      <button class="mmi-head" type="button" data-market-toggle="${escapeHtml(c.id)}" aria-expanded="${expanded ? "true" : "false"}" aria-controls="${bodyId}">
+        <span class="mmi-rank">${Number.isFinite(c.rank) ? "#" + c.rank : "–"}</span>
+        <span class="asset-avatar">${c.image ? `<img src="${escapeHtml(c.image)}" alt="" width="30" height="30" loading="lazy" />` : `<span>${escapeHtml(c.symbol.slice(0, 3))}</span>`}</span>
+        <span class="mmi-id"><strong>${escapeHtml(c.name)}${owned ? ' <em class="rank-owned">●</em>' : ""}</strong><small>${escapeHtml(c.symbol)}</small></span>
+        <span class="mmi-main">
+          <strong class="num">${escapeHtml(formatCurrency(c.price, getPriceDigits(c.price)))}</strong>
+          <span class="num ${tone24}">${Number.isFinite(c.change24h) ? formatSignedPercent(c.change24h) : "--"} · ${Number.isFinite(c.marketCap) ? formatCompactCurrency(c.marketCap) : "--"}</span>
+        </span>
+        <svg class="mmi-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="mmi-body" id="${bodyId}">
+        <div class="mmi-body-inner">
+          <dl class="mmi-grid">
+            <div><dt>${escapeHtml(t("markets.col1h"))}</dt><dd class="num ${tone1}">${Number.isFinite(c.change1h) ? formatSignedPercent(c.change1h) : "--"}</dd></div>
+            <div><dt>${escapeHtml(t("markets.col7d"))}</dt><dd class="num ${tone7}">${Number.isFinite(c.change7d) ? formatSignedPercent(c.change7d) : "--"}</dd></div>
+            <div><dt>${escapeHtml(t("markets.colVol"))}</dt><dd class="num">${Number.isFinite(c.volume) ? formatCompactCurrency(c.volume) : "--"}</dd></div>
+            <div><dt>${escapeHtml(t("markets.ath"))}</dt><dd class="num">${escapeHtml(athPrice)}</dd></div>
+            <div><dt>${escapeHtml(t("markets.colAthDist"))}</dt><dd class="num ${toneClass(c.athChangePct)}">${athDist}</dd></div>
+          </dl>
+          <button class="ghost-btn mmi-open" type="button" data-market-open="${escapeHtml(c.id)}">${escapeHtml(owned ? t("markets.openDetail") : t("markets.addToPortfolio"))}</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 // Control de orden para móvil (mismos criterios y estado que las cabeceras).
@@ -2202,6 +2272,34 @@ function renderMarketsMobileSort(sortBox) {
       <select id="marketsSortSelect">${options}</select>
     </label>
     <button type="button" class="ghost-btn mms-dir" id="marketsSortDir" aria-label="${escapeHtml(dir === "desc" ? t("table.sortDesc") : t("table.sortAsc"))}" title="${escapeHtml(dir === "desc" ? t("table.sortDesc") : t("table.sortAsc"))}">${dir === "desc" ? "↓" : "↑"}</button>`;
+}
+
+// Barra de estado del mercado: última sincronización, aviso de caché y
+// botón de actualización manual (no bloquea la pantalla).
+function renderMarketsMeta() {
+  const box = document.getElementById("marketsMeta");
+  if (!box) return;
+  const hasData = state.marketsList.length > 0;
+  const cached = hasData && state.marketsListAt > 0 && (Date.now() - state.marketsListAt >= MARKETS_LIST_TTL);
+  let syncText;
+  if (state.marketsLoading) syncText = t("status.syncing");
+  else if (state.marketsListAt) syncText = t("markets.lastSync", { time: formatRelativeTime(state.marketsListAt) });
+  else syncText = t("status.syncManual");
+  const cachedNote = cached && !state.marketsLoading ? ` · ${t("markets.cached")}` : "";
+  box.innerHTML = `
+    <span class="mm-sync ${cached && !state.marketsLoading ? "is-cached" : ""}">${escapeHtml(syncText)}${escapeHtml(cachedNote)}</span>
+    <button class="ghost-btn markets-refresh-btn" type="button" id="marketsRefreshBtn" ${state.marketsLoading ? "disabled" : ""}>
+      ${escapeHtml(state.marketsLoading ? t("status.syncing") : t("markets.refresh"))}
+    </button>`;
+}
+
+function toggleMarketCard(coinId, toggleBtn) {
+  const card = document.querySelector(`.market-mobile-item[data-market-card="${coinId}"]`);
+  if (!card) return;
+  const expanded = card.classList.toggle("is-expanded");
+  if (expanded) state.expandedMarket.add(coinId);
+  else state.expandedMarket.delete(coinId);
+  toggleBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
 }
 
 function setMarketsSort(key, dir) {
@@ -2243,6 +2341,15 @@ function bindMarkets() {
       }
     });
   }
+  // Actualización manual (no bloquea la pantalla; conserva datos previos).
+  const meta = document.getElementById("marketsMeta");
+  if (meta) {
+    meta.addEventListener("click", (event) => {
+      if (event.target.closest("#marketsRefreshBtn")) {
+        fetchTopMarkets(true);
+      }
+    });
+  }
   // Control de orden móvil (delegado, el contenido se re-renderiza).
   const sortBox = document.getElementById("marketsMobileSort");
   if (sortBox) {
@@ -2268,6 +2375,19 @@ function bindMarkets() {
         setMarketsSort(sortCell.dataset.marketSort);
         return;
       }
+      // Móvil: abrir/añadir desde el botón del detalle desplegado.
+      const openBtn = event.target.closest("[data-market-open]");
+      if (openBtn) {
+        handleMarketCoinTap(openBtn.dataset.marketOpen);
+        return;
+      }
+      // Móvil: desplegar/plegar la tarjeta.
+      const toggle = event.target.closest("[data-market-toggle]");
+      if (toggle) {
+        toggleMarketCard(toggle.dataset.marketToggle, toggle);
+        return;
+      }
+      // Escritorio: tocar la fila abre el detalle o añade el activo.
       const coinRow = event.target.closest("[data-market-coin]");
       if (coinRow) {
         handleMarketCoinTap(coinRow.dataset.marketCoin);
@@ -2543,10 +2663,18 @@ function loadState() {
   state.activity = Array.isArray(payload?.activity) ? payload.activity.slice(0, MAX_ACTIVITY_ITEMS) : [];
   state.trades = Array.isArray(payload?.trades) ? payload.trades.slice(0, MAX_TRADES) : [];
   state.history = Array.isArray(history?.points) ? compactHistoryPoints(history.points) : [];
+  const storedTheme = prefs && (prefs.theme === "light" || prefs.theme === "dark") ? prefs.theme : null;
   state.prefs = {
     ...DEFAULT_PREFS,
     ...(prefs && typeof prefs === "object" ? prefs : {})
   };
+  // Primer arranque sin elección previa: se adopta la preferencia del sistema
+  // (coincide con el script anti-parpadeo del <head>). La elección del usuario,
+  // una vez guardada, siempre prevalece.
+  if (!storedTheme) {
+    state.prefs.theme = (typeof window !== "undefined" && window.matchMedia
+      && window.matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
+  }
   if (!TRANSLATIONS[state.prefs.language]) {
     state.prefs.language = DEFAULT_PREFS.language;
   }

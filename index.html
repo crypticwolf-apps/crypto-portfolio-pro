@@ -4,6 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#050d14" />
+
+    <!-- Tema aplicado antes de pintar: evita el parpadeo claro/oscuro.
+         Prioriza la eleccion guardada; si no existe, usa la del sistema. -->
+    <script>
+      (function () {
+        try {
+          var stored = JSON.parse(localStorage.getItem("crypto-dashboard-prefs-v2") || "{}");
+          var theme = stored && (stored.theme === "light" || stored.theme === "dark") ? stored.theme : null;
+          if (!theme) {
+            theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+          }
+          document.documentElement.dataset.theme = theme;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", theme === "light" ? "#f0f4f8" : "#050d14");
+        } catch (e) {
+          document.documentElement.dataset.theme = "dark";
+        }
+      })();
+    </script>
     <meta
       name="description"
       content="Gestiona tu portafolio de criptomonedas: precios en tiempo real, objetivos de TP, graficos y exportacion CSV/PDF."
@@ -382,6 +401,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
             <input id="marketsSearchInput" type="search" autocomplete="off" placeholder="Buscar activo..." data-i18n-placeholder="markets.search" aria-label="Buscar activo" data-i18n-aria-label="markets.search" />
           </div>
+
+          <!-- Estado: ultima sincronizacion / datos en cache + actualizar -->
+          <div id="marketsMeta" class="markets-meta" aria-live="polite"></div>
 
           <!-- Movil: control de orden (sin cabeceras de tabla) -->
           <div id="marketsMobileSort" class="market-mobile-sort" role="group" aria-label="Ordenar mercado" data-i18n-aria-label="markets.sortAria"></div>
