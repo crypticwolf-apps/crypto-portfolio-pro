@@ -1496,38 +1496,31 @@ function confirmTrade(sheet) {
   const curInvestment = parseDecimal(row.investment);
 
   if (mode === "buy") {
-    // Dinero invertido → tokens comprados = importe / precio.
-    // La comisión se suma al coste (base de inversión), no compra tokens.
-    const addTokens = amount / price;
-    const addInvestment = amount + fee;
-    const newTokens = curTokens + addTokens;
-    const newInvestment = curInvestment + addInvestment;
-    row.tokens = formatEditableNumber(newTokens);
-    row.investment = formatEditableNumber(newInvestment);
-    row.entryPrice = newTokens > 0 ? formatEditableNumber(newInvestment / newTokens) : "";
+    // Única fuente de verdad de los cálculos: CryptoFinance (finance.js).
+    const r = CryptoFinance.buy({ amount, price, fee, curTokens, curInvestment });
+    row.tokens = formatEditableNumber(r.newTokens);
+    row.investment = formatEditableNumber(r.newInvestment);
+    row.entryPrice = r.newTokens > 0 ? formatEditableNumber(r.entryPrice) : "";
     row.derivedField = "";
     if (!row.purchaseDate && dateStr) row.purchaseDate = dateStr;
-    recordTrade({ type: "buy", rowId: row.id, symbol: row.symbol || row.crypto, tokens: addTokens, price, amount: addInvestment, fee, at, note });
-    finishTrade(row, t("trade.buySaved", { tokens: formatNumber(addTokens, 6), asset: assetDisplayName(row) }));
+    recordTrade({ type: "buy", rowId: row.id, symbol: row.symbol || row.crypto, tokens: r.addTokens, price, amount: r.addInvestment, fee, at, note });
+    finishTrade(row, t("trade.buySaved", { tokens: formatNumber(r.addTokens, 6), asset: assetDisplayName(row) }));
   } else {
-    // Venta: dinero recibido → tokens vendidos = importe / precio de venta.
-    // No se puede vender más de lo disponible. La comisión reduce lo realizado.
-    const avgCost = curTokens > 0 ? curInvestment / curTokens : 0;
-    const sellPrice = price;
-    let soldTokens = amount / sellPrice;
-    if (soldTokens > curTokens) soldTokens = curTokens;
-    const newTokens = Math.max(0, curTokens - soldTokens);
-    row.tokens = newTokens > 0 ? formatEditableNumber(newTokens) : "";
-    row.investment = newTokens > 0 ? formatEditableNumber(newTokens * avgCost) : "";
-    row.entryPrice = newTokens > 0 ? formatEditableNumber(avgCost) : "";
+    const r = CryptoFinance.sell({ amount, price, fee, curTokens, curInvestment });
+    if (!r.ok) {
+      showToast(t("trade.invalidTitle"), t("trade.noPositionsText"), "warning");
+      return;
+    }
+    row.tokens = r.newTokens > 0 ? formatEditableNumber(r.newTokens) : "";
+    row.investment = r.newTokens > 0 ? formatEditableNumber(r.newInvestment) : "";
+    row.entryPrice = r.newTokens > 0 ? formatEditableNumber(r.entryPrice) : "";
     row.derivedField = "";
-    const grossProceeds = soldTokens * sellPrice;
     recordTrade({
       type: "sell", rowId: row.id, symbol: row.symbol || row.crypto,
-      tokens: soldTokens, price: sellPrice, amount: grossProceeds, fee, at, note,
-      realized: sellPrice > 0 && avgCost > 0 ? soldTokens * (sellPrice - avgCost) - fee : null
+      tokens: r.soldTokens, price, amount: r.grossProceeds, fee, at, note,
+      realized: r.realized
     });
-    finishTrade(row, t("trade.sellSaved", { tokens: formatNumber(soldTokens, 6), asset: assetDisplayName(row) }));
+    finishTrade(row, t("trade.sellSaved", { tokens: formatNumber(r.soldTokens, 6), asset: assetDisplayName(row) }));
   }
 }
 
@@ -2534,6 +2527,10 @@ function bindEvents() {
   dom.exportBtn.addEventListener("click", handleExportCsv);
   dom.importBtn.addEventListener("click", () => dom.importFileInput.click());
   dom.importFileInput.addEventListener("change", handleImportCsv);
+  document.getElementById("backupJsonBtn")?.addEventListener("click", handleBackupJson);
+  const restoreInput = document.getElementById("restoreJsonInput");
+  document.getElementById("restoreJsonBtn")?.addEventListener("click", () => restoreInput?.click());
+  restoreInput?.addEventListener("change", handleRestoreJson);
   dom.toggleChartsBtn.addEventListener("click", toggleCharts);
   dom.themeToggle.addEventListener("click", toggleTheme);
   dom.portfolioNameInput.addEventListener("input", (event) => {
@@ -7863,6 +7860,72 @@ function scheduleAutosave() {
   state.autosaveTimer = window.setTimeout(() => {
     persistState(false);
   }, AUTOSAVE_DELAY);
+}
+
+// ── Copia de seguridad completa en JSON (posiciones, operaciones,
+//    historial y preferencias) y su restauración con validación. ──
+function handleBackupJson() {
+  try {
+    const backup = {
+      app: "crypto-portfolio-pro",
+      kind: "backup",
+      schema: DATA_SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(),
+      state: safeParse(localStorage.getItem(STORAGE_KEY)),
+      prefs: safeParse(localStorage.getItem(PREFS_KEY)),
+      history: safeParse(localStorage.getItem(HISTORY_KEY))
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `crypto-portfolio-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast(t("backup.doneTitle"), t("backup.doneText"), "positive");
+  } catch (error) {
+    showToast(t("status.apiError"), t("backup.failText"), "negative");
+  }
+}
+
+function handleRestoreJson(event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(String(reader.result));
+    } catch {
+      showToast(t("restore.invalidTitle"), t("restore.invalidText"), "warning");
+      return;
+    }
+    // Validación de estructura: debe contener un estado con lista de posiciones.
+    const stateObj = data && typeof data === "object" ? data.state : null;
+    const rows = stateObj && Array.isArray(stateObj.rows) ? stateObj.rows : null;
+    if (!rows) {
+      showToast(t("restore.invalidTitle"), t("restore.structureText"), "warning");
+      return;
+    }
+    const nTrades = Array.isArray(stateObj.trades) ? stateObj.trades.length : 0;
+    // No se sobrescribe nada sin confirmación explícita (reemplaza los datos).
+    if (!window.confirm(t("restore.confirm", { positions: rows.length, trades: nTrades }))) {
+      return;
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateObj));
+      if (data.prefs && typeof data.prefs === "object") localStorage.setItem(PREFS_KEY, JSON.stringify(data.prefs));
+      if (data.history && typeof data.history === "object") localStorage.setItem(HISTORY_KEY, JSON.stringify(data.history));
+      // Recarga: loadState reconstruye el estado desde el almacenamiento restaurado.
+      window.location.reload();
+    } catch {
+      showToast(t("status.apiError"), t("restore.failText"), "negative");
+    }
+  };
+  reader.readAsText(file);
 }
 
 function persistState(manual) {

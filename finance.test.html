@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pruebas · CryptoFinance</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; background: #0b1520; color: #e8f2ff; }
+    h1 { font-size: 1.1rem; }
+    .ok { color: #3effa8; } .fail { color: #ff5555; }
+    ol { line-height: 1.6; font-family: monospace; font-size: 0.85rem; }
+    #summary { font-weight: 700; margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <h1>Pruebas de cálculo financiero (CryptoFinance)</h1>
+  <div id="summary">Ejecutando…</div>
+  <ol id="results"></ol>
+
+  <script src="./finance.js"></script>
+  <script>
+    (function () {
+      const F = window.CryptoFinance;
+      const out = document.getElementById("results");
+      const results = [];
+      let pass = 0, fail = 0;
+
+      // Comparación con tolerancia (evita ruido de coma flotante).
+      function approx(a, b, eps) { return Math.abs(a - b) <= (eps == null ? 1e-6 : eps); }
+      function check(name, cond) {
+        const li = document.createElement("li");
+        li.className = cond ? "ok" : "fail";
+        li.textContent = (cond ? "PASS · " : "FAIL · ") + name;
+        out.appendChild(li);
+        results.push({ name, ok: !!cond });
+        cond ? pass++ : fail++;
+      }
+
+      // 1. Cantidad comprada = importe / precio
+      const b1 = F.buy({ amount: 500, price: 2, fee: 0, curTokens: 0, curInvestment: 0 });
+      check("buy: 500€ a 2 → 250 tokens", approx(b1.addTokens, 250));
+      check("buy: inversión = 500", approx(b1.newInvestment, 500));
+      check("buy: precio medio = 2", approx(b1.entryPrice, 2));
+
+      // 2. Comisión suma al coste, no compra tokens
+      const b2 = F.buy({ amount: 200, price: 2, fee: 5, curTokens: 0.05, curInvestment: 3000 });
+      check("buy+fee: tokens = 100 (200/2)", approx(b2.addTokens, 100));
+      check("buy+fee: inversión añadida = 205", approx(b2.addInvestment, 205));
+      check("buy+fee: tokens totales = 100.05", approx(b2.newTokens, 100.05));
+      check("buy+fee: inversión total = 3205", approx(b2.newInvestment, 3205));
+
+      // 3. Cantidad vendida = dinero recibido / precio
+      const s1 = F.sell({ amount: 300, price: 3, fee: 0, curTokens: 250, curInvestment: 500 });
+      check("sell: 300€ a 3 → 100 tokens", approx(s1.soldTokens, 100));
+      check("sell: restantes = 150 tokens", approx(s1.newTokens, 150));
+      check("sell: % de la posición = 40%", approx(s1.pctOfPosition, 40, 1e-3));
+
+      // 4. Beneficio realizado (coste medio 2, venta a 3, 100 tokens) = 100
+      check("sell: realizado = +100", approx(s1.realized, 100));
+
+      // 5. Comisión reduce lo realizado
+      const s2 = F.sell({ amount: 300, price: 3, fee: 10, curTokens: 250, curInvestment: 500 });
+      check("sell+fee: realizado = 90 (100 - 10 comisión)", approx(s2.realized, 90));
+
+      // 6. No se puede vender más de lo disponible (capado)
+      const s3 = F.sell({ amount: 100000, price: 3, fee: 0, curTokens: 150, curInvestment: 300 });
+      check("sell capado: vende como máx. 150 tokens", approx(s3.soldTokens, 150));
+      check("sell capado: restantes = 0", approx(s3.newTokens, 0));
+
+      // 7. Venta total (100%) deja inversión y precio medio a 0
+      check("sell total: inversión restante = 0", approx(s3.newInvestment, 0));
+      check("sell total: precio medio restante = 0", approx(s3.entryPrice, 0));
+
+      // 8. Coste medio
+      check("avgPrice: 3205 / 100.05 ≈ 32.0340", approx(F.avgPrice(3205, 100.05), 32.034, 1e-3));
+
+      // 9. Beneficio no realizado y %
+      const u1 = F.unrealized({ tokens: 2, investment: 100, currentPrice: 80 });
+      check("unrealized: valor = 160", approx(u1.currentValue, 160));
+      check("unrealized: pnl = +60", approx(u1.pnl, 60));
+      check("unrealized: pnl% = 60%", approx(u1.pnlPct, 60, 1e-3));
+
+      // 10. Rentabilidad desde precio medio
+      check("roiPct: (150-100)/100 = 50%", approx(F.roiPct(100, 150), 50, 1e-3));
+
+      // 11. Seguridad de coma flotante: 0.1 + 0.2 no debe arrastrar error
+      const fp = F.buy({ amount: 0.3, price: 1, fee: 0, curTokens: 0.1, curInvestment: 0.1 });
+      check("float-safe: 0.1 + 0.3 = 0.4 exacto", fp.newTokens === 0.4);
+
+      // 12. Números muy pequeños (token de fracción de céntimo)
+      const tiny = F.buy({ amount: 10, price: 0.00001234, fee: 0, curTokens: 0, curInvestment: 0 });
+      check("small: 10 / 0.00001234 ≈ 810372.77 tokens", approx(tiny.addTokens, 10 / 0.00001234, 1));
+
+      // 13. Entradas inválidas devuelven ok:false (sin dividir por cero)
+      check("guard: precio 0 → ok:false", F.buy({ amount: 100, price: 0 }).ok === false);
+      check("guard: importe negativo → ok:false", F.sell({ amount: -5, price: 2, curTokens: 10, curInvestment: 10 }).ok === false);
+      check("guard: vender sin posición → ok:false", F.sell({ amount: 100, price: 2, curTokens: 0, curInvestment: 0 }).ok === false);
+
+      const summary = document.getElementById("summary");
+      summary.textContent = `Total: ${pass + fail} · PASS ${pass} · FAIL ${fail}`;
+      summary.className = fail === 0 ? "ok" : "fail";
+      window.__testResults = { pass, fail, total: pass + fail, results };
+    })();
+  </script>
+</body>
+</html>

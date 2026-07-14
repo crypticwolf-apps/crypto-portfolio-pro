@@ -1,0 +1,13 @@
+{
+  "name": "crypto-portfolio-pro",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gestor de cartera de criptomonedas (PWA en JavaScript vanilla). La app se sirve como estáticos; este package.json solo habilita las pruebas de cálculo financiero.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

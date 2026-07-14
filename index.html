@@ -60,6 +60,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
 
     <script src="./i18n.js" defer></script>
+    <script src="./finance.js" defer></script>
     <script src="./app.js" defer></script>
 
     <script>
@@ -513,8 +514,11 @@
           <button id="downloadPdfBtn" class="ghost-btn" type="button" data-i18n="buttons.downloadPdf">Descargar PDF</button>
           <button id="exportBtn" class="ghost-btn" type="button" data-i18n="buttons.exportCsv">Exportar CSV</button>
           <button id="importBtn" class="ghost-btn" type="button" data-i18n="buttons.importCsv">Importar CSV</button>
+          <button id="backupJsonBtn" class="ghost-btn" type="button" data-i18n="buttons.backupJson">Copia de seguridad JSON</button>
+          <button id="restoreJsonBtn" class="ghost-btn" type="button" data-i18n="buttons.restoreJson">Restaurar copia</button>
           <button id="clearBtn" class="danger-btn" type="button" data-i18n="buttons.resetData">Resetear datos</button>
           <input id="importFileInput" type="file" accept=".csv,text/csv" hidden />
+          <input id="restoreJsonInput" type="file" accept=".json,application/json" hidden />
         </div>
       </section>
 
