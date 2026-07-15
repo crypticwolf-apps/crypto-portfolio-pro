@@ -6262,3 +6262,55 @@ body.filters-open { overflow: hidden; }
 @media (max-width: 768px) {
   :root[data-density="compact"] .panel { padding: 13px; }
 }
+
+/* ═══════════════════════════════════════════════════════
+   TOKENS DE DISEÑO — fuente única para nuevos componentes.
+   Los valores reflejan los ya usados en la app (espaciado,
+   alturas de control, z-index, duraciones), de modo que se
+   pueden adoptar de forma incremental sin regresiones.
+   Complementan los tokens de color/radio/sombra de :root.
+   ═══════════════════════════════════════════════════════ */
+:root {
+  /* Escala de espaciado (4-40) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Alturas de control (táctil ≥44) */
+  --control-sm: 40px;
+  --control-md: 44px;
+  --control-lg: 48px;
+  --control-xl: 52px;
+
+  /* Anchuras máximas */
+  --max-content: 1100px;
+  --max-readable: 720px;
+
+  /* Duraciones y curvas (interacción → pantalla → modal) */
+  --dur-fast: 130ms;
+  --dur-base: 200ms;
+  --dur-slow: 280ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Capas z-index (coinciden con el apilado real actual) */
+  --z-base: 1;
+  --z-sticky: 60;
+  --z-nav: 80;
+  --z-fab: 90;
+  --z-overlay: 100;
+  --z-sheet: 200;
+  --z-toast: 210;
+
+  /* Safe areas como tokens (fallback 0px) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
