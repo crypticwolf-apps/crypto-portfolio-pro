@@ -18,6 +18,7 @@
           document.documentElement.dataset.theme = theme;
           var oled = stored && stored.oled === true;
           document.documentElement.dataset.oled = oled ? "on" : "";
+          document.documentElement.dataset.density = stored && stored.density === "compact" ? "compact" : "";
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) {
             meta.setAttribute("content", oled && theme === "dark" ? "#000000" : (theme === "light" ? "#f0f4f8" : "#050d14"));
@@ -485,6 +486,7 @@
 
           <button id="themeToggle" class="ghost-btn" type="button" data-i18n="theme.light">Modo claro</button>
           <button id="oledToggle" class="ghost-btn oled-toggle" type="button" aria-pressed="false" data-i18n="theme.oled">Negro OLED</button>
+          <button id="densityToggle" class="ghost-btn oled-toggle" type="button" aria-pressed="false" data-i18n="density.compact">Vista compacta</button>
         </div>
 
         <div class="autorefresh-row">

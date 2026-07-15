@@ -6233,3 +6233,32 @@ body.filters-open { overflow: hidden; }
   color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--line-accent);
 }
+
+/* ═══════════════════════════════════════════════════════
+   MODO COMPACTO — densidad apretada para carteras grandes.
+   Reduce alturas, espaciado e iconos secundarios; conserva
+   objetivos táctiles (cabecera-fila y botones ≥44px) y
+   legibilidad. Capa independiente data-density="compact".
+   ═══════════════════════════════════════════════════════ */
+:root[data-density="compact"] .portfolio-mobile-list { gap: 6px; }
+:root[data-density="compact"] .market-mobile-list { gap: 5px; }
+
+/* Tarjeta de posición: cabecera más baja (sigue ≥44px), avatar e
+   info secundaria más compactos. */
+:root[data-density="compact"] .amc-head { min-height: 46px; padding: 6px 11px; gap: 8px; }
+:root[data-density="compact"] .amc-avatar { width: 28px; height: 28px; }
+:root[data-density="compact"] .amc-name { font-size: 0.88rem; }
+:root[data-density="compact"] .amc-value .money { font-size: 0.88rem; }
+:root[data-density="compact"] .amc-subline { padding: 0 11px 7px; font-size: 0.76rem; }
+:root[data-density="compact"] .amc-grid { padding: 8px 11px; gap: 6px 10px; }
+:root[data-density="compact"] .amc-tps { padding: 0 11px 8px; }
+
+/* Tarjeta de mercado: mismo criterio. */
+:root[data-density="compact"] .mmi-head { min-height: 46px; padding: 6px 11px; }
+:root[data-density="compact"] .mmi-head > .asset-avatar { width: 28px; height: 28px; }
+:root[data-density="compact"] .mmi-id strong { font-size: 0.84rem; }
+
+/* Paneles ligeramente más ajustados en móvil (sin afectar a escritorio). */
+@media (max-width: 768px) {
+  :root[data-density="compact"] .panel { padding: 13px; }
+}

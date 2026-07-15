@@ -139,6 +139,7 @@ const TRANSLATIONS = window.APP_I18N?.TRANSLATIONS || {};
 const DEFAULT_PREFS = {
   theme: "dark",
   oled: false,
+  density: "comfortable",
   currency: "usd",
   language: "es",
   portfolioName: "",
@@ -331,6 +332,7 @@ const dom = {
   autoRefreshSelect: document.getElementById("autoRefreshSelect"),
   themeToggle: document.getElementById("themeToggle"),
   oledToggle: document.getElementById("oledToggle"),
+  densityToggle: document.getElementById("densityToggle"),
   apiStatus: document.getElementById("apiStatus"),
   apiStatusMeta: document.getElementById("apiStatusMeta"),
   saveStatus: document.getElementById("saveStatus"),
@@ -531,6 +533,7 @@ function init() {
   loadState();
   translateStaticContent();
   applyTheme();
+  applyDensity();
   bindEvents();
   bindEnvironmentEvents();
   applyBalanceVisibility();
@@ -2536,6 +2539,7 @@ function bindEvents() {
   dom.toggleChartsBtn.addEventListener("click", toggleCharts);
   dom.themeToggle.addEventListener("click", toggleTheme);
   dom.oledToggle?.addEventListener("click", toggleOled);
+  dom.densityToggle?.addEventListener("click", toggleDensity);
   dom.portfolioNameInput.addEventListener("input", (event) => {
     savePortfolioName(event.target.value);
   });
@@ -5877,6 +5881,24 @@ function applyOled() {
     document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
       meta.setAttribute("content", "#000000");
     });
+  }
+}
+
+// Modo compacto: densidad de listas/tarjetas más apretada para carteras con
+// muchas posiciones. Mantiene objetivos táctiles y legibilidad (capa
+// independiente data-density="compact").
+function toggleDensity() {
+  state.prefs.density = state.prefs.density === "compact" ? "comfortable" : "compact";
+  applyDensity();
+  savePreferences();
+}
+
+function applyDensity() {
+  const compact = state.prefs.density === "compact";
+  document.documentElement.dataset.density = compact ? "compact" : "";
+  if (dom.densityToggle) {
+    dom.densityToggle.classList.toggle("is-active", compact);
+    dom.densityToggle.setAttribute("aria-pressed", compact ? "true" : "false");
   }
 }
 
