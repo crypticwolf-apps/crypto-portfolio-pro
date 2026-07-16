@@ -2491,9 +2491,10 @@ body {
   }
 
   /* Sticky bar compacta en móvil (no tapa contenido: aparece
-     solo cuando el hero sale de pantalla) */
+     solo cuando el hero sale de pantalla). Datos centrados: valor + PnL. */
   .sticky-bar {
     display: flex;
+    justify-content: center;
     top: max(8px, env(safe-area-inset-top));
     width: calc(100% - 16px);
     padding: 6px 10px;
@@ -2503,6 +2504,12 @@ body {
   /* En la barra compacta el nombre es redundante (ya está en la cabecera
      principal). Se oculta para que el valor total sea el elemento dominante. */
   .sticky-bar-title {
+    display: none;
+  }
+
+  /* Sin insignias de estado ("Conectado a CoinGecko", guardado) en la
+     barra de scroll: el estado ya vive en la cabecera y en Ajustes. */
+  .sticky-bar-right {
     display: none;
   }
 
