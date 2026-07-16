@@ -2588,6 +2588,7 @@ function bindEvents() {
   dom.themeToggle.addEventListener("click", toggleTheme);
   dom.oledToggle?.addEventListener("click", toggleOled);
   dom.densityToggle?.addEventListener("click", toggleDensity);
+  bindCapComparator();
   dom.portfolioNameInput.addEventListener("input", (event) => {
     savePortfolioName(event.target.value);
   });
@@ -4131,6 +4132,255 @@ function renderAnalyticsExtras(snapshot) {
   renderAnalyticsConcentration(snapshot);
   renderAnalyticsRisk(snapshot);
   renderAnalyticsActivityStats();
+  renderCapComparator();
+}
+
+/* ═══════════════════════════════════════════════════════
+   COMPARADOR DE CAPITALIZACIÓN (Analítica)
+   Simulación: ¿qué precio tendría un activo con la cap de
+   otro? Usa oferta circulante real (derivada de cap/precio),
+   ID único de CoinGecko y las funciones puras de finance.js.
+   No es una predicción; no altera datos reales del portafolio.
+   ═══════════════════════════════════════════════════════ */
+
+// Activos disponibles: top de mercado + posiciones de la cartera,
+// de-duplicados por id de CoinGecko (la cartera marca inPortfolio).
+function bindCapComparator() {
+  const capBox = document.getElementById("capComparator");
+  if (!capBox) return;
+  const cc = () => (state.capcmp || (state.capcmp = { baseId: null, targetId: "bitcoin", mode: "asset", customCap: null, targetPrice: null }));
+  capBox.addEventListener("change", (e) => {
+    const sel = e.target.closest("[data-cap-select]");
+    if (!sel) return;
+    if (sel.dataset.capSelect === "base") cc().baseId = sel.value;
+    else cc().targetId = sel.value;
+    renderCapComparator();
+  });
+  capBox.addEventListener("click", (e) => {
+    const mode = e.target.closest("[data-cap-mode]");
+    if (mode) { cc().mode = mode.dataset.capMode; renderCapComparator(); return; }
+    const act = e.target.closest("[data-cap-action]");
+    if (act && act.dataset.capAction === "swap") {
+      const c = cc();
+      const b = c.baseId; c.baseId = c.targetId; c.targetId = b;
+      renderCapComparator();
+      return;
+    }
+    const preset = e.target.closest("[data-cap-preset]");
+    if (preset) { cc().customCap = Number(preset.dataset.capPreset) || null; renderCapComparator(); return; }
+  });
+  capBox.addEventListener("input", (e) => {
+    const inp = e.target.closest("[data-cap-input]");
+    if (!inp) return;
+    const val = parseDecimal(inp.value);
+    if (inp.dataset.capInput === "customCap") cc().customCap = val || null;
+    else cc().targetPrice = val || null;
+    updateCapResult();
+  });
+}
+
+function getCapAssets() {
+  const map = new Map();
+  (state.marketsList || []).forEach((c) => {
+    if (!c.id || !(Number(c.price) > 0) || !(Number(c.marketCap) > 0)) return;
+    map.set(c.id, {
+      id: c.id, symbol: c.symbol, name: c.name, image: c.image || "",
+      price: Number(c.price), marketCap: Number(c.marketCap),
+      rank: Number(c.rank) || null, change24h: Number.isFinite(c.change24h) ? c.change24h : null,
+      inPortfolio: false, row: null
+    });
+  });
+  (state.rows || []).forEach((row) => {
+    const id = row.coinId;
+    if (!id) return;
+    const price = typeof row.currentPrice === "number" ? row.currentPrice : 0;
+    const cap = Number(row.marketCap) || 0;
+    const existing = map.get(id);
+    if (existing) { existing.inPortfolio = true; existing.row = row; return; }
+    if (price > 0 && cap > 0) {
+      map.set(id, {
+        id, symbol: (row.symbol || "").toUpperCase(),
+        name: row.resolvedName || row.crypto || row.symbol || id,
+        image: row.image || "", price, marketCap: cap,
+        rank: Number(row.marketCapRank) || null,
+        change24h: typeof row.priceChange24h === "number" ? row.priceChange24h : null,
+        inPortfolio: true, row
+      });
+    }
+  });
+  return [...map.values()].sort((a, b) => (a.rank || 99999) - (b.rank || 99999));
+}
+
+function getCapAsset(id) {
+  return getCapAssets().find((a) => a.id === id) || null;
+}
+
+function capLocale() { return UI_LOCALES[state.prefs.language] || "es-ES"; }
+
+// Valor entero completo (para title/tooltip; secciones 82/96).
+function capFull(v) {
+  try { return new Intl.NumberFormat(capLocale(), { maximumFractionDigits: 0 }).format(v); }
+  catch { return String(Math.round(v)); }
+}
+
+// Número compacto (oferta en tokens): 59,4 mil M, etc.
+function capCompactNum(v) {
+  try { return new Intl.NumberFormat(capLocale(), { notation: "compact", maximumFractionDigits: 2 }).format(v); }
+  catch { return String(Math.round(v)); }
+}
+
+function renderCapComparator() {
+  const box = document.getElementById("capComparator");
+  if (!box) return;
+  // No reconstruir mientras el usuario edita un campo (evita perder foco).
+  if (box.contains(document.activeElement) && document.activeElement.tagName === "INPUT") {
+    updateCapResult();
+    return;
+  }
+  const assets = getCapAssets();
+  const cc = state.capcmp || (state.capcmp = { baseId: null, targetId: "bitcoin", mode: "asset", customCap: null, targetPrice: null });
+
+  if (!assets.length) {
+    box.innerHTML = `<p class="movers-empty">${escapeHtml(t("cap.noData"))}</p>`;
+    return;
+  }
+  if (!cc.baseId || !assets.find((a) => a.id === cc.baseId)) {
+    cc.baseId = (assets.find((a) => a.inPortfolio) || assets[0]).id;
+  }
+  if (!cc.targetId || !assets.find((a) => a.id === cc.targetId)) {
+    cc.targetId = (assets.find((a) => a.id === "bitcoin") || assets[1] || assets[0]).id;
+  }
+  const optionList = (selId) => assets
+    .map((a) => `<option value="${a.id}" ${a.id === selId ? "selected" : ""}>${escapeHtml(a.symbol)} · ${escapeHtml(a.name)}${a.rank ? " (#" + a.rank + ")" : ""}${a.inPortfolio ? " ★" : ""}</option>`)
+    .join("");
+  const base = getCapAsset(cc.baseId);
+  const statLine = (a) => a ? `<div class="cap-stat"><span class="asset-avatar">${renderAssetAvatar(a.row || { image: a.image, symbol: a.symbol, crypto: a.name })}</span><span class="cap-stat-txt">${maskedCurrency(a.price)} · ${escapeHtml(t("detail.marketCap"))} <span title="${escapeHtml(capFull(a.marketCap))}">${formatCompactCurrency(a.marketCap)}</span>${a.rank ? " · #" + a.rank : ""}${a.inPortfolio ? ` · <b class="cap-inport">${escapeHtml(t("cap.inPortfolio"))}</b>` : ""}</span></div>` : "";
+
+  const modeBtn = (m, key) => `<button class="cap-mode ${cc.mode === m ? "is-active" : ""}" type="button" data-cap-mode="${m}">${escapeHtml(t(key))}</button>`;
+
+  // Control objetivo según el modo.
+  let targetControl = "";
+  if (cc.mode === "asset") {
+    targetControl = `
+      <label class="cap-field"><span>${escapeHtml(t("cap.targetAsset"))}</span>
+        <select class="cap-select" data-cap-select="target">${optionList(cc.targetId)}</select>
+      </label>
+      ${statLine(getCapAsset(cc.targetId))}`;
+  } else if (cc.mode === "custom") {
+    const presets = [1e8, 5e8, 1e9, 5e9, 1e10, 5e10, 1e11];
+    targetControl = `
+      <label class="cap-field"><span>${escapeHtml(t("cap.customCap"))}</span>
+        <input class="cap-input" type="text" inputmode="decimal" data-cap-input="customCap" value="${cc.customCap ? escapeHtml(formatEditableNumber(cc.customCap)) : ""}" placeholder="0" />
+      </label>
+      <div class="cap-presets">${presets.map((v) => `<button class="chip-preset" type="button" data-cap-preset="${v}">${formatCompactCurrency(v).replace(/\s?\D*$/, (m) => m.trim())}</button>`).join("")}</div>`;
+  } else {
+    targetControl = `
+      <label class="cap-field"><span>${escapeHtml(t("cap.targetPrice"))}</span>
+        <input class="cap-input" type="text" inputmode="decimal" data-cap-input="targetPrice" value="${cc.targetPrice ? escapeHtml(formatEditableNumber(cc.targetPrice)) : ""}" placeholder="0" />
+      </label>`;
+  }
+
+  box.innerHTML = `
+    <p class="cap-intro">${escapeHtml(t("cap.intro"))}</p>
+    <div class="cap-modes">${modeBtn("asset", "cap.modeAsset")}${modeBtn("custom", "cap.modeCustom")}${modeBtn("inverse", "cap.modeInverse")}</div>
+    <label class="cap-field"><span>${escapeHtml(t("cap.baseAsset"))}</span>
+      <select class="cap-select" data-cap-select="base">${optionList(cc.baseId)}</select>
+    </label>
+    ${statLine(base)}
+    ${cc.mode === "asset" ? `<div class="cap-swap-row"><button class="cap-swap" type="button" data-cap-action="swap" aria-label="${escapeHtml(t("cap.swap"))}" title="${escapeHtml(t("cap.swap"))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l-4 4 4 4"/><path d="M3 14h13a4 4 0 0 0 4-4V4"/><path d="M17 14l4-4-4-4" transform="translate(0 -4)" opacity="0"/></svg><span>${escapeHtml(t("cap.swap"))}</span></button></div>` : ""}
+    ${targetControl}
+    <div id="capResult" class="cap-result" aria-live="polite"></div>
+    <div id="capImpact"></div>
+    <p class="plan-disclaimer">${escapeHtml(t("cap.disclaimer"))}</p>
+  `;
+  updateCapResult();
+}
+
+function updateCapResult() {
+  const box = document.getElementById("capResult");
+  if (!box) return;
+  const cc = state.capcmp;
+  const base = getCapAsset(cc.baseId);
+  const impactBox = document.getElementById("capImpact");
+  if (impactBox) impactBox.innerHTML = "";
+  if (!base) { box.innerHTML = `<p class="cap-warn">${escapeHtml(t("cap.noData"))}</p>`; return; }
+
+  const F = window.CryptoFinance;
+  const money = (v, d) => maskedCurrency(v, d);
+
+  // Modo inverso: capitalización necesaria para un precio objetivo.
+  if (cc.mode === "inverse") {
+    const r = F.capNeededForPrice({ targetPrice: cc.targetPrice, basePrice: base.price, baseCap: base.marketCap });
+    if (!r.ok) { box.innerHTML = `<p class="cap-warn">${escapeHtml(t("cap.enterPrice"))}</p>`; return; }
+    box.innerHTML = `
+      <div class="cap-card">
+        <div class="cap-card-head"><strong>${escapeHtml(base.symbol)} → ${money(cc.targetPrice, getPriceDigits(cc.targetPrice))}</strong></div>
+        <div class="cap-card-main"><span class="cap-card-label">${escapeHtml(t("cap.capNeeded"))}</span><strong class="cap-big" title="${escapeHtml(capFull(r.capNeeded))}">${formatCompactCurrency(r.capNeeded)}</strong></div>
+        <div class="cap-grid">
+          <div><span>${escapeHtml(t("cap.multiplier"))}</span><b>${r.multiplier.toFixed(2)}×</b></div>
+          <div><span>${escapeHtml(t("cap.variation"))}</span><b class="${r.pctChange >= 0 ? "positive" : "negative"}">${formatSignedPercent(r.pctChange)}</b></div>
+          <div><span>${escapeHtml(t("cap.capAdded"))}</span><b title="${escapeHtml(capFull(r.capAdded))}">${formatCompactCurrency(r.capAdded)}</b></div>
+          <div><span>${escapeHtml(t("cap.currentCap"))}</span><b title="${escapeHtml(capFull(base.marketCap))}">${formatCompactCurrency(base.marketCap)}</b></div>
+        </div>
+        <p class="cap-note">${escapeHtml(t("cap.inverseNote"))}</p>
+      </div>`;
+    return;
+  }
+
+  // Capitalización objetivo (activo o personalizada).
+  const targetCap = cc.mode === "custom" ? (Number(cc.customCap) || 0) : (getCapAsset(cc.targetId)?.marketCap || 0);
+  if (cc.mode === "custom" && !(targetCap > 0)) { box.innerHTML = `<p class="cap-warn">${escapeHtml(t("cap.enterCap"))}</p>`; return; }
+  if (cc.mode === "asset" && cc.targetId === cc.baseId) { box.innerHTML = `<p class="cap-warn">${escapeHtml(t("cap.sameAsset"))}</p>`; return; }
+
+  const r = F.capScenario({ basePrice: base.price, baseCap: base.marketCap, targetCap });
+  if (!r.ok) { box.innerHTML = `<p class="cap-warn">${escapeHtml(t("cap.missingData"))}</p>`; return; }
+
+  const target = cc.mode === "asset" ? getCapAsset(cc.targetId) : null;
+  const targetLabel = target ? `${escapeHtml(base.symbol)} ${escapeHtml(t("cap.withCapOf"))} ${escapeHtml(target.symbol)}` : `${escapeHtml(base.symbol)} · ${formatCompactCurrency(targetCap)}`;
+  const up = r.pctChange >= 0;
+  box.innerHTML = `
+    <div class="cap-card ${up ? "up" : "down"}">
+      <div class="cap-card-head">
+        <span class="asset-avatar">${renderAssetAvatar(base.row || { image: base.image, symbol: base.symbol })}</span>
+        <span class="cap-arrow" aria-hidden="true">→</span>
+        ${target ? `<span class="asset-avatar">${renderAssetAvatar(target.row || { image: target.image, symbol: target.symbol })}</span>` : ""}
+        <strong>${targetLabel}</strong>
+      </div>
+      <div class="cap-card-main"><span class="cap-card-label">${escapeHtml(t("cap.simPrice"))}</span><strong class="cap-big" title="${escapeHtml(maskedCurrency(r.simPrice, 8))}">${money(r.simPrice, getPriceDigits(r.simPrice))}</strong>
+        <span class="cap-chip ${up ? "positive" : "negative"}">${r.multiplier.toFixed(2)}×</span></div>
+      <div class="cap-grid">
+        <div><span>${escapeHtml(t("cap.current"))}</span><b>${money(base.price, getPriceDigits(base.price))}</b></div>
+        <div><span>${escapeHtml(t("cap.variation"))}</span><b class="${up ? "positive" : "negative"}">${formatSignedPercent(r.pctChange)}</b></div>
+        <div><span>${escapeHtml(t("cap.difference"))}</span><b class="${r.priceDiff >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(r.priceDiff, getPriceDigits(Math.abs(r.priceDiff) || 1))}</b></div>
+        <div><span>${escapeHtml(t("cap.targetCap"))}</span><b title="${escapeHtml(capFull(targetCap))}">${formatCompactCurrency(targetCap)}</b></div>
+        <div><span>${escapeHtml(t("cap.supplyUsed"))}</span><b title="${escapeHtml(capFull(r.supply))}">${capCompactNum(r.supply)} ${escapeHtml(base.symbol)}</b></div>
+        ${target && target.rank ? `<div><span>${escapeHtml(t("cap.targetRank"))}</span><b>#${target.rank}</b></div>` : ""}
+      </div>
+    </div>`;
+
+  // Impacto en la posición (si el activo base está en la cartera).
+  if (base.inPortfolio && base.row) {
+    const m = computeRowMetrics(base.row);
+    if (m.tokens > 0) {
+      const imp = F.capPositionImpact({ tokens: m.tokens, invested: m.investment, currentPrice: m.currentPrice, simPrice: r.simPrice });
+      impactBox.innerHTML = `
+        <div class="cap-impact">
+          <div class="cap-impact-head"><strong>${escapeHtml(t("cap.impactTitle"))}</strong></div>
+          <p class="cap-impact-line">${escapeHtml(t("cap.impactPhrase", { tokens: formatNumber(m.tokens, m.tokens >= 1 ? 4 : 8), symbol: base.symbol, value: maskedCurrency(imp.simValue) }))}</p>
+          <div class="cap-grid">
+            <div><span>${escapeHtml(t("cap.nowValue"))}</span><b>${maskedCurrency(imp.curValue)}</b></div>
+            <div><span>${escapeHtml(t("cap.scenarioValue"))}</span><b>${maskedCurrency(imp.simValue)}</b></div>
+            <div><span>${escapeHtml(t("cap.valueDiff"))}</span><b class="${imp.valueDiff >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(imp.valueDiff)}</b></div>
+            <div><span>${escapeHtml(t("cap.simProfit"))}</span><b class="${imp.simProfit >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(imp.simProfit)}</b></div>
+            <div><span>${escapeHtml(t("cap.simRoi"))}</span><b class="${imp.simRoiPct >= 0 ? "positive" : "negative"}">${formatSignedPercent(imp.simRoiPct)}</b></div>
+          </div>
+          <div class="cap-impact-bars">
+            <div class="cap-bar-row"><span>${escapeHtml(t("cap.now"))}</span><div class="cap-bar"><span style="width:${imp.simValue > 0 ? Math.min(100, (imp.curValue / Math.max(imp.curValue, imp.simValue)) * 100) : 0}%"></span></div></div>
+            <div class="cap-bar-row"><span>${escapeHtml(t("cap.scenario"))}</span><div class="cap-bar"><span class="scenario" style="width:${imp.simValue > 0 ? Math.min(100, (imp.simValue / Math.max(imp.curValue, imp.simValue)) * 100) : 0}%"></span></div></div>
+          </div>
+        </div>`;
+    }
+  }
 }
 
 // Historial resumido: compras/ventas por mes + acumulados (desde el ledger).

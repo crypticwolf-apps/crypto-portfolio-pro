@@ -85,3 +85,68 @@ describe("CryptoFinance métricas", () => {
     expect(F.roiPct(0, 150)).toBe(0);
   });
 });
+
+describe("CryptoFinance.capScenario", () => {
+  it("precio simulado = cap objetivo / oferta (derivada de cap/precio)", () => {
+    // baseCap 100e9 @ precio 2 → oferta 50e9; objetivo 500e9 → sim 10
+    const r = F.capScenario({ basePrice: 2, baseCap: 100e9, targetCap: 500e9 });
+    expect(r.ok).toBe(true);
+    expect(r.supply).toBeCloseTo(50e9, 0);
+    expect(r.simPrice).toBeCloseTo(10, 6);
+    expect(r.multiplier).toBeCloseTo(5, 6);
+    expect(r.pctChange).toBeCloseTo(400, 4);
+    expect(r.priceDiff).toBeCloseTo(8, 6);
+  });
+
+  it("oferta explícita tiene prioridad sobre la derivada", () => {
+    const r = F.capScenario({ basePrice: 2, baseCap: 100e9, baseSupply: 25e9, targetCap: 500e9 });
+    expect(r.simPrice).toBeCloseTo(20, 6);
+  });
+
+  it("capitalización objetivo inferior → multiplicador < 1 y variación negativa", () => {
+    const r = F.capScenario({ basePrice: 2, baseCap: 100e9, targetCap: 50e9 });
+    expect(r.multiplier).toBeCloseTo(0.5, 6);
+    expect(r.pctChange).toBeCloseTo(-50, 4);
+    expect(r.simPrice).toBeCloseTo(1, 6);
+  });
+
+  it("precios por debajo de un céntimo", () => {
+    // supply grande: baseCap 60e6 @ 0.0006 → oferta 1e11; objetivo 6e9 → 0.06
+    const r = F.capScenario({ basePrice: 0.0006, baseCap: 60e6, targetCap: 6e9 });
+    expect(r.simPrice).toBeCloseTo(0.06, 8);
+    expect(r.multiplier).toBeCloseTo(100, 4);
+  });
+
+  it("datos faltantes → ok:false, sin NaN/Infinity", () => {
+    expect(F.capScenario({ basePrice: 2, baseCap: 0, targetCap: 500e9, baseSupply: 0 }).ok).toBe(false);
+    expect(F.capScenario({ basePrice: 2, baseCap: 100e9, targetCap: 0 }).ok).toBe(false);
+    expect(F.capScenario({ basePrice: 0, baseCap: 0, targetCap: 500e9 }).ok).toBe(false);
+  });
+});
+
+describe("CryptoFinance.capPositionImpact", () => {
+  it("valor y beneficio simulados de la posición", () => {
+    const r = F.capPositionImpact({ tokens: 100, invested: 150, currentPrice: 2, simPrice: 10 });
+    expect(r.curValue).toBeCloseTo(200, 6);
+    expect(r.simValue).toBeCloseTo(1000, 6);
+    expect(r.valueDiff).toBeCloseTo(800, 6);
+    expect(r.simProfit).toBeCloseTo(850, 6);
+    expect(r.simRoiPct).toBeCloseTo(566.6667, 3);
+  });
+});
+
+describe("CryptoFinance.capNeededForPrice", () => {
+  it("capitalización necesaria = precio objetivo × oferta", () => {
+    const r = F.capNeededForPrice({ targetPrice: 10, basePrice: 2, baseCap: 100e9 });
+    expect(r.ok).toBe(true);
+    expect(r.capNeeded).toBeCloseTo(500e9, 0);
+    expect(r.multiplier).toBeCloseTo(5, 6);
+    expect(r.pctChange).toBeCloseTo(400, 4);
+    expect(r.capAdded).toBeCloseTo(400e9, 0);
+  });
+
+  it("precio objetivo inválido → ok:false", () => {
+    expect(F.capNeededForPrice({ targetPrice: -1, basePrice: 2, baseCap: 100e9 }).ok).toBe(false);
+    expect(F.capNeededForPrice({ targetPrice: 10, basePrice: 0, baseCap: 0 }).ok).toBe(false);
+  });
+});

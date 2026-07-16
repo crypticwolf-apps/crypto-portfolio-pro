@@ -123,5 +123,89 @@
     return e > 0 && c > 0 ? round(((c - e) / e) * 100, 4) : 0;
   }
 
-  return { round, buy, sell, avgPrice, unrealized, roiPct };
+  /* ═══════════════════════════════════════════════════════
+     Comparador de capitalización — funciones puras.
+     No redondean: la precisión completa se conserva y el
+     formato se aplica solo al mostrar. Devuelven ok:false
+     cuando faltan datos esenciales (nunca NaN/Infinity).
+     ═══════════════════════════════════════════════════════ */
+
+  // Oferta circulante derivada de cap/precio (idéntica a la que usa el
+  // mercado: market_cap = precio × oferta_circulante).
+  function circulatingSupply(marketCap, price) {
+    const cap = toNum(marketCap);
+    const p = toNum(price);
+    return p > 0 && cap > 0 ? cap / p : 0;
+  }
+
+  // ¿Qué precio tendría el activo base con la capitalización objetivo?
+  // input: { basePrice, baseCap, baseSupply?, targetCap }
+  function capScenario(input) {
+    const basePrice = toNum(input.basePrice);
+    const baseCap = toNum(input.baseCap);
+    const targetCap = toNum(input.targetCap);
+    let supply = toNum(input.baseSupply);
+    if (!(supply > 0)) supply = circulatingSupply(baseCap, basePrice);
+    if (!(basePrice > 0)) return { ok: false, reason: "no-price" };
+    if (!(supply > 0)) return { ok: false, reason: "no-supply" };
+    if (!(targetCap > 0)) return { ok: false, reason: "no-target-cap" };
+    const simPrice = targetCap / supply;
+    const multiplier = baseCap > 0 ? targetCap / baseCap : simPrice / basePrice;
+    return {
+      ok: true,
+      supply,
+      simPrice,
+      multiplier,
+      pctChange: (simPrice / basePrice - 1) * 100,
+      priceDiff: simPrice - basePrice,
+      targetCap,
+      baseCap,
+      basePrice
+    };
+  }
+
+  // Impacto en una posición (simulación; no altera datos reales).
+  // input: { tokens, invested, currentPrice, simPrice }
+  function capPositionImpact(input) {
+    const tokens = Math.max(0, toNum(input.tokens));
+    const invested = Math.max(0, toNum(input.invested));
+    const curPrice = Math.max(0, toNum(input.currentPrice));
+    const simPrice = Math.max(0, toNum(input.simPrice));
+    const curValue = tokens * curPrice;
+    const simValue = tokens * simPrice;
+    return {
+      tokens,
+      curValue,
+      simValue,
+      valueDiff: simValue - curValue,
+      simProfit: simValue - invested,
+      simRoiPct: invested > 0 ? ((simValue - invested) / invested) * 100 : 0
+    };
+  }
+
+  // Inverso: capitalización necesaria para alcanzar un precio objetivo.
+  // input: { targetPrice, basePrice, baseCap, baseSupply? }
+  function capNeededForPrice(input) {
+    const targetPrice = toNum(input.targetPrice);
+    const basePrice = toNum(input.basePrice);
+    const baseCap = toNum(input.baseCap);
+    let supply = toNum(input.baseSupply);
+    if (!(supply > 0)) supply = circulatingSupply(baseCap, basePrice);
+    if (!(supply > 0)) return { ok: false, reason: "no-supply" };
+    if (!(targetPrice > 0)) return { ok: false, reason: "no-target-price" };
+    const capNeeded = targetPrice * supply;
+    return {
+      ok: true,
+      supply,
+      capNeeded,
+      capAdded: capNeeded - baseCap,
+      multiplier: baseCap > 0 ? capNeeded / baseCap : targetPrice / basePrice,
+      pctChange: basePrice > 0 ? (targetPrice / basePrice - 1) * 100 : 0
+    };
+  }
+
+  return {
+    round, buy, sell, avgPrice, unrealized, roiPct,
+    circulatingSupply, capScenario, capPositionImpact, capNeededForPrice
+  };
 });
