@@ -8,6 +8,15 @@ const DATA_SCHEMA_VERSION = 1;
 // OJO: debe declararse antes de la llamada a init() (línea ~350).
 const rowMetricsMemo = new WeakMap();
 const MAX_TRADES = 1000;
+// Periodos del resumen de rendimiento (antes de init(): se usa en el 1er render).
+const ANALYTICS_PERIODS = [
+  { key: "24h", ms: 24 * 3600e3, label: "period.24h" },
+  { key: "7d", ms: 7 * 24 * 3600e3, label: "period.7d" },
+  { key: "30d", ms: 30 * 24 * 3600e3, label: "period.30d" },
+  { key: "3m", ms: 90 * 24 * 3600e3, label: "period.3m" },
+  { key: "1a", ms: 365 * 24 * 3600e3, label: "period.1a" },
+  { key: "total", ms: null, label: "period.total" }
+];
 const PREFS_KEY = "crypto-dashboard-prefs-v2";
 const HISTORY_KEY = "crypto-dashboard-history-v2";
 const FX_RATE_CACHE_KEY = "crypto-dashboard-fx-v1";
@@ -2589,6 +2598,7 @@ function bindEvents() {
   dom.oledToggle?.addEventListener("click", toggleOled);
   dom.densityToggle?.addEventListener("click", toggleDensity);
   bindCapComparator();
+  bindAnalyticsSummary();
   dom.portfolioNameInput.addEventListener("input", (event) => {
     savePortfolioName(event.target.value);
   });
@@ -4048,78 +4058,110 @@ function getMaxDrawdownPct() {
 
 // Resumen de Analítica: ROI, rentabilidad por periodos, drawdown,
 // concentración (Top 1/3/5), % en stables y riesgo de concentración.
+// Resultado del periodo desde el historial de valor (o total desde el inicio).
+// No sustituye datos inexistentes por cero: si falta historial → enough:false.
+function getPeriodResult(key, snapshot) {
+  if (key === "total") {
+    const totalPnl = snapshot.totals.currentValue - snapshot.totals.investment;
+    const money = totalPnl + getRealizedPnl();
+    const pct = snapshot.totals.investment > 0 ? (totalPnl / snapshot.totals.investment) * 100 : null;
+    return { enough: true, money, pct };
+  }
+  const def = ANALYTICS_PERIODS.find((p) => p.key === key);
+  const points = state.history.filter((p) => p.currency === state.prefs.currency);
+  if (!def || points.length < 2) return { enough: false };
+  const last = Number(points[points.length - 1].total || 0);
+  const cutoff = Date.now() - def.ms;
+  let base = null;
+  for (const p of points) {
+    if (new Date(p.at).getTime() >= cutoff) { base = Number(p.total || 0); break; }
+  }
+  if (base === null || !(base > 0) || !(last > 0)) return { enough: false };
+  return { enough: true, money: last - base, pct: ((last - base) / base) * 100 };
+}
+
+// Resumen de rendimiento (rediseño): un número principal, contexto temporal,
+// hasta 3 secundarias y un desglose plegable. El resto de métricas viven en
+// sus paneles (Insights, Distribución, Riesgo, Actividad, Comparativas).
 function renderAnalyticsSummary(snapshot) {
-  const grid = document.getElementById("analyticsSummaryGrid");
-  if (!grid) {
+  const box = document.getElementById("analyticsSummaryGrid");
+  if (!box) return;
+  if (box.contains(document.activeElement) && document.activeElement.tagName === "INPUT") { return; }
+
+  const hasPositions = snapshot.totals.investment > 0 || snapshot.totals.currentValue > 0;
+  if (!hasPositions) {
+    box.innerHTML = `<div class="as-empty"><p>${escapeHtml(t("summary.emptyPositions"))}</p></div>`;
+    renderAnalyticsExtras(snapshot);
     return;
   }
 
+  const period = ANALYTICS_PERIODS.some((p) => p.key === state.analyticsPeriod) ? state.analyticsPeriod : "total";
+  state.analyticsPeriod = period;
+  const periodLabel = t(ANALYTICS_PERIODS.find((p) => p.key === period).label);
+
   const totalPnl = snapshot.totals.currentValue - snapshot.totals.investment;
-  const roi = snapshot.totals.investment ? (totalPnl / snapshot.totals.investment) * 100 : null;
-  const change24h = getPortfolio24hChange(snapshot);
-  const ret7d = getHistoryChangePct(7 * 24 * 60 * 60 * 1000);
-  const ret30d = getHistoryChangePct(30 * 24 * 60 * 60 * 1000);
-  const drawdown = getMaxDrawdownPct();
-  const alloc = getAllocationBreakdown(snapshot);
-
-  const weights = snapshot.items
-    .filter((item) => item.metrics.currentValue > 0)
-    .map((item) => ({
-      name: assetDisplayName(item.row),
-      pct: snapshot.totals.currentValue > 0
-        ? (item.metrics.currentValue / snapshot.totals.currentValue) * 100
-        : 0
-    }))
-    .sort((a, b) => b.pct - a.pct);
-  const top1 = weights[0] || null;
-  const topSum = (count) => weights.slice(0, count).reduce((total, item) => total + item.pct, 0);
-  const riskLevel = top1 ? (top1.pct > 40 ? "high" : top1.pct > 25 ? "medium" : "low") : null;
-  const riskLabels = { low: t("analytics.riskLow"), medium: t("analytics.riskMedium"), high: t("analytics.riskHigh") };
-  const riskTones = { low: "positive", medium: "warning", high: "negative" };
-
   const realized = getRealizedPnl();
-  const totalWithRealized = totalPnl + realized;
-  const assetCount = state.rows.filter((r) => r.crypto.trim()).length;
+  const netTotal = totalPnl + realized;
+  const roi = snapshot.totals.investment > 0 ? (totalPnl / snapshot.totals.investment) * 100 : null;
+  const res = getPeriodResult(period, snapshot);
 
-  const pct = (value) => (value == null ? "--" : formatSignedPercent(value));
-  const stats = [
-    { label: t("analytics.totalValue"), value: maskedCurrency(snapshot.totals.currentValue), tone: "" },
-    { label: t("analytics.invested"), value: maskedCurrency(snapshot.totals.investment), tone: "" },
-    { label: t("analytics.unrealizedPnl"), value: maskedSignedCurrency(totalPnl), tone: toneClass(totalPnl) },
-    { label: t("analytics.realizedPnl"), value: state.trades.some((tr) => tr.type === "sell") ? maskedSignedCurrency(realized) : "--", tone: realized ? toneClass(realized) : "" },
-    { label: t("analytics.totalPnl"), value: maskedSignedCurrency(totalWithRealized), tone: toneClass(totalWithRealized) },
-    { label: t("analytics.nAssets"), value: String(assetCount), tone: "" },
-    { label: t("analytics.nTrades"), value: String(state.trades.length), tone: "" },
-    { label: t("analytics.roi"), value: pct(roi), tone: roi != null ? toneClass(roi) : "" },
-    { label: t("analytics.ret24h"), value: change24h ? formatSignedPercent(change24h.pct) : "--", tone: change24h ? toneClass(change24h.pct) : "" },
-    { label: t("analytics.ret7d"), value: pct(ret7d), tone: ret7d != null ? toneClass(ret7d) : "" },
-    { label: t("analytics.ret30d"), value: pct(ret30d), tone: ret30d != null ? toneClass(ret30d) : "" },
-    { label: t("analytics.retTotal"), value: pct(roi), tone: roi != null ? toneClass(roi) : "" },
-    { label: t("analytics.drawdown"), value: drawdown != null ? (drawdown < 0.005 ? "0.00%" : `-${drawdown.toFixed(2)}%`) : "--", tone: drawdown != null && drawdown >= 0.005 ? "negative" : "" },
-    { label: t("analytics.top1"), value: top1 ? `${top1.name} ${top1.pct.toFixed(1)}%` : "--", tone: "" },
-    { label: t("analytics.top3"), value: weights.length ? `${topSum(3).toFixed(1)}%` : "--", tone: "" },
-    { label: t("analytics.top5"), value: weights.length ? `${topSum(5).toFixed(1)}%` : "--", tone: "" },
-    { label: t("analytics.stables"), value: alloc ? `${alloc.stable.toFixed(1)}%` : "--", tone: "" },
-    {
-      label: t("analytics.concentration"),
-      value: riskLevel ? riskLabels[riskLevel] : "--",
-      tone: riskLevel ? riskTones[riskLevel] : "",
-      dot: true
-    }
-  ];
-
-  grid.innerHTML = stats
-    .map(
-      (stat) => `
-        <article class="as-item">
-          <span>${escapeHtml(stat.label)}</span>
-          <strong class="${stat.tone}">${stat.dot && stat.tone ? `<i class="as-dot ${stat.tone}"></i>` : ""}${escapeHtml(stat.value)}</strong>
-        </article>
-      `
-    )
+  const chips = ANALYTICS_PERIODS
+    .map((p) => `<button class="as-period ${p.key === period ? "is-active" : ""}" type="button" data-period="${p.key}">${escapeHtml(t(p.label))}</button>`)
     .join("");
 
-  // Sub-secciones de Analítica (comparativa, categoría, concentración, riesgo).
+  const mainMoney = period === "total" ? netTotal : res.money;
+  const mainPct = period === "total" ? roi : res.pct;
+  const mainOk = period === "total" ? true : res.enough;
+  const mainTone = mainOk ? toneClass(mainMoney) : "";
+  const mainBlock = mainOk
+    ? `<strong class="as-main ${mainTone}">${maskedSignedCurrency(mainMoney)}</strong>${mainPct == null ? "" : `<span class="as-main-pct ${mainTone}">${formatSignedPercent(mainPct)}</span>`}`
+    : `<strong class="as-main muted">—</strong>`;
+
+  let phrase = "";
+  if (period === "total") phrase = t("summary.phraseTotal");
+  else if (!res.enough) phrase = t("summary.noHistoryPeriod");
+  else phrase = t(res.money >= 0 ? "summary.phraseGain" : "summary.phraseLoss", { amount: maskedCurrency(Math.abs(res.money)), period: periodLabel.toLowerCase() });
+
+  const secondary = [
+    { label: t("analytics.totalValue"), value: maskedCurrency(snapshot.totals.currentValue) },
+    { label: t("analytics.invested"), value: maskedCurrency(snapshot.totals.investment) }
+  ];
+  if (period === "total") {
+    if (roi != null) secondary.push({ label: t("summary.roi"), value: formatSignedPercent(roi), tone: toneClass(roi) });
+  } else {
+    secondary.push({ label: t("summary.totalSinceStart"), value: maskedSignedCurrency(netTotal), tone: toneClass(netTotal), muted: true });
+  }
+
+  const hasSells = state.trades.some((tr) => tr.type === "sell");
+  const recovered = state.trades.reduce((s, tr) => s + (tr.type === "sell" ? Number(tr.amount) || 0 : 0), 0);
+  const fees = state.trades.reduce((s, tr) => s + (Number(tr.fee) || 0), 0);
+  const bdRow = (label, value, tone) => `<div class="as-bd-row"><span>${escapeHtml(label)}</span><b class="${tone || ""}">${value}</b></div>`;
+  const breakdown = `
+    <details class="as-breakdown"${state.analyticsBreakdownOpen ? " open" : ""}>
+      <summary>${escapeHtml(t("summary.seeBreakdown"))}</summary>
+      <div class="as-bd-grid">
+        ${bdRow(t("analytics.unrealizedPnl"), maskedSignedCurrency(totalPnl), toneClass(totalPnl))}
+        ${hasSells ? bdRow(t("analytics.realizedPnl"), maskedSignedCurrency(realized), toneClass(realized)) : ""}
+        ${fees > 0 ? bdRow(t("summary.fees"), maskedCurrency(fees)) : ""}
+        ${hasSells ? bdRow(t("summary.recovered"), maskedCurrency(recovered)) : ""}
+        ${bdRow(t("summary.openCost"), maskedCurrency(snapshot.totals.investment))}
+      </div>
+    </details>`;
+
+  box.innerHTML = `
+    <div class="as-clean">
+      <div class="as-period-row" role="group" aria-label="${escapeHtml(t("summary.periodAria"))}">${chips}</div>
+      <div class="as-hero">
+        <span class="as-label">${escapeHtml(period === "total" ? t("summary.netTotal") : t("summary.periodResult", { period: periodLabel }))}</span>
+        <div class="as-hero-main" aria-live="polite">${mainBlock}</div>
+        ${phrase ? `<p class="as-phrase">${escapeHtml(phrase)}</p>` : ""}
+      </div>
+      <div class="as-secondary">
+        ${secondary.map((s) => `<div class="as-sec ${s.muted ? "muted" : ""}"><span>${escapeHtml(s.label)}</span><b class="${s.tone || ""}">${escapeHtml(String(s.value))}</b></div>`).join("")}
+      </div>
+      ${breakdown}
+    </div>`;
+
   renderAnalyticsExtras(snapshot);
 }
 
@@ -4145,6 +4187,21 @@ function renderAnalyticsExtras(snapshot) {
 
 // Activos disponibles: top de mercado + posiciones de la cartera,
 // de-duplicados por id de CoinGecko (la cartera marca inPortfolio).
+function bindAnalyticsSummary() {
+  const box = document.getElementById("analyticsSummaryGrid");
+  if (!box) return;
+  box.addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-period]");
+    if (!chip) return;
+    state.analyticsPeriod = chip.dataset.period;
+    renderAnalyticsSummary(buildSnapshot());
+  });
+  box.addEventListener("toggle", (e) => {
+    const d = e.target.closest && e.target.closest("details.as-breakdown");
+    if (d) state.analyticsBreakdownOpen = d.open;
+  }, true);
+}
+
 function bindCapComparator() {
   const capBox = document.getElementById("capComparator");
   if (!capBox) return;
