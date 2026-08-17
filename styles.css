@@ -6606,3 +6606,69 @@ body.filters-open { overflow: hidden; }
   color: var(--muted); padding-left: 18px; margin-top: -2px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+
+/* ── Selector de tema (claro / oscuro / OLED) ── */
+.theme-picker { display: flex; gap: 4px; padding: 3px; background: var(--panel-soft); border-radius: var(--radius-sm); }
+.theme-opt {
+  flex: 1; min-height: var(--control-md); border: none; border-radius: var(--radius-xs);
+  background: transparent; color: var(--muted); font: inherit; font-size: 0.74rem; font-weight: 600;
+  cursor: pointer; padding: 0 6px;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast);
+}
+.theme-opt.is-active { background: var(--panel-hover); color: var(--accent); box-shadow: var(--shadow-sm); }
+.theme-opt:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+/* ── Pestaña principal (Portafolio) destacada en la barra inferior ── */
+.tab-btn-primary { position: relative; color: var(--text); }
+.tab-btn-primary svg {
+  padding: 6px; border-radius: 999px;
+  background: var(--accent-dim); box-shadow: inset 0 0 0 1px var(--line-accent);
+  width: 34px; height: 34px;
+}
+.tab-btn-primary span { font-weight: 700; }
+.tab-btn-primary.is-active svg { background: var(--accent); color: #04121a; box-shadow: var(--glow-accent); }
+
+@media (prefers-reduced-motion: reduce) { .theme-opt { transition: none; } }
+
+/* ── Cuadros plegables de la pestaña Más ── */
+.more-fold { padding: 0; overflow: hidden; }
+.more-fold-sum {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4); min-height: 56px;
+}
+.more-fold-sum::-webkit-details-marker { display: none; }
+.more-fold-sum:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
+.more-fold-txt { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.more-fold-txt small { font-size: 0.58rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-family: var(--font-mono); }
+.more-fold-txt strong { font-size: 0.95rem; }
+.more-fold-chev { color: var(--muted); font-size: 0.8rem; flex: 0 0 auto; transition: transform var(--dur-fast) var(--ease-out); }
+.more-fold[open] .more-fold-chev { transform: rotate(180deg); }
+.more-fold-body {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--line);
+}
+@media (prefers-reduced-motion: reduce) { .more-fold-chev { transition: none; } }
+
+/* ── Densidad compacta: alcance homogéneo en toda la app ──
+   Antes solo afectaba a las tarjetas de cartera y mercado, y el resto de
+   superficies (Plan, Mas, Analitica) quedaba mas holgado: la app se veia
+   mezclada. Aqui se igualan cabeceras plegables, listas y paneles. */
+:root[data-density="compact"] .tp-fold-sum,
+:root[data-density="compact"] .more-fold-sum { min-height: 48px; padding: var(--space-2) var(--space-3); }
+:root[data-density="compact"] .tp-fold-body,
+:root[data-density="compact"] .more-fold-body { padding: var(--space-2) var(--space-3) var(--space-3); gap: var(--space-2); }
+:root[data-density="compact"] .tp-fold-txt strong,
+:root[data-density="compact"] .more-fold-txt strong { font-size: 0.86rem; }
+:root[data-density="compact"] .tp-step { padding: 8px 10px; }
+:root[data-density="compact"] .tp-steps { gap: 6px; }
+:root[data-density="compact"] .tp-config { padding: 8px 10px; }
+:root[data-density="compact"] .tp-summary,
+:root[data-density="compact"] .tp-global-grid { padding: 10px 12px; }
+:root[data-density="compact"] .hl-item { padding: 8px 10px; }
+:root[data-density="compact"] .hl-list { gap: 6px; }
+:root[data-density="compact"] .contrib-list { gap: 6px; }
+:root[data-density="compact"] .avg-card,
+:root[data-density="compact"] .tp-scenario { padding: 10px 12px; }
+:root[data-density="compact"] .analytics-view { gap: var(--space-3); }
+:root[data-density="compact"] .as-clean { gap: var(--space-3); }

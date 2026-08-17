@@ -186,7 +186,6 @@ const TRANSLATIONS = window.APP_I18N?.TRANSLATIONS || {};
 const DEFAULT_PREFS = {
   theme: "dark",
   oled: false,
-  density: "comfortable",
   currency: "usd",
   language: "es",
   portfolioName: "",
@@ -377,9 +376,6 @@ const dom = {
   portfolioNameDisplay: document.getElementById("portfolioNameDisplay"),
   currencySelect: document.getElementById("currencySelect"),
   autoRefreshSelect: document.getElementById("autoRefreshSelect"),
-  themeToggle: document.getElementById("themeToggle"),
-  oledToggle: document.getElementById("oledToggle"),
-  densityToggle: document.getElementById("densityToggle"),
   apiStatus: document.getElementById("apiStatus"),
   apiStatusMeta: document.getElementById("apiStatusMeta"),
   saveStatus: document.getElementById("saveStatus"),
@@ -1033,7 +1029,7 @@ function renderPlan() {
 // en tpFolds para que no se cierre al re-renderizar mientras se editan los TP.
 // Etiqueta del botón global según haya o no secciones abiertas.
 function updateFoldAllBtn() {
-  const btn = document.querySelector("#planContent .tp-foldall");
+  const btn = document.getElementById("planFoldAllBtn");
   if (!btn) return;
   const anyOpen = tpFolds.size > 0;
   btn.textContent = anyOpen ? t("tp.collapseAll") : t("tp.expandAll");
@@ -1249,43 +1245,37 @@ function renderTpTool() {
 
   // ── Barra rápida: aplicar los % TP1-TP3 a todos los activos de golpe ──
   const tpAll = state.plan.tpAll || { p1: 30, p2: 50, p3: 100 };
-  const quickBar = `
-    <section class="panel tp-quick">
-      <div class="tp-quick-head"><strong>${escapeHtml(t("tp.applyAllTitle"))}</strong><small>${escapeHtml(t("tp.applyAllHint"))}</small></div>
+  const quickBar = tpFold("quick", "tp-quick",
+    `<span class="tp-fold-txt"><strong>${escapeHtml(t("tp.applyAllTitle"))}</strong><small>${escapeHtml(t("tp.applyAllHint"))}</small></span>`,
+    `
       <div class="tp-quick-row">
         <label class="tp-quick-field">TP1<input type="text" inputmode="decimal" data-tp-all="p1" value="${planClamp(Number(tpAll.p1) || 0, 0, 100)}" />%</label>
         <label class="tp-quick-field">TP2<input type="text" inputmode="decimal" data-tp-all="p2" value="${planClamp(Number(tpAll.p2) || 0, 0, 100)}" />%</label>
         <label class="tp-quick-field">TP3<input type="text" inputmode="decimal" data-tp-all="p3" value="${planClamp(Number(tpAll.p3) || 0, 0, 100)}" />%</label>
         <button class="primary-btn tp-quick-btn" type="button" data-plan-action="tpApplyAll">${escapeHtml(t("tp.applyAllBtn"))}</button>
       </div>
-    </section>`;
-
-  // Botón global: si hay alguna sección abierta, pliega todo; si no, despliega.
-  const anyOpen = tpFolds.size > 0;
-  const foldAllBar = `
-    <div class="tp-foldall-row">
-      <button class="ghost-btn tp-foldall" type="button" data-plan-action="foldAll" aria-expanded="${anyOpen ? "true" : "false"}">
-        ${escapeHtml(anyOpen ? t("tp.collapseAll") : t("tp.expandAll"))}
-      </button>
-    </div>`;
+    `);
 
   box.innerHTML = `
-    ${quickBar}
-    ${foldAllBar}
     ${block1}
     ${block2}
     ${block3}
     <div class="tp-detail-head"><h2 class="home-section-title">${escapeHtml(t("tp.detailTitle"))}</h2></div>
     ${perAsset}
     ${noTpNotice}
+    ${quickBar}
     <p class="plan-disclaimer">${escapeHtml(PLAN_DISCLAIMER)}</p>
   `;
+  updateFoldAllBtn();
 }
 
 /* ── Bindings ── */
 function bindPlan() {
   const box = document.getElementById("planContent");
   if (!box) return;
+
+  // El botón de plegar/desplegar vive en la cabecera, fuera de #planContent.
+  document.getElementById("planFoldAllBtn")?.addEventListener("click", () => handlePlanAction("foldAll"));
 
   // Mantiene tpFolds al día: el estado abierto sobrevive a los re-renders.
   // Se refresca la etiqueta del botón global sin repintar toda la vista.
@@ -2685,9 +2675,9 @@ function bindEvents() {
   document.getElementById("restoreJsonBtn")?.addEventListener("click", () => restoreInput?.click());
   restoreInput?.addEventListener("change", handleRestoreJson);
   dom.toggleChartsBtn.addEventListener("click", toggleCharts);
-  dom.themeToggle.addEventListener("click", toggleTheme);
-  dom.oledToggle?.addEventListener("click", toggleOled);
-  dom.densityToggle?.addEventListener("click", toggleDensity);
+  document.querySelectorAll("[data-theme-set]").forEach((btn) => {
+    btn.addEventListener("click", () => setTheme(btn.dataset.themeSet));
+  });
   bindAnalyticsSummary();
   dom.portfolioNameInput.addEventListener("input", (event) => {
     savePortfolioName(event.target.value);
@@ -5946,8 +5936,15 @@ function toggleCharts() {
   }
 }
 
-function toggleTheme() {
-  state.prefs.theme = state.prefs.theme === "dark" ? "light" : "dark";
+// Tema con tres opciones excluyentes: claro, oscuro y OLED (oscuro + negro).
+function setTheme(mode) {
+  if (mode === "oled") {
+    state.prefs.theme = "dark";
+    state.prefs.oled = true;
+  } else {
+    state.prefs.theme = mode === "light" ? "light" : "dark";
+    state.prefs.oled = false;
+  }
   applyTheme();
   savePreferences();
   renderDashboardOnly();
@@ -5955,7 +5952,6 @@ function toggleTheme() {
 
 function applyTheme() {
   document.documentElement.dataset.theme = state.prefs.theme;
-  dom.themeToggle.textContent = state.prefs.theme === "dark" ? t("theme.light") : t("theme.dark");
 
   // Mantiene el color del marco del navegador/PWA alineado con el tema activo.
   const themeColor = THEME_COLORS[state.prefs.theme] || THEME_COLORS.dark;
@@ -5964,23 +5960,19 @@ function applyTheme() {
   });
   // OLED es una capa sobre el modo oscuro; se reevalúa tras cambiar de tema.
   applyOled();
+  const active = state.prefs.oled && state.prefs.theme === "dark" ? "oled" : state.prefs.theme;
+  document.querySelectorAll("[data-theme-set]").forEach((btn) => {
+    const on = btn.dataset.themeSet === active;
+    btn.classList.toggle("is-active", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  });
 }
 
 // Tema OLED: capa negra profunda sobre el modo oscuro (independiente del
 // toggle claro/oscuro). Solo tiene efecto visual cuando el tema es "dark".
-function toggleOled() {
-  state.prefs.oled = !state.prefs.oled;
-  applyOled();
-  savePreferences();
-}
-
 function applyOled() {
   const active = Boolean(state.prefs.oled);
   document.documentElement.dataset.oled = active ? "on" : "";
-  if (dom.oledToggle) {
-    dom.oledToggle.classList.toggle("is-active", active);
-    dom.oledToggle.setAttribute("aria-pressed", active ? "true" : "false");
-  }
   // En OLED sobre oscuro, el marco del navegador/PWA va a negro puro.
   if (active && state.prefs.theme === "dark") {
     document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
@@ -5989,22 +5981,9 @@ function applyOled() {
   }
 }
 
-// Modo compacto: densidad de listas/tarjetas más apretada para carteras con
-// muchas posiciones. Mantiene objetivos táctiles y legibilidad (capa
-// independiente data-density="compact").
-function toggleDensity() {
-  state.prefs.density = state.prefs.density === "compact" ? "comfortable" : "compact";
-  applyDensity();
-  savePreferences();
-}
-
+// La vista compacta es ahora la norma: se aplica siempre y no hay ajuste.
 function applyDensity() {
-  const compact = state.prefs.density === "compact";
-  document.documentElement.dataset.density = compact ? "compact" : "";
-  if (dom.densityToggle) {
-    dom.densityToggle.classList.toggle("is-active", compact);
-    dom.densityToggle.setAttribute("aria-pressed", compact ? "true" : "false");
-  }
+  document.documentElement.dataset.density = "compact";
 }
 
 function isAutoRefreshAllowed() {
