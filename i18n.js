@@ -304,7 +304,7 @@ window.APP_I18N = {
       "analytics.totalPnl": "B/P total",
       "analytics.nAssets": "Activos",
       "analytics.nTrades": "Operaciones",
-      "analytics.activityStats": "Compras y ventas por mes",
+      "analytics.activityStats": "Compras y ventas",
       "analytics.noTrades": "Aun no hay operaciones registradas. Las compras y ventas nuevas apareceran aqui.",
       "analytics.totalBuys": "Aportes acumulados",
       "analytics.totalSells": "Capital recuperado",

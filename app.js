@@ -132,34 +132,60 @@ function getAssetCategory(row) {
    (el endpoint de mercados no devuelve categorías). Lo no listado cae en
    "otros"; en la vista solo se muestran los sectores presentes en la cartera. */
 const ASSET_SECTORS = {
-  l1: ["bitcoin", "ethereum", "solana", "cardano", "avalanche-2", "polkadot", "cosmos", "near", "aptos", "sui", "the-open-network", "tron", "algorand", "hedera-hashgraph", "internet-computer", "sei-network", "kaspa", "tezos", "eos", "elrond-erd-2", "multiversx", "flow", "celo", "kava", "binancecoin", "ethereum-classic", "bitcoin-cash", "litecoin"],
-  l2: ["matic-network", "polygon-ecosystem-token", "arbitrum", "optimism", "immutable-x", "starknet", "mantle", "metis-token", "loopring", "zksync", "blast", "manta-network", "scroll", "taiko"],
-  defi: ["uniswap", "aave", "maker", "sky", "curve-dao-token", "lido-dao", "compound-governance-token", "havven", "pancakeswap-token", "jupiter-exchange-solana", "raydium", "thorchain", "dydx-chain", "dydx", "ethena", "pendle", "rocket-pool", "frax-share", "1inch", "gmx", "convex-finance", "balancer", "yearn-finance", "jito-governance-token"],
-  ia: ["fetch-ai", "artificial-superintelligence-alliance", "singularitynet", "ocean-protocol", "render-token", "bittensor", "akash-network", "worldcoin-wld", "arkham", "grass", "nosana", "phala-network"],
-  meme: ["dogecoin", "shiba-inu", "pepe", "bonk", "dogwifcoin", "floki", "brett-based", "popcat", "mog-coin", "book-of-meme", "cat-in-a-dogs-world", "turbo", "notcoin", "memecoin-2", "spx6900", "fartcoin"],
-  gaming: ["the-sandbox", "decentraland", "axie-infinity", "gala", "illuvium", "beam-2", "ronin", "enjincoin", "yield-guild-games", "apecoin", "pixels", "echelon-prime"],
-  infra: ["chainlink", "the-graph", "filecoin", "arweave", "helium", "storj", "pyth-network", "wormhole", "celestia", "eigenlayer", "quant-network", "vechain", "iota", "theta-token", "livepeer", "golem"],
-  rwa: ["ondo-finance", "polymesh", "centrifuge", "maple", "goldfinch", "clearpool", "chintai"],
-  privacy: ["monero", "zcash", "dash", "oasis-network", "secret", "decred"],
-  payments: ["ripple", "stellar", "nano", "iexec-rlc", "request-network"],
-  exchange: ["okb", "crypto-com-chain", "kucoin-shares", "leo-token", "gatechain-token", "bitget-token", "whitebit", "bnb"],
-  stable: ["tether", "usd-coin", "dai", "first-digital-usd", "ethena-usde", "usds", "true-usd", "paypal-usd", "frax", "usdd"]
+  l1: ["bitcoin", "ethereum", "solana", "cardano", "avalanche-2", "polkadot", "cosmos", "near", "aptos", "sui", "the-open-network", "tron", "algorand", "hedera-hashgraph", "internet-computer", "sei-network", "kaspa", "tezos", "eos", "elrond-erd-2", "multiversx", "flow", "celo", "kava", "binancecoin", "ethereum-classic", "bitcoin-cash", "litecoin", "sonic-3", "berachain-bera", "monad", "movement", "story-2", "injective-protocol", "kadena", "fantom", "harmony", "zilliqa", "stacks", "core", "cronos", "neo", "qtum"],
+  l2: ["matic-network", "polygon-ecosystem-token", "arbitrum", "optimism", "immutable-x", "starknet", "mantle", "metis-token", "loopring", "zksync", "blast", "manta-network", "scroll", "taiko", "linea", "mode", "zora", "morph", "unichain"],
+  defi: ["uniswap", "aave", "maker", "sky", "curve-dao-token", "lido-dao", "compound-governance-token", "havven", "synthetix-network-token", "pancakeswap-token", "jupiter-exchange-solana", "raydium", "thorchain", "dydx-chain", "dydx", "ethena", "pendle", "rocket-pool", "frax-share", "1inch", "gmx", "convex-finance", "balancer", "yearn-finance", "jito-governance-token", "aerodrome-finance", "velodrome-finance", "hyperliquid", "radiant-capital", "spell-token", "liquity", "stargate-finance", "sushi", "orca", "meteora", "kamino", "drift-protocol", "morpho", "euler", "usual", "resolv"],
+  ia: ["fetch-ai", "artificial-superintelligence-alliance", "singularitynet", "ocean-protocol", "render-token", "bittensor", "akash-network", "worldcoin-wld", "arkham", "grass", "nosana", "phala-network", "virtuals-protocol", "ai16z", "aixbt", "zerebro", "griffain", "freysa-ai", "io-net", "aethir", "tars-protocol", "tars-ai", "swarms", "cookie", "wayfinder", "vana", "sahara-ai", "openledger", "kaito", "numeraire", "cortex", "autonolas", "theoriq", "allora", "prime-intellect", "gaib", "kite-ai"],
+  meme: ["dogecoin", "shiba-inu", "pepe", "bonk", "dogwifcoin", "floki", "brett-based", "popcat", "mog-coin", "book-of-meme", "cat-in-a-dogs-world", "turbo", "notcoin", "memecoin-2", "spx6900", "fartcoin", "neiro-3", "first-neiro-on-ethereum", "neiro", "ponke", "goatseus-maximus", "peanut-the-squirrel", "moo-deng", "act-i-the-ai-prophecy", "michi", "myro", "wen-4", "slerf", "just-a-chill-guy", "apu-apustaja", "andy-the-wojak", "mother-iggy", "daddy-tate", "retardio", "gigachad-2", "baby-doge-coin", "dogelon-mars", "samoyedcoin", "hoppy", "simons-cat", "pepecoin-2", "dogs-2", "hamster-kombat", "pudgy-penguins", "keyboard-cat", "toshi", "degen-base", "higher", "mumu-the-bull", "useless-coin", "housecoin"],
+  gaming: ["the-sandbox", "decentraland", "axie-infinity", "gala", "illuvium", "beam-2", "ronin", "enjincoin", "yield-guild-games", "apecoin", "pixels", "echelon-prime", "gods-unchained", "star-atlas", "wax", "ultra", "big-time", "portal-2", "nakamoto-games", "shrapnel", "xai-blockchain"],
+  infra: ["chainlink", "the-graph", "filecoin", "arweave", "helium", "storj", "pyth-network", "wormhole", "celestia", "eigenlayer", "quant-network", "vechain", "iota", "theta-token", "livepeer", "golem", "layerzero", "axelar", "ankr", "band-protocol", "api3", "dia-data", "zelcash", "iexec-rlc", "walrus-2", "space-and-time", "chainbase", "hemi", "succinct"],
+  rwa: ["ondo-finance", "polymesh", "centrifuge", "maple", "goldfinch", "clearpool", "chintai", "mantra-dao", "realio-network", "propy", "landshare", "tokenfi", "plume"],
+  privacy: ["monero", "zcash", "dash", "oasis-network", "secret", "decred", "railgun", "aleph-zero", "horizen"],
+  payments: ["ripple", "stellar", "nano", "request-network", "pundi-x-2", "cheqd-network"],
+  exchange: ["okb", "crypto-com-chain", "kucoin-shares", "leo-token", "gatechain-token", "bitget-token", "whitebit", "bnb", "huobi-token", "mx-token"],
+  stable: ["tether", "usd-coin", "dai", "first-digital-usd", "ethena-usde", "usds", "true-usd", "paypal-usd", "frax", "usdd", "usdt0", "susds", "binance-usd", "gemini-dollar", "liquity-usd", "crvusd"]
 };
 
-// Índice invertido id → sector (se construye una vez).
+/* Respaldo por simbolo: si el id de CoinGecko no esta en el mapa (o la posicion
+   se creo a mano sin id), se clasifica por ticker. Evita que activos conocidos
+   acaben en "Otros" solo porque su id no coincida. */
+const SECTOR_BY_SYMBOL_RAW = {
+  ia: ["TAO", "RENDER", "RNDR", "FET", "AGIX", "OCEAN", "AKT", "WLD", "VIRTUAL", "AI16Z", "AIXBT", "ZEREBRO", "GRIFFAIN", "FREYSA", "IO", "ATH", "TARS", "SWARMS", "COOKIE", "PROMPT", "VANA", "SAHARA", "OPEN", "KAITO", "NMR", "CTXC", "OLAS", "GRASS", "NOS", "PHA", "ARKM", "ALLO", "GAIB", "KITE"],
+  meme: ["DOGE", "SHIB", "PEPE", "BONK", "WIF", "FLOKI", "BRETT", "POPCAT", "MOG", "BOME", "MEW", "TURBO", "NOT", "MEME", "SPX", "FARTCOIN", "NEIRO", "PONKE", "GOAT", "PNUT", "MOODENG", "ACT", "MICHI", "MYRO", "WEN", "SLERF", "CHILLGUY", "APU", "ANDY", "MOTHER", "DADDY", "RETARDIO", "GIGA", "BABYDOGE", "ELON", "SAMO", "HOPPY", "DOGS", "HMSTR", "TOSHI", "DEGEN", "HIGHER", "MUMU", "WOJAK", "USELESS", "HOUSE", "PENGU"],
+  l1: ["BTC", "ETH", "SOL", "ADA", "AVAX", "DOT", "ATOM", "NEAR", "APT", "SUI", "TON", "TRX", "ALGO", "HBAR", "ICP", "SEI", "KAS", "XTZ", "EOS", "EGLD", "FLOW", "CELO", "KAVA", "BNB", "ETC", "BCH", "LTC", "BERA", "MON", "MOVE", "IP", "INJ", "KDA", "FTM", "ONE", "STX", "CORE", "CRO", "NEO", "QTUM"],
+  l2: ["MATIC", "POL", "ARB", "OP", "IMX", "STRK", "MNT", "METIS", "LRC", "ZK", "BLAST", "MANTA", "SCR", "TAIKO", "LINEA", "MODE", "ZORA"],
+  defi: ["UNI", "AAVE", "MKR", "SKY", "CRV", "LDO", "COMP", "SNX", "CAKE", "JUP", "RAY", "RUNE", "DYDX", "ENA", "PENDLE", "RPL", "FXS", "1INCH", "GMX", "CVX", "BAL", "YFI", "JTO", "AERO", "VELO", "HYPE", "SUSHI", "ORCA", "MET", "KMNO", "DRIFT", "MORPHO", "EUL", "USUAL", "RESOLV"],
+  gaming: ["SAND", "MANA", "AXS", "GALA", "ILV", "BEAM", "RON", "ENJ", "YGG", "APE", "PIXEL", "PRIME", "GODS", "ATLAS", "WAXP", "UOS", "BIGTIME", "PORTAL", "NAKA", "SHRAP", "XAI"],
+  infra: ["LINK", "GRT", "FIL", "AR", "HNT", "STORJ", "PYTH", "W", "TIA", "EIGEN", "QNT", "VET", "IOTA", "THETA", "LPT", "GLM", "ZRO", "AXL", "ANKR", "BAND", "API3", "DIA", "FLUX", "RLC", "WAL", "SXT", "HEMI", "PROVE"],
+  rwa: ["ONDO", "POLYX", "CFG", "MPL", "GFI", "CPOOL", "OM", "RIO", "PRO", "PLUME"],
+  privacy: ["XMR", "ZEC", "DASH", "ROSE", "SCRT", "DCR", "RAIL", "AZERO", "ZEN"],
+  payments: ["XRP", "XLM", "XNO", "REQ", "PUNDIX", "CHEQ"],
+  exchange: ["OKB", "KCS", "LEO", "GT", "BGB", "WBT", "HT", "MX"],
+  stable: ["USDT", "USDC", "DAI", "FDUSD", "USDE", "USDS", "TUSD", "PYUSD", "FRAX", "USDD", "USDT0", "SUSDS", "BUSD", "GUSD", "LUSD", "CRVUSD"]
+};
+
+// Indices invertidos (se construyen una vez).
 const SECTOR_BY_ID = (() => {
   const map = new Map();
   Object.entries(ASSET_SECTORS).forEach(([sector, ids]) => ids.forEach((id) => map.set(id, sector)));
   return map;
 })();
+const SECTOR_BY_SYMBOL = (() => {
+  const map = new Map();
+  Object.entries(SECTOR_BY_SYMBOL_RAW).forEach(([sector, syms]) => syms.forEach((sy) => {
+    if (!map.has(sy)) map.set(sy, sector);
+  }));
+  return map;
+})();
 
-// Sector de una posición: por id de CoinGecko; las stablecoins se detectan
-// también por símbolo para no depender del id.
+// Sector de una posicion: primero por id de CoinGecko (exacto) y, si no
+// aparece, por simbolo. Las stablecoins tienen su propia comprobacion.
 function getAssetSector(row) {
   const id = String(row.coinId || "").toLowerCase();
   if (id && SECTOR_BY_ID.has(id)) return SECTOR_BY_ID.get(id);
   const symbol = String(row.symbol || "").toUpperCase();
   if (STABLE_SYMBOLS.has(symbol)) return "stable";
+  if (symbol && SECTOR_BY_SYMBOL.has(symbol)) return SECTOR_BY_SYMBOL.get(symbol);
   return "otros";
 }
 
@@ -2682,7 +2708,7 @@ function bindEvents() {
   dom.portfolioNameInput.addEventListener("input", (event) => {
     savePortfolioName(event.target.value);
   });
-  dom.lineRangeControl.addEventListener("click", handleChartRangeClick);
+  dom.lineRangeControl?.addEventListener("click", handleChartRangeClick);
 
   dom.currencySelect.addEventListener("change", async (event) => {
     await handleBaseCurrencyChange(event.target.value);
@@ -4174,65 +4200,9 @@ function renderAnalyticsSummary(snapshot) {
 // Analítica en una sola vista: origen del resultado, comparativa 24h,
 // mejor/peor, reparto por sector, seguimiento e historial de operaciones.
 function renderAnalyticsExtras(snapshot) {
-  renderAnalyticsContribution(snapshot);
-  renderAnalyticsCompare(snapshot);
-  renderAnalyticsBestWorst(snapshot);
   renderAnalyticsCategory(snapshot);
-  renderAnalyticsRisk(snapshot);
+  renderAnalyticsCompare(snapshot);
   renderAnalyticsActivityStats();
-}
-
-// Origen del rendimiento: contribución monetaria de cada activo al resultado
-// (B/P no realizada por activo). Distinta de la rentabilidad individual.
-function renderAnalyticsContribution(snapshot) {
-  const box = document.getElementById("analyticsContribution");
-  if (!box) return;
-  const items = snapshot.items
-    .filter((i) => i.metrics.investment > 0 || i.metrics.currentValue > 0)
-    .map((i) => ({ row: i.row, name: assetDisplayName(i.row), symbol: (i.row.symbol || "").toUpperCase(), pnl: i.metrics.pnlUsd, pct: i.metrics.pnlPct }))
-    .filter((i) => Math.abs(i.pnl) > 0.005)
-    .sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl));
-
-  if (!items.length) {
-    box.innerHTML = `<p class="movers-empty">${escapeHtml(t("origin.empty"))}</p>`;
-    return;
-  }
-  // Agrupar impacto mínimo en "Otros" (más de 6 filas).
-  let rows = items;
-  if (items.length > 6) {
-    const head = items.slice(0, 5);
-    const restPnl = items.slice(5).reduce((s, i) => s + i.pnl, 0);
-    rows = head.concat([{ name: t("charts.others"), symbol: "", pnl: restPnl, pct: null, isOther: true }]);
-  }
-  const maxAbs = Math.max(...rows.map((r) => Math.abs(r.pnl))) || 1;
-  const totalPnl = items.reduce((s, i) => s + i.pnl, 0);
-
-  box.innerHTML = `
-    <p class="contrib-hint">${escapeHtml(t("origin.hint"))}</p>
-    <div class="contrib-list">
-      ${rows.map((r) => {
-        const w = Math.max(3, (Math.abs(r.pnl) / maxAbs) * 100);
-        const share = totalPnl !== 0 ? (r.pnl / totalPnl) * 100 : null;
-        const pos = r.pnl >= 0;
-        return `
-        <div class="contrib-row">
-          <div class="contrib-id">${r.isOther ? "" : `<span class="asset-avatar">${renderAssetAvatar(r.row)}</span>`}<span class="contrib-sym">${escapeHtml(r.symbol || r.name)}</span></div>
-          <div class="contrib-bar"><span class="${pos ? "pos" : "neg"}" style="width:${w}%"></span></div>
-          <div class="contrib-val"><b class="${pos ? "positive" : "negative"}">${maskedSignedCurrency(r.pnl)}</b>${share != null && !r.isOther ? `<small>${share >= 0 ? "+" : ""}${share.toFixed(0)}%</small>` : ""}</div>
-        </div>`;
-      }).join("")}
-    </div>`;
-}
-
-function bindAnalyticsSummary() {
-  const box = document.getElementById("analyticsSummaryGrid");
-  if (!box) return;
-  box.addEventListener("click", (e) => {
-    const chip = e.target.closest("[data-period]");
-    if (!chip) return;
-    state.analyticsPeriod = chip.dataset.period;
-    renderAnalyticsSummary(buildSnapshot());
-  });
 }
 
 function renderAnalyticsActivityStats() {
@@ -4266,30 +4236,6 @@ function renderAnalyticsActivityStats() {
   `;
 }
 
-function renderAnalyticsBestWorst(snapshot) {
-  const box = document.getElementById("analyticsBestWorst");
-  if (!box) {
-    return;
-  }
-  const current = getCurrentInsightItems(snapshot);
-  const best = [...current].sort((a, b) => b.metrics.pnlPct - a.metrics.pnlPct)[0] || null;
-  const worst = [...current].sort((a, b) => a.metrics.pnlPct - b.metrics.pnlPct)[0] || null;
-
-  const card = (labelKey, item, tone) => `
-    <div class="bw-card">
-      <span>${escapeHtml(t(labelKey))}</span>
-      ${item ? `
-        <div class="bw-main">
-          <span class="asset-avatar">${renderAssetAvatar(item.row)}</span>
-          <strong>${escapeHtml(assetDisplayName(item.row))}</strong>
-        </div>
-        <strong class="bw-pct ${tone}">${formatPercent(item.metrics.pnlPct)}</strong>
-      ` : `<p class="movers-empty">${escapeHtml(t("home.noData"))}</p>`}
-    </div>
-  `;
-  box.innerHTML = card("analytics.best", best, "positive") + card("analytics.worst", worst, "negative");
-}
-
 function renderAnalyticsCompare(snapshot) {
   const box = document.getElementById("analyticsCompare");
   if (!box) {
@@ -4315,6 +4261,18 @@ function renderAnalyticsCompare(snapshot) {
       </div>
     `;
   }).join("");
+}
+
+// Chips de periodo del resumen de rendimiento.
+function bindAnalyticsSummary() {
+  const box = document.getElementById("analyticsSummaryGrid");
+  if (!box) return;
+  box.addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-period]");
+    if (!chip) return;
+    state.analyticsPeriod = chip.dataset.period;
+    renderAnalyticsSummary(buildSnapshot());
+  });
 }
 
 function renderAnalyticsCategory(snapshot) {
@@ -4356,61 +4314,6 @@ function renderAnalyticsCategory(snapshot) {
       <small class="category-assets">${escapeHtml(r.assets.slice(0, 4).join(" · "))}${r.assets.length > 4 ? " +" + (r.assets.length - 4) : ""}</small>
     </div>
   `).join("");
-}
-
-function renderAnalyticsRisk(snapshot) {
-  const box = document.getElementById("analyticsRisk");
-  if (!box) {
-    return;
-  }
-  const current = getCurrentInsightItems(snapshot);
-  const totalValue = snapshot.totals.currentValue || 1;
-
-  // Progreso medio hacia el siguiente TP.
-  const progresses = snapshot.items
-    .map((item) => getTpProgressPct(item.metrics))
-    .filter((p) => p != null);
-  const avgProgress = progresses.length ? progresses.reduce((s, v) => s + v, 0) / progresses.length : null;
-
-  // Posiciones cerca del siguiente TP (<8%).
-  const nearTp = getNextTpCandidates(snapshot).filter((c) => c.pct <= 8).slice(0, 5);
-  // Posiciones con pérdida > 20%.
-  const losers = current.filter((i) => i.metrics.pnlPct <= -20)
-    .sort((a, b) => a.metrics.pnlPct - b.metrics.pnlPct).slice(0, 5);
-
-  const listBlock = (titleKey, rows, empty) => `
-    <div class="risk-list-block">
-      <h3 class="home-section-title">${escapeHtml(t(titleKey))}</h3>
-      ${rows.length ? `<div class="hl-list">${rows}</div>` : `<p class="movers-empty">${escapeHtml(empty)}</p>`}
-    </div>
-  `;
-
-  const nearRows = nearTp.map((c) => `
-    <article class="hl-item">
-      <span class="asset-avatar">${renderAssetAvatar(c.row)}</span>
-      <div class="hl-main"><strong>${escapeHtml(assetDisplayName(c.row))}</strong><small>${c.label}</small></div>
-      <strong class="hl-pct warning">+${c.pct.toFixed(1)}%</strong>
-    </article>
-  `).join("");
-  const loserRows = losers.map((i) => `
-    <article class="hl-item">
-      <span class="asset-avatar">${renderAssetAvatar(i.row)}</span>
-      <div class="hl-main"><strong>${escapeHtml(assetDisplayName(i.row))}</strong><small>${maskedCurrency(i.metrics.currentValue)}</small></div>
-      <strong class="hl-pct negative">${formatPercent(i.metrics.pnlPct)}</strong>
-    </article>
-  `).join("");
-
-  box.innerHTML = `
-    <div class="risk-gauges">
-      <div class="risk-gauge">
-        <span>${escapeHtml(t("analytics.avgTp"))}</span>
-        <strong>${avgProgress != null ? avgProgress.toFixed(0) + "%" : "--"}</strong>
-        <div class="tp-progress"><span style="width:${avgProgress || 0}%"></span></div>
-      </div>
-    </div>
-    ${listBlock("analytics.nearTp", nearRows, t("analytics.nearTpEmpty"))}
-    ${listBlock("analytics.losers", loserRows, t("analytics.losersEmpty"))}
-  `;
 }
 
 function renderStickyBar(snapshot) {
@@ -4593,8 +4496,12 @@ function renderStatusCards() {
 }
 
 function renderChartsVisibility() {
-  dom.chartsPanel.classList.toggle("hidden", !state.prefs.showCharts);
-  dom.toggleChartsBtn.textContent = state.prefs.showCharts ? t("buttons.hideCharts") : t("buttons.showCharts");
+  // El panel del grafico de evolucion se retiro de Analitica; el resto de
+  // graficos (dona de distribucion) no depende de este control.
+  dom.chartsPanel?.classList.toggle("hidden", !state.prefs.showCharts);
+  if (dom.toggleChartsBtn) {
+    dom.toggleChartsBtn.textContent = state.prefs.showCharts ? t("buttons.hideCharts") : t("buttons.showCharts");
+  }
   renderChartRangeControl();
 }
 
@@ -7906,7 +7813,7 @@ async function updateCharts(snapshot) {
     state.charts.pie.update();
   }
 
-  if (!state.charts.line) {
+  if (!state.charts.line && dom.portfolioLineChart) {
     state.charts.line = new Chart(dom.portfolioLineChart, {
       type: "line",
       data: {
@@ -7970,7 +7877,7 @@ async function updateCharts(snapshot) {
         }
       }
     });
-  } else {
+  } else if (state.charts.line) {
     state.charts.line.data.labels = lineLabels;
     state.charts.line.data.datasets[0].data = lineValues;
     state.charts.line.options.scales.x.ticks.color = textColor;

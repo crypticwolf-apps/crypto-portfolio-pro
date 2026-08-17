@@ -241,7 +241,7 @@
 
       <!-- Subnavegación sticky: Mi portafolio / Comparativas / Herramientas -->
       <div class="analytics-view">
-        <!-- Resumen: valor, invertido, B/P, rendimiento -->
+        <!-- 1. Rendimiento -->
         <section class="panel analytics-summary-panel">
           <div class="panel-heading compact-heading">
             <h2 class="home-section-title" data-i18n="analytics.summaryTitle">Rendimiento</h2>
@@ -249,60 +249,7 @@
           <div id="analyticsSummaryGrid" class="analytics-summary-grid"></div>
         </section>
 
-        <!-- Evolución del portafolio -->
-        <section class="panel charts-panel" id="chartsPanel">
-          <article class="chart-card">
-            <div class="chart-head">
-              <div class="chart-head-copy">
-                <h3 data-i18n="charts.totalEvolution">Evolucion del valor total</h3>
-                <p class="chart-current" id="lineChartSummary" hidden>
-                  <strong id="lineChartValue">--</strong>
-                  <span id="lineChartDelta" class="delta-chip" hidden></span>
-                </p>
-              </div>
-              <div class="chart-head-tools">
-                <div id="lineRangeControl" class="chart-range-control" role="group" aria-label="Rango temporal" data-i18n-aria-label="charts.rangeAriaLabel">
-                  <button class="range-chip" type="button" data-range="1h" data-i18n="charts.range1h">1h</button>
-                  <button class="range-chip" type="button" data-range="1d" data-i18n="charts.range1d">1d</button>
-                  <button class="range-chip" type="button" data-range="1w" data-i18n="charts.range1w">1s</button>
-                  <button class="range-chip" type="button" data-range="1mo" data-i18n="charts.range1mo">1m</button>
-                  <button class="range-chip" type="button" data-range="6mo" data-i18n="charts.range6mo">6m</button>
-                  <button class="range-chip" type="button" data-range="1y" data-i18n="charts.range1y">1a</button>
-                  <button class="range-chip" type="button" data-range="total" data-i18n="charts.rangeTotal">Total</button>
-                </div>
-              </div>
-            </div>
-            <div class="chart-stage">
-              <div class="chart-skeleton" aria-hidden="true"></div>
-              <canvas id="portfolioLineChart" height="280"></canvas>
-              <div id="lineChartEmpty" class="chart-empty hidden" data-i18n="charts.emptyHistory">
-                Todavia no hay suficiente historial. Cada actualizacion de precios crea un punto nuevo.
-              </div>
-            </div>
-          </article>
-        </section>
-
-        <!-- Origen del rendimiento (contribución por activo) -->
-        <section class="panel">
-          <div class="panel-heading compact-heading">
-            <h2 class="home-section-title" data-i18n="origin.title">De donde viene tu resultado</h2>
-          </div>
-          <div id="analyticsContribution" class="contrib-block"></div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-heading compact-heading">
-            <h2 class="home-section-title" data-i18n="analytics.vsTitle">Comparativa 24h vs BTC y ETH</h2>
-          </div>
-          <div id="analyticsCompare" class="compare-block"></div>
-        </section>
-
-        <!-- Mejor y peor activo -->
-        <section class="panel">
-          <div id="analyticsBestWorst" class="best-worst-grid"></div>
-        </section>
-
-        <!-- Distribución por activos -->
+        <!-- 2. Distribucion del portafolio -->
         <section class="panel">
           <div class="panel-heading compact-heading">
             <h2 class="home-section-title" data-i18n="charts.portfolioDistribution">Distribucion del portafolio</h2>
@@ -312,6 +259,8 @@
             <canvas id="portfolioPieChart" height="280"></canvas>
           </div>
         </section>
+
+        <!-- 3. Por categoria -->
         <section class="panel">
           <div class="panel-heading compact-heading">
             <h2 class="home-section-title" data-i18n="analytics.byCategory">Por categoria</h2>
@@ -319,20 +268,15 @@
           <div id="analyticsCategory" class="category-block"></div>
         </section>
 
-        <!-- Seguimiento: cerca de TP y posiciones en perdida -->
-        <section class="panel">
-          <div id="analyticsRisk" class="risk-block"></div>
-        </section>
-
-        <!-- Actividad y aportaciones -->
+        <!-- 4. Comparativa -->
         <section class="panel">
           <div class="panel-heading compact-heading">
-            <h2 class="home-section-title" data-i18n="analytics.activityStats">Compras y ventas por mes</h2>
+            <h2 class="home-section-title" data-i18n="analytics.vsTitle">Comparativa 24h vs BTC y ETH</h2>
           </div>
-          <div id="analyticsActivityStats" class="acts-block"></div>
+          <div id="analyticsCompare" class="compare-block"></div>
         </section>
 
-        <!-- Insights del portafolio -->
+        <!-- 5. Insights -->
         <section class="panel insights-panel">
           <div class="panel-heading compact-heading">
             <h2 class="home-section-title" data-i18n="insights.title">Insights del Portafolio</h2>
@@ -340,9 +284,16 @@
           <div id="insightsRankingsGrid" class="insights-rankings-grid"></div>
         </section>
 
+        <!-- 6. Compras y ventas -->
+        <section class="panel">
+          <div class="panel-heading compact-heading">
+            <h2 class="home-section-title" data-i18n="analytics.activityStats">Compras y ventas</h2>
+          </div>
+          <div id="analyticsActivityStats" class="acts-block"></div>
+        </section>
+
         <button id="toggleChartsBtn" class="hidden" type="button" aria-hidden="true"></button>
       </div>
-
       </section>
 
       <!-- ═══ POSICIONES (dentro de Portafolio) ═══ -->

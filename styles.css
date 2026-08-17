@@ -6672,3 +6672,67 @@ body.filters-open { overflow: hidden; }
 :root[data-density="compact"] .tp-scenario { padding: 10px 12px; }
 :root[data-density="compact"] .analytics-view { gap: var(--space-3); }
 :root[data-density="compact"] .as-clean { gap: var(--space-3); }
+
+/* ═══════════════════════════════════════════════════════
+   DOCK INFERIOR v12 — barra más estrecha y Portafolio
+   sobresaliendo con volumen (efecto 3D / profundidad).
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Barra más baja y ceñida: el icono central se sale por arriba. */
+  .tab-bar { padding: 3px; border-radius: 22px; overflow: visible; }
+  .tab-btn { min-height: 44px; border-radius: 16px; }
+  .tab-btn svg { width: 21px; height: 21px; }
+  .tab-btn span { font-size: 0.6rem; }
+
+  /* Portafolio: círculo elevado que rompe el borde superior del dock. */
+  .tab-btn-primary { overflow: visible; justify-content: flex-end; padding-bottom: 2px; }
+  .tab-btn-primary svg {
+    width: 46px; height: 46px; padding: 12px;
+    margin-top: -26px; margin-bottom: 1px;
+    border-radius: 50%;
+    color: #04121a;
+    background: linear-gradient(155deg, #7dffc9, var(--accent) 45%, #16b47a);
+    box-shadow:
+      0 8px 18px rgba(0, 0, 0, 0.45),
+      0 2px 5px rgba(0, 0, 0, 0.35),
+      inset 0 2px 3px rgba(255, 255, 255, 0.55),
+      inset 0 -3px 5px rgba(0, 60, 40, 0.35),
+      0 0 0 4px var(--bg-2);
+    transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+  }
+  .tab-btn-primary:active svg { transform: translateY(2px) scale(0.96); box-shadow: 0 4px 10px rgba(0,0,0,.4), inset 0 2px 3px rgba(255,255,255,.4), 0 0 0 4px var(--bg-2); }
+  .tab-btn-primary.is-active svg { box-shadow: 0 10px 22px rgba(0,0,0,.5), inset 0 2px 3px rgba(255,255,255,.6), inset 0 -3px 5px rgba(0,60,40,.35), 0 0 0 4px var(--bg-2), var(--glow-accent); }
+  .tab-btn-primary.is-active { background: transparent; }
+  .tab-btn-primary span { font-size: 0.6rem; font-weight: 700; color: var(--accent); }
+}
+@media (prefers-reduced-motion: reduce) { .tab-btn-primary svg { transition: none; } }
+
+/* ── Plan: densidad extra (todo más compacto) ── */
+.tp-fold-sum { min-height: 44px; padding: 7px 11px; gap: 9px; }
+.tp-fold-txt strong { font-size: 0.82rem; }
+.tp-fold-txt small { font-size: 0.62rem; }
+.tp-fold-body { padding: 8px 11px 11px; gap: 8px; }
+.tp-step { padding: 7px 9px; }
+.tp-step-top { font-size: 0.72rem; }
+.tp-step-grid { gap: 6px; margin-top: 4px; }
+.tp-step-grid b { font-size: 0.72rem; }
+.tp-steps { gap: 5px; }
+.tp-config { padding: 7px 9px; gap: 4px; }
+.tp-config-row, .tp-config-legend { grid-template-columns: 36px 1fr 66px 24px; gap: 6px; }
+.tp-config-price, .tp-config-pct input { min-height: 32px; }
+.tp-summary, .tp-global-grid { padding: 9px 11px; gap: 5px 12px; }
+.tp-summary b, .tp-global-grid b { font-size: 0.78rem; }
+.tp-scenario { padding: 9px 11px; gap: 6px; }
+.tp-scenarios { gap: 7px; }
+.tp-line { margin: 0 0 4px; }
+.tp-full-grid { gap: 5px 12px; }
+.tp-detail-head { margin: 2px 0 -4px; }
+#planContent { display: flex; flex-direction: column; gap: 8px; }
+
+/* ── Insights más compactos ── */
+.insights-rankings-grid { gap: 8px; }
+.insights-rankings-grid .hl-item, .insight-card { padding: 7px 10px; }
+.insights-rankings-grid h3 { font-size: 0.74rem; margin-bottom: 4px; }
+.insights-rankings-grid .hl-main strong { font-size: 0.8rem; }
+.insights-rankings-grid .hl-main small { font-size: 0.62rem; }
+.insights-rankings-grid .hl-list { gap: 5px; }
