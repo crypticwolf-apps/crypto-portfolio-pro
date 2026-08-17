@@ -8,6 +8,9 @@ const DATA_SCHEMA_VERSION = 1;
 // OJO: debe declararse antes de la llamada a init() (línea ~350).
 const rowMetricsMemo = new WeakMap();
 const MAX_TRADES = 1000;
+// Secciones abiertas del Plan. Solo en memoria: al abrir la app todo empieza
+// plegado, pero se conserva mientras se edita (el render se repite al escribir).
+const tpFolds = new Set();
 // Periodos del resumen de rendimiento (antes de init(): se usa en el 1er render).
 const ANALYTICS_PERIODS = [
   { key: "24h", ms: 24 * 3600e3, label: "period.24h" },
@@ -997,6 +1000,26 @@ function renderPlan() {
   renderTpTool();
 }
 
+// Sección plegable del Plan. Todo empieza cerrado; el estado de apertura vive
+// en tpFolds para que no se cierre al re-renderizar mientras se editan los TP.
+// Etiqueta del botón global según haya o no secciones abiertas.
+function updateFoldAllBtn() {
+  const btn = document.querySelector("#planContent .tp-foldall");
+  if (!btn) return;
+  const anyOpen = tpFolds.size > 0;
+  btn.textContent = anyOpen ? t("tp.collapseAll") : t("tp.expandAll");
+  btn.setAttribute("aria-expanded", anyOpen ? "true" : "false");
+}
+
+function tpFold(key, cls, headHtml, bodyHtml) {
+  const open = tpFolds.has(key);
+  return `
+    <details class="panel tp-fold ${cls}" data-fold="${escapeHtml(key)}"${open ? " open" : ""}>
+      <summary class="tp-fold-sum">${headHtml}<span class="tp-fold-chev" aria-hidden="true">▾</span></summary>
+      <div class="tp-fold-body">${bodyHtml}</div>
+    </details>`;
+}
+
 function renderTpTool() {
   const box = document.getElementById("planContent");
   if (!box) return;
@@ -1017,9 +1040,9 @@ function renderTpTool() {
   const progTableRows = usedLevels
     .map((k, i) => `<div class="tpg-row"><span>TP${k + 1}</span><span>${money(prog.phases[k])}</span><span>${money(prog.phaseAcc[k])}</span><span>${money(prog.phaseRemain[k])}</span><span class="tpg-exp">${escapeHtml(i === 0 ? t("tp.expFirst") : t("tp.expNext"))}</span></div>`)
     .join("");
-  const block1 = `
-    <section class="panel tp-block tp-block-prog">
-      <div class="tp-block-head"><span class="tp-block-badge">1</span><div><h2 class="home-section-title">${escapeHtml(t("tp.progTitle"))}</h2><small>${escapeHtml(t("tp.progSubtitle"))}</small></div></div>
+  const block1 = tpFold("prog", "tp-block tp-block-prog",
+    `<span class="tp-block-badge">1</span><span class="tp-fold-txt"><strong>${escapeHtml(t("tp.progTitle"))}</strong><small>${escapeHtml(t("tp.progSubtitle"))}</small></span>`,
+    `
       ${prog.count ? `
       <div class="tp-global-grid">
         <div><span>${escapeHtml(t("tp.grandTotal"))}</span><b>${money(prog.totalOut)}</b></div>
@@ -1032,7 +1055,7 @@ function renderTpTool() {
         <div class="tpg-row tpg-head"><span>TP</span><span>${escapeHtml(t("tp.collected"))}</span><span>${escapeHtml(t("tp.accumulated"))}</span><span>${escapeHtml(t("tp.remainValue"))}</span><span>${escapeHtml(t("tp.explanation"))}</span></div>
         ${progTableRows}
       </div>` : `<p class="plan-hint">${escapeHtml(t("tp.noneConfigured"))}</p>`}
-    </section>`;
+    `);
 
   // ── BLOQUE 2: resumen global de venta 100% en cada TP ──
   const fullCards = full
@@ -1048,21 +1071,21 @@ function renderTpTool() {
   const fullTableRows = full
     .map((sc) => `<div class="tpg-row"><span>${escapeHtml(t("tp.sell100at", { tp: sc.label }))}</span><span>${money(sc.total)}</span><span class="${sc.profit >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(sc.profit)}</span><span class="${sc.roi >= 0 ? "positive" : "negative"}">${formatPercent(sc.roi)}</span></div>`)
     .join("");
-  const block2 = `
-    <section class="panel tp-block tp-block-full">
-      <div class="tp-block-head"><span class="tp-block-badge">2</span><div><h2 class="home-section-title">${escapeHtml(t("tp.fullTitle"))}</h2><small>${escapeHtml(t("tp.fullSubtitle"))}</small></div></div>
+  const block2 = tpFold("full", "tp-block tp-block-full",
+    `<span class="tp-block-badge">2</span><span class="tp-fold-txt"><strong>${escapeHtml(t("tp.fullTitle"))}</strong><small>${escapeHtml(t("tp.fullSubtitle"))}</small></span>`,
+    `
       ${full.length ? `
       <div class="tp-scenarios">${fullCards}</div>
       <div class="tp-global-table tp-table-full">
         <div class="tpg-row tpg-head"><span>${escapeHtml(t("tp.scenario"))}</span><span>${escapeHtml(t("tp.estTotal"))}</span><span>${escapeHtml(t("tp.profit"))}</span><span>${escapeHtml(t("tp.roi"))}</span></div>
         ${fullTableRows}
       </div>` : `<p class="plan-hint">${escapeHtml(t("tp.noneConfigured"))}</p>`}
-    </section>`;
+    `);
 
   // ── BLOQUE 3: tabla comparativa global por activo ──
-  const block3 = prog.count ? `
-    <section class="panel">
-      <div class="panel-heading compact-heading"><h2 class="home-section-title">${escapeHtml(t("tp.compareTitle"))}</h2></div>
+  const block3 = prog.count ? tpFold("compare", "",
+    `<span class="tp-fold-txt"><strong>${escapeHtml(t("tp.compareTitle"))}</strong></span>`,
+    `
       <div class="tp-global-table tp-table-compare" style="--tp-cols:${usedLevels.length + 2}">
         <div class="tpg-row tpg-head"><span>${escapeHtml(t("reb.asset"))}</span>${usedLevels.map((k) => `<span>TP${k + 1}</span>`).join("")}<span>${escapeHtml(t("tp.total"))}</span></div>
         ${prog.rows.map((r) => {
@@ -1071,7 +1094,7 @@ function renderTpTool() {
           return `<div class="tpg-row"><span>${escapeHtml(r.p.symbol || r.p.name)}</span>${usedLevels.map((k) => `<span>${money(byIdx[k] || 0)}</span>`).join("")}<span>${money(r.sim.totalOut)}</span></div>`;
         }).join("")}
       </div>
-    </section>` : "";
+    `) : "";
 
   // Línea de precio con marcadores: medio, actual y cada TP.
   // Escala lineal entre el mínimo y el máximo de los precios relevantes.
@@ -1150,18 +1173,20 @@ function renderTpTool() {
           : `<button class="tp-config-del" type="button" data-tp-del="${l.key}" data-row-id="${p.id}" aria-label="${escapeHtml(t("tp.deleteLevel"))}" title="${escapeHtml(t("tp.deleteLevel"))}">✕</button>`}
       </div>`).join("");
 
+    // Cabecera plegable: identidad del activo + su rendimiento estimado, para
+    // poder comparar activos sin necesidad de desplegarlos.
+    const foldKey = "asset:" + p.id;
     const head = `
-      <div class="tp-card-head">
-        <span class="asset-avatar">${renderAssetAvatar(p.row)}</span>
-        <div class="tp-card-id"><strong>${escapeHtml(p.name)}</strong><small>${formatNumber(p.tokens, p.tokens >= 1 ? 4 : 8)} · ${escapeHtml(t("tp.avg"))} ${p.avg > 0 ? formatCurrency(p.avg, getPriceDigits(p.avg)) : "--"} · ${escapeHtml(t("tp.now"))} ${p.price > 0 ? formatCurrency(p.price, getPriceDigits(p.price)) : "--"}</small></div>
-      </div>`;
+      <span class="asset-avatar">${renderAssetAvatar(p.row)}</span>
+      <span class="tp-fold-txt tp-card-id"><strong>${escapeHtml(p.name)}</strong><small>${formatNumber(p.tokens, p.tokens >= 1 ? 4 : 8)} · ${escapeHtml(t("tp.avg"))} ${p.avg > 0 ? formatCurrency(p.avg, getPriceDigits(p.avg)) : "--"} · ${escapeHtml(t("tp.now"))} ${p.price > 0 ? formatCurrency(p.price, getPriceDigits(p.price)) : "--"}</small></span>
+      ${sim.hasTp && !noData ? `<span class="tp-fold-badge ${sim.profit >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(sim.profit)}</span>` : ""}`;
     const configBlock = `<div class="tp-config"><div class="tp-config-legend"><span>${escapeHtml(t("tp.price"))}</span><span>${escapeHtml(t("tp.pctSell"))}</span></div>${configRows}</div>`;
 
     if (noData) {
-      return `<section class="panel tp-card">${head}${configBlock}<p class="plan-hint tp-warn">${escapeHtml(t("tp.noData"))}</p></section>`;
+      return tpFold(foldKey, "tp-card", head, `${configBlock}<p class="plan-hint tp-warn">${escapeHtml(t("tp.noData"))}</p>`);
     }
     if (!sim.hasTp) {
-      return `<section class="panel tp-card">${head}${configBlock}<p class="plan-hint">${escapeHtml(t("tp.noTargets"))}</p></section>`;
+      return tpFold(foldKey, "tp-card", head, `${configBlock}<p class="plan-hint">${escapeHtml(t("tp.noTargets"))}</p>`);
     }
 
     const steps = sim.steps.map((s) => `
@@ -1174,9 +1199,7 @@ function renderTpTool() {
         </div>
       </div>`).join("");
     const fullRows = fullA.map((f) => `<div><span>${f.label} 100%${f.reached ? ` <em class="tp-reached-tag">${escapeHtml(t("tp.reachedTag"))}</em>` : ""}</span><b>${money(f.income)}</b><small class="${f.roi >= 0 ? "positive" : "negative"}">${formatPercent(f.roi)}</small></div>`).join("");
-    return `
-      <section class="panel tp-card">
-        ${head}
+    return tpFold(foldKey, "tp-card", head, `
         ${buildTpPriceLine(p, sim)}
         ${configBlock}
         <div class="tp-steps">${steps}</div>
@@ -1187,7 +1210,7 @@ function renderTpTool() {
           <div><span>${escapeHtml(t("tp.roi"))}</span><b class="${sim.roi >= 0 ? "positive" : "negative"}">${formatPercent(sim.roi)}</b></div>
         </div>
         <div class="tp-full"><span class="tp-full-label">${escapeHtml(t("tp.full100"))}</span><div class="tp-full-grid">${fullRows}</div></div>
-      </section>`;
+      `);
   }).join("");
 
   // ── BLOQUE 7: avisos de activos sin TP ──
@@ -1208,8 +1231,18 @@ function renderTpTool() {
       </div>
     </section>`;
 
+  // Botón global: si hay alguna sección abierta, pliega todo; si no, despliega.
+  const anyOpen = tpFolds.size > 0;
+  const foldAllBar = `
+    <div class="tp-foldall-row">
+      <button class="ghost-btn tp-foldall" type="button" data-plan-action="foldAll" aria-expanded="${anyOpen ? "true" : "false"}">
+        ${escapeHtml(anyOpen ? t("tp.collapseAll") : t("tp.expandAll"))}
+      </button>
+    </div>`;
+
   box.innerHTML = `
     ${quickBar}
+    ${foldAllBar}
     ${block1}
     ${block2}
     ${block3}
@@ -1224,6 +1257,16 @@ function renderTpTool() {
 function bindPlan() {
   const box = document.getElementById("planContent");
   if (!box) return;
+
+  // Mantiene tpFolds al día: el estado abierto sobrevive a los re-renders.
+  // Se refresca la etiqueta del botón global sin repintar toda la vista.
+  box.addEventListener("toggle", (event) => {
+    const fold = event.target.closest && event.target.closest("details.tp-fold");
+    if (!fold) return;
+    const key = fold.dataset.fold;
+    if (fold.open) tpFolds.add(key); else tpFolds.delete(key);
+    updateFoldAllBtn();
+  }, true);
 
   box.addEventListener("click", (event) => {
     const tpDel = event.target.closest("[data-tp-del]");
@@ -1270,6 +1313,18 @@ function bindPlan() {
 
 function handlePlanAction(action) {
   switch (action) {
+    case "foldAll": {
+      // Si hay algo abierto → plegar todo; si todo está plegado → desplegar.
+      const folds = document.querySelectorAll("#planContent details.tp-fold");
+      const collapse = tpFolds.size > 0;
+      folds.forEach((d) => {
+        d.open = !collapse;
+        if (collapse) tpFolds.delete(d.dataset.fold);
+        else tpFolds.add(d.dataset.fold);
+      });
+      updateFoldAllBtn();
+      break;
+    }
     case "tpApplyAll": {
       const box = document.getElementById("planContent");
       if (!box) break;

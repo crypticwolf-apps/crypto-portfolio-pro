@@ -6558,3 +6558,43 @@ body.filters-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .asub-tab, .contrib-bar > span { transition: none; }
 }
+
+/* ═══════════════════════════════════════════════════════
+   PLAN: secciones plegables (todo cerrado al entrar) +
+   boton global de plegar/desplegar.
+   ═══════════════════════════════════════════════════════ */
+.tp-foldall-row { display: flex; justify-content: flex-end; }
+.tp-foldall { min-height: var(--control-md); padding: 0 var(--space-4); font-size: 0.76rem; }
+
+.tp-fold { padding: 0; overflow: hidden; }
+.tp-fold-sum {
+  list-style: none; cursor: pointer;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4); min-height: 56px;
+}
+.tp-fold-sum::-webkit-details-marker { display: none; }
+.tp-fold-sum:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
+.tp-fold-txt { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.tp-fold-txt strong { font-size: 0.9rem; line-height: 1.25; }
+.tp-fold-txt small { font-size: 0.66rem; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+.tp-fold-badge {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: 0.78rem; font-weight: 700; white-space: nowrap;
+  padding: 2px var(--space-2); border-radius: 999px;
+}
+.tp-fold-badge.positive { color: var(--positive); background: var(--positive-bg); }
+.tp-fold-badge.negative { color: var(--negative); background: var(--negative-bg); }
+.tp-fold-chev { color: var(--muted); font-size: 0.8rem; flex: 0 0 auto; transition: transform var(--dur-fast) var(--ease-out); }
+.tp-fold[open] .tp-fold-chev { transform: rotate(180deg); }
+.tp-fold-body {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4);
+  border-top: 1px solid var(--line); margin-top: 0; padding-top: var(--space-3);
+}
+/* Los bloques 1 y 2 conservan su franja de color a la izquierda */
+.tp-fold.tp-block { border-left: 3px solid transparent; }
+.tp-fold.tp-block-prog { border-left-color: var(--accent); }
+.tp-fold.tp-block-full { border-left-color: var(--accent2, #a988ff); }
+.tp-fold .tp-card-id small { font-family: var(--font-mono); }
+
+@media (prefers-reduced-motion: reduce) { .tp-fold-chev { transition: none; } }

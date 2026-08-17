@@ -33,6 +33,8 @@ window.APP_I18N = {
       "fab.pdf": "Descargar PDF",
       "fab.pdfDesc": "Informe del portafolio en PDF",
       "tp.lineAria": "Linea de precio: medio, actual y objetivos TP",
+      "tp.expandAll": "Desplegar todo",
+      "tp.collapseAll": "Plegar todo",
       "cap.title": "Comparador de capitalizacion",
       "cap.intro": "Simula que precio tendria un activo con la capitalizacion de otro. Herramienta educativa.",
       "cap.disclaimer": "Este calculo es una simulacion basada en la oferta disponible y la capitalizacion seleccionada. No representa una prediccion de precio.",
