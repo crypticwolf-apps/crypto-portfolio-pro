@@ -4066,11 +4066,28 @@ function getMaxDrawdownPct() {
 // concentración (Top 1/3/5), % en stables y riesgo de concentración.
 // Resultado del periodo desde el historial de valor (o total desde el inicio).
 // No sustituye datos inexistentes por cero: si falta historial → enough:false.
+// Capital aportado total = coste de las posiciones abiertas + coste atribuido
+// a los tokens ya vendidos. Ese coste se deriva de cada venta registrada:
+// realizado = ingresos - coste - comisión  →  coste = ingresos - comisión - realizado.
+// Es la base correcta para el porcentaje del resultado NETO (realizado +
+// no realizado): usar solo el coste abierto inflaría la rentabilidad.
+function getDeployedCapital(snapshot) {
+  const soldCost = state.trades.reduce((sum, tr) => {
+    if (tr.type !== "sell" || !Number.isFinite(tr.realized)) return sum;
+    const cost = (Number(tr.amount) || 0) - (Number(tr.fee) || 0) - Number(tr.realized);
+    return sum + Math.max(0, cost);
+  }, 0);
+  return snapshot.totals.investment + soldCost;
+}
+
 function getPeriodResult(key, snapshot) {
   if (key === "total") {
-    const totalPnl = snapshot.totals.currentValue - snapshot.totals.investment;
-    const money = totalPnl + getRealizedPnl();
-    const pct = snapshot.totals.investment > 0 ? (totalPnl / snapshot.totals.investment) * 100 : null;
+    const unrealized = snapshot.totals.currentValue - snapshot.totals.investment;
+    const money = unrealized + getRealizedPnl();
+    // El importe y el porcentaje deben describir lo mismo: resultado neto
+    // sobre el capital aportado (no solo sobre el coste aún abierto).
+    const base = getDeployedCapital(snapshot);
+    const pct = base > 0 ? (money / base) * 100 : null;
     return { enough: true, money, pct };
   }
   const def = ANALYTICS_PERIODS.find((p) => p.key === key);
@@ -4108,15 +4125,16 @@ function renderAnalyticsSummary(snapshot) {
   const totalPnl = snapshot.totals.currentValue - snapshot.totals.investment;
   const realized = getRealizedPnl();
   const netTotal = totalPnl + realized;
-  const roi = snapshot.totals.investment > 0 ? (totalPnl / snapshot.totals.investment) * 100 : null;
   const res = getPeriodResult(period, snapshot);
 
   const chips = ANALYTICS_PERIODS
     .map((p) => `<button class="as-period ${p.key === period ? "is-active" : ""}" type="button" data-period="${p.key}">${escapeHtml(t(p.label))}</button>`)
     .join("");
 
-  const mainMoney = period === "total" ? netTotal : res.money;
-  const mainPct = period === "total" ? roi : res.pct;
+  // Importe y porcentaje salen SIEMPRE del mismo cálculo (getPeriodResult):
+  // así nunca describen magnitudes distintas.
+  const mainMoney = res.money;
+  const mainPct = res.pct;
   const mainOk = period === "total" ? true : res.enough;
   const mainTone = mainOk ? toneClass(mainMoney) : "";
   const mainBlock = mainOk
@@ -4128,13 +4146,17 @@ function renderAnalyticsSummary(snapshot) {
   else if (!res.enough) phrase = t("summary.noHistoryPeriod");
   else phrase = t(res.money >= 0 ? "summary.phraseGain" : "summary.phraseLoss", { amount: maskedCurrency(Math.abs(res.money)), period: periodLabel.toLowerCase() });
 
+  // Con ventas registradas, "invertido" es el capital aportado total (coste
+  // abierto + coste de lo vendido): así el % del resultado neto cuadra con
+  // los importes visibles. El coste solo-abierto vive en el desglose.
+  const deployed = getDeployedCapital(snapshot);
   const secondary = [
-    { label: t("analytics.totalValue"), value: maskedCurrency(snapshot.totals.currentValue) },
-    { label: t("analytics.invested"), value: maskedCurrency(snapshot.totals.investment) }
+    { label: t("analytics.totalValue"), value: maskedCurrency(snapshot.totals.currentValue), hint: t("summary.hintValue") },
+    { label: t("analytics.invested"), value: maskedCurrency(deployed), hint: t("summary.hintInvested") }
   ];
-  if (period === "total") {
-    if (roi != null) secondary.push({ label: t("summary.roi"), value: formatSignedPercent(roi), tone: toneClass(roi) });
-  } else {
+  // En "Total" el porcentaje ya está en la cifra principal: no se repite aquí
+  // (evita métricas duplicadas). En un periodo concreto se añade el acumulado.
+  if (period !== "total") {
     secondary.push({ label: t("summary.totalSinceStart"), value: maskedSignedCurrency(netTotal), tone: toneClass(netTotal), muted: true });
   }
 
@@ -4158,12 +4180,12 @@ function renderAnalyticsSummary(snapshot) {
     <div class="as-clean">
       <div class="as-period-row" role="group" aria-label="${escapeHtml(t("summary.periodAria"))}">${chips}</div>
       <div class="as-hero">
-        <span class="as-label">${escapeHtml(period === "total" ? t("summary.netTotal") : t("summary.periodResult", { period: periodLabel }))}</span>
+        <span class="as-label" title="${escapeHtml(period === "total" ? t("summary.hintNet") : t("summary.hintPeriod"))}">${escapeHtml(period === "total" ? t("summary.netTotal") : t("summary.periodResult", { period: periodLabel }))}</span>
         <div class="as-hero-main" aria-live="polite">${mainBlock}</div>
         ${phrase ? `<p class="as-phrase">${escapeHtml(phrase)}</p>` : ""}
       </div>
       <div class="as-secondary">
-        ${secondary.map((s) => `<div class="as-sec ${s.muted ? "muted" : ""}"><span>${escapeHtml(s.label)}</span><b class="${s.tone || ""}">${escapeHtml(String(s.value))}</b></div>`).join("")}
+        ${secondary.map((s) => `<div class="as-sec ${s.muted ? "muted" : ""}"${s.hint ? ` title="${escapeHtml(s.hint)}"` : ""}><span>${escapeHtml(s.label)}</span><b class="${s.tone || ""}">${escapeHtml(String(s.value))}</b></div>`).join("")}
       </div>
       ${breakdown}
     </div>`;

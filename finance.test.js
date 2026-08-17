@@ -135,6 +135,32 @@ describe("CryptoFinance.capPositionImpact", () => {
   });
 });
 
+// El coste atribuido a una venta se deriva de lo que guarda el ledger:
+// realizado = ingresos - coste - comision  =>  coste = ingresos - comision - realizado.
+// Es la base del "capital aportado" del resumen; si esta derivacion falla, el
+// porcentaje del resultado neto dejaria de cuadrar con los importes visibles.
+describe("coste atribuido a una venta (base del capital aportado)", () => {
+  it("se deriva de ingresos, comision y realizado", () => {
+    const r = F.sell({ amount: 1000, price: 1000, fee: 5, curTokens: 2, curInvestment: 1200 });
+    // avgCost 600 -> vende 1 token: ingresos 1000, realizado 1000-600-5 = 395
+    expect(r.grossProceeds).toBeCloseTo(1000, 6);
+    expect(r.realized).toBeCloseTo(395, 6);
+    const costDerived = r.grossProceeds - 5 - r.realized;
+    expect(costDerived).toBeCloseTo(600, 6);
+  });
+
+  it("resultado neto y porcentaje usan la misma base", () => {
+    const openCost = 4750, currentValue = 4859.79, soldCost = 600, realized = 395;
+    const unrealized = currentValue - openCost;
+    const net = unrealized + realized;
+    const deployed = openCost + soldCost;
+    expect(net).toBeCloseTo(504.79, 2);
+    expect((net / deployed) * 100).toBeCloseTo(9.4353, 3);
+    // El error historico era dividir el neto entre el coste abierto:
+    expect((net / openCost) * 100).not.toBeCloseTo((net / deployed) * 100, 2);
+  });
+});
+
 describe("CryptoFinance.capNeededForPrice", () => {
   it("capitalización necesaria = precio objetivo × oferta", () => {
     const r = F.capNeededForPrice({ targetPrice: 10, basePrice: 2, baseCap: 100e9 });
