@@ -6598,3 +6598,11 @@ body.filters-open { overflow: hidden; }
 .tp-fold .tp-card-id small { font-family: var(--font-mono); }
 
 @media (prefers-reduced-motion: reduce) { .tp-fold-chev { transition: none; } }
+
+/* Categoría por sector: fila con etiqueta, barra, % y activos del sector. */
+.category-row { align-items: center; }
+.category-assets {
+  grid-column: 1 / -1; font-family: var(--font-mono); font-size: 0.6rem;
+  color: var(--muted); padding-left: 18px; margin-top: -2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

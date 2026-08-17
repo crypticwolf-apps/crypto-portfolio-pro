@@ -128,6 +128,41 @@ function getAssetCategory(row) {
   }
   return "alt";
 }
+/* Sectores para la analítica por categoría. Mapa curado por id de CoinGecko
+   (el endpoint de mercados no devuelve categorías). Lo no listado cae en
+   "otros"; en la vista solo se muestran los sectores presentes en la cartera. */
+const ASSET_SECTORS = {
+  l1: ["bitcoin", "ethereum", "solana", "cardano", "avalanche-2", "polkadot", "cosmos", "near", "aptos", "sui", "the-open-network", "tron", "algorand", "hedera-hashgraph", "internet-computer", "sei-network", "kaspa", "tezos", "eos", "elrond-erd-2", "multiversx", "flow", "celo", "kava", "binancecoin", "ethereum-classic", "bitcoin-cash", "litecoin"],
+  l2: ["matic-network", "polygon-ecosystem-token", "arbitrum", "optimism", "immutable-x", "starknet", "mantle", "metis-token", "loopring", "zksync", "blast", "manta-network", "scroll", "taiko"],
+  defi: ["uniswap", "aave", "maker", "sky", "curve-dao-token", "lido-dao", "compound-governance-token", "havven", "pancakeswap-token", "jupiter-exchange-solana", "raydium", "thorchain", "dydx-chain", "dydx", "ethena", "pendle", "rocket-pool", "frax-share", "1inch", "gmx", "convex-finance", "balancer", "yearn-finance", "jito-governance-token"],
+  ia: ["fetch-ai", "artificial-superintelligence-alliance", "singularitynet", "ocean-protocol", "render-token", "bittensor", "akash-network", "worldcoin-wld", "arkham", "grass", "nosana", "phala-network"],
+  meme: ["dogecoin", "shiba-inu", "pepe", "bonk", "dogwifcoin", "floki", "brett-based", "popcat", "mog-coin", "book-of-meme", "cat-in-a-dogs-world", "turbo", "notcoin", "memecoin-2", "spx6900", "fartcoin"],
+  gaming: ["the-sandbox", "decentraland", "axie-infinity", "gala", "illuvium", "beam-2", "ronin", "enjincoin", "yield-guild-games", "apecoin", "pixels", "echelon-prime"],
+  infra: ["chainlink", "the-graph", "filecoin", "arweave", "helium", "storj", "pyth-network", "wormhole", "celestia", "eigenlayer", "quant-network", "vechain", "iota", "theta-token", "livepeer", "golem"],
+  rwa: ["ondo-finance", "polymesh", "centrifuge", "maple", "goldfinch", "clearpool", "chintai"],
+  privacy: ["monero", "zcash", "dash", "oasis-network", "secret", "decred"],
+  payments: ["ripple", "stellar", "nano", "iexec-rlc", "request-network"],
+  exchange: ["okb", "crypto-com-chain", "kucoin-shares", "leo-token", "gatechain-token", "bitget-token", "whitebit", "bnb"],
+  stable: ["tether", "usd-coin", "dai", "first-digital-usd", "ethena-usde", "usds", "true-usd", "paypal-usd", "frax", "usdd"]
+};
+
+// Índice invertido id → sector (se construye una vez).
+const SECTOR_BY_ID = (() => {
+  const map = new Map();
+  Object.entries(ASSET_SECTORS).forEach(([sector, ids]) => ids.forEach((id) => map.set(id, sector)));
+  return map;
+})();
+
+// Sector de una posición: por id de CoinGecko; las stablecoins se detectan
+// también por símbolo para no depender del id.
+function getAssetSector(row) {
+  const id = String(row.coinId || "").toLowerCase();
+  if (id && SECTOR_BY_ID.has(id)) return SECTOR_BY_ID.get(id);
+  const symbol = String(row.symbol || "").toUpperCase();
+  if (STABLE_SYMBOLS.has(symbol)) return "stable";
+  return "otros";
+}
+
 const CHART_RANGE_WINDOWS = {
   "1m": 60 * 1000,
   "1h": 60 * 60 * 1000,
@@ -603,12 +638,6 @@ function setActiveTab(tab) {
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-current", active ? "page" : "false");
   });
-
-  if (nextTab === "analytics") {
-    // Subpestañas: aplica la activa (Mi portafolio por defecto) y construye
-    // Herramientas solo si corresponde (carga diferida).
-    setAnalyticsSub(state.analyticsSub || "portfolio");
-  }
 
   if (nextTab === "analytics" && state.prefs.showCharts) {
     // Chart.js se carga perezosamente solo al abrir Analitica; los skeletons
@@ -2659,9 +2688,7 @@ function bindEvents() {
   dom.themeToggle.addEventListener("click", toggleTheme);
   dom.oledToggle?.addEventListener("click", toggleOled);
   dom.densityToggle?.addEventListener("click", toggleDensity);
-  bindCapComparator();
   bindAnalyticsSummary();
-  bindAnalyticsSubNav();
   dom.portfolioNameInput.addEventListener("input", (event) => {
     savePortfolioName(event.target.value);
   });
@@ -4138,22 +4165,6 @@ function renderAnalyticsSummary(snapshot) {
     secondary.push({ label: t("summary.totalSinceStart"), value: maskedSignedCurrency(netTotal), tone: toneClass(netTotal), muted: true });
   }
 
-  const hasSells = state.trades.some((tr) => tr.type === "sell");
-  const recovered = state.trades.reduce((s, tr) => s + (tr.type === "sell" ? Number(tr.amount) || 0 : 0), 0);
-  const fees = state.trades.reduce((s, tr) => s + (Number(tr.fee) || 0), 0);
-  const bdRow = (label, value, tone) => `<div class="as-bd-row"><span>${escapeHtml(label)}</span><b class="${tone || ""}">${value}</b></div>`;
-  const breakdown = `
-    <details class="as-breakdown"${state.analyticsBreakdownOpen ? " open" : ""}>
-      <summary>${escapeHtml(t("summary.seeBreakdown"))}</summary>
-      <div class="as-bd-grid">
-        ${bdRow(t("analytics.unrealizedPnl"), maskedSignedCurrency(totalPnl), toneClass(totalPnl))}
-        ${hasSells ? bdRow(t("analytics.realizedPnl"), maskedSignedCurrency(realized), toneClass(realized)) : ""}
-        ${fees > 0 ? bdRow(t("summary.fees"), maskedCurrency(fees)) : ""}
-        ${hasSells ? bdRow(t("summary.recovered"), maskedCurrency(recovered)) : ""}
-        ${bdRow(t("summary.openCost"), maskedCurrency(snapshot.totals.investment))}
-      </div>
-    </details>`;
-
   box.innerHTML = `
     <div class="as-clean">
       <div class="as-period-row" role="group" aria-label="${escapeHtml(t("summary.periodAria"))}">${chips}</div>
@@ -4165,54 +4176,20 @@ function renderAnalyticsSummary(snapshot) {
       <div class="as-secondary">
         ${secondary.map((s) => `<div class="as-sec ${s.muted ? "muted" : ""}"${s.hint ? ` title="${escapeHtml(s.hint)}"` : ""}><span>${escapeHtml(s.label)}</span><b class="${s.tone || ""}">${escapeHtml(String(s.value))}</b></div>`).join("")}
       </div>
-      ${breakdown}
     </div>`;
 
   renderAnalyticsExtras(snapshot);
 }
 
-// Analítica unificada: mejor/peor, comparativa 24h, reparto por categoría,
-// concentración, riesgo e historial resumido de compras y ventas.
+// Analítica en una sola vista: origen del resultado, comparativa 24h,
+// mejor/peor, reparto por sector, seguimiento e historial de operaciones.
 function renderAnalyticsExtras(snapshot) {
   renderAnalyticsContribution(snapshot);
+  renderAnalyticsCompare(snapshot);
   renderAnalyticsBestWorst(snapshot);
   renderAnalyticsCategory(snapshot);
-  renderAnalyticsConcentration(snapshot);
   renderAnalyticsRisk(snapshot);
   renderAnalyticsActivityStats();
-  renderAnalyticsCompare(snapshot);
-  // Herramientas: se construye solo cuando su subpestaña está activa (carga diferida).
-  if (state.analyticsSub === "tools") renderCapComparator();
-}
-
-// Subpestañas de Analítica: Mi portafolio / Comparativas / Herramientas.
-function setAnalyticsSub(sub) {
-  const valid = ["portfolio", "compare", "tools"];
-  const next = valid.includes(sub) ? sub : "portfolio";
-  state.analyticsSub = next;
-  document.querySelectorAll("#analyticsSubNav .asub-tab").forEach((btn) => {
-    const active = btn.dataset.asubTarget === next;
-    btn.classList.toggle("is-active", active);
-    btn.setAttribute("aria-selected", active ? "true" : "false");
-  });
-  document.querySelectorAll('.tab-section[data-tab="analytics"] .asub-group').forEach((g) => {
-    g.hidden = g.dataset.asub !== next;
-  });
-  if (next === "tools") renderCapComparator();
-  // Los gráficos ocultos quedan a 0px; se recrean al mostrar su grupo.
-  if (next === "portfolio" && typeof window.Chart !== "undefined") {
-    window.setTimeout(() => { try { updateCharts(buildSnapshot()); } catch { /* noop */ } }, 60);
-  }
-  window.scrollTo({ top: 0 });
-}
-
-function bindAnalyticsSubNav() {
-  const nav = document.getElementById("analyticsSubNav");
-  if (!nav) return;
-  nav.addEventListener("click", (e) => {
-    const tab = e.target.closest("[data-asub-target]");
-    if (tab) setAnalyticsSub(tab.dataset.asubTarget);
-  });
 }
 
 // Origen del rendimiento: contribución monetaria de cada activo al resultado
@@ -4257,16 +4234,6 @@ function renderAnalyticsContribution(snapshot) {
     </div>`;
 }
 
-/* ═══════════════════════════════════════════════════════
-   COMPARADOR DE CAPITALIZACIÓN (Analítica)
-   Simulación: ¿qué precio tendría un activo con la cap de
-   otro? Usa oferta circulante real (derivada de cap/precio),
-   ID único de CoinGecko y las funciones puras de finance.js.
-   No es una predicción; no altera datos reales del portafolio.
-   ═══════════════════════════════════════════════════════ */
-
-// Activos disponibles: top de mercado + posiciones de la cartera,
-// de-duplicados por id de CoinGecko (la cartera marca inPortfolio).
 function bindAnalyticsSummary() {
   const box = document.getElementById("analyticsSummaryGrid");
   if (!box) return;
@@ -4276,251 +4243,8 @@ function bindAnalyticsSummary() {
     state.analyticsPeriod = chip.dataset.period;
     renderAnalyticsSummary(buildSnapshot());
   });
-  box.addEventListener("toggle", (e) => {
-    const d = e.target.closest && e.target.closest("details.as-breakdown");
-    if (d) state.analyticsBreakdownOpen = d.open;
-  }, true);
 }
 
-function bindCapComparator() {
-  const capBox = document.getElementById("capComparator");
-  if (!capBox) return;
-  const cc = () => (state.capcmp || (state.capcmp = { baseId: null, targetId: "bitcoin", mode: "asset", customCap: null, targetPrice: null }));
-  capBox.addEventListener("change", (e) => {
-    const sel = e.target.closest("[data-cap-select]");
-    if (!sel) return;
-    if (sel.dataset.capSelect === "base") cc().baseId = sel.value;
-    else cc().targetId = sel.value;
-    renderCapComparator();
-  });
-  capBox.addEventListener("click", (e) => {
-    const mode = e.target.closest("[data-cap-mode]");
-    if (mode) { cc().mode = mode.dataset.capMode; renderCapComparator(); return; }
-    const act = e.target.closest("[data-cap-action]");
-    if (act && act.dataset.capAction === "swap") {
-      const c = cc();
-      const b = c.baseId; c.baseId = c.targetId; c.targetId = b;
-      renderCapComparator();
-      return;
-    }
-    const preset = e.target.closest("[data-cap-preset]");
-    if (preset) { cc().customCap = Number(preset.dataset.capPreset) || null; renderCapComparator(); return; }
-  });
-  capBox.addEventListener("input", (e) => {
-    const inp = e.target.closest("[data-cap-input]");
-    if (!inp) return;
-    const val = parseDecimal(inp.value);
-    if (inp.dataset.capInput === "customCap") cc().customCap = val || null;
-    else cc().targetPrice = val || null;
-    updateCapResult();
-  });
-}
-
-function getCapAssets() {
-  const map = new Map();
-  (state.marketsList || []).forEach((c) => {
-    if (!c.id || !(Number(c.price) > 0) || !(Number(c.marketCap) > 0)) return;
-    map.set(c.id, {
-      id: c.id, symbol: c.symbol, name: c.name, image: c.image || "",
-      price: Number(c.price), marketCap: Number(c.marketCap),
-      rank: Number(c.rank) || null, change24h: Number.isFinite(c.change24h) ? c.change24h : null,
-      inPortfolio: false, row: null
-    });
-  });
-  (state.rows || []).forEach((row) => {
-    const id = row.coinId;
-    if (!id) return;
-    const price = typeof row.currentPrice === "number" ? row.currentPrice : 0;
-    const cap = Number(row.marketCap) || 0;
-    const existing = map.get(id);
-    if (existing) { existing.inPortfolio = true; existing.row = row; return; }
-    if (price > 0 && cap > 0) {
-      map.set(id, {
-        id, symbol: (row.symbol || "").toUpperCase(),
-        name: row.resolvedName || row.crypto || row.symbol || id,
-        image: row.image || "", price, marketCap: cap,
-        rank: Number(row.marketCapRank) || null,
-        change24h: typeof row.priceChange24h === "number" ? row.priceChange24h : null,
-        inPortfolio: true, row
-      });
-    }
-  });
-  return [...map.values()].sort((a, b) => (a.rank || 99999) - (b.rank || 99999));
-}
-
-function getCapAsset(id) {
-  return getCapAssets().find((a) => a.id === id) || null;
-}
-
-function capLocale() { return UI_LOCALES[state.prefs.language] || "es-ES"; }
-
-// Valor entero completo (para title/tooltip; secciones 82/96).
-function capFull(v) {
-  try { return new Intl.NumberFormat(capLocale(), { maximumFractionDigits: 0 }).format(v); }
-  catch { return String(Math.round(v)); }
-}
-
-// Número compacto (oferta en tokens): 59,4 mil M, etc.
-function capCompactNum(v) {
-  try { return new Intl.NumberFormat(capLocale(), { notation: "compact", maximumFractionDigits: 2 }).format(v); }
-  catch { return String(Math.round(v)); }
-}
-
-function renderCapComparator() {
-  const box = document.getElementById("capComparator");
-  if (!box) return;
-  // No reconstruir mientras el usuario edita un campo (evita perder foco).
-  if (box.contains(document.activeElement) && document.activeElement.tagName === "INPUT") {
-    updateCapResult();
-    return;
-  }
-  const assets = getCapAssets();
-  const cc = state.capcmp || (state.capcmp = { baseId: null, targetId: "bitcoin", mode: "asset", customCap: null, targetPrice: null });
-
-  if (!assets.length) {
-    box.innerHTML = `<p class="movers-empty">${escapeHtml(t("cap.noData"))}</p>`;
-    return;
-  }
-  if (!cc.baseId || !assets.find((a) => a.id === cc.baseId)) {
-    cc.baseId = (assets.find((a) => a.inPortfolio) || assets[0]).id;
-  }
-  if (!cc.targetId || !assets.find((a) => a.id === cc.targetId)) {
-    cc.targetId = (assets.find((a) => a.id === "bitcoin") || assets[1] || assets[0]).id;
-  }
-  const optionList = (selId) => assets
-    .map((a) => `<option value="${a.id}" ${a.id === selId ? "selected" : ""}>${escapeHtml(a.symbol)} · ${escapeHtml(a.name)}${a.rank ? " (#" + a.rank + ")" : ""}${a.inPortfolio ? " ★" : ""}</option>`)
-    .join("");
-  const base = getCapAsset(cc.baseId);
-  const statLine = (a) => a ? `<div class="cap-stat"><span class="asset-avatar">${renderAssetAvatar(a.row || { image: a.image, symbol: a.symbol, crypto: a.name })}</span><span class="cap-stat-txt">${maskedCurrency(a.price)} · ${escapeHtml(t("detail.marketCap"))} <span title="${escapeHtml(capFull(a.marketCap))}">${formatCompactCurrency(a.marketCap)}</span>${a.rank ? " · #" + a.rank : ""}${a.inPortfolio ? ` · <b class="cap-inport">${escapeHtml(t("cap.inPortfolio"))}</b>` : ""}</span></div>` : "";
-
-  const modeBtn = (m, key) => `<button class="cap-mode ${cc.mode === m ? "is-active" : ""}" type="button" data-cap-mode="${m}">${escapeHtml(t(key))}</button>`;
-
-  // Control objetivo según el modo.
-  let targetControl = "";
-  if (cc.mode === "asset") {
-    targetControl = `
-      <label class="cap-field"><span>${escapeHtml(t("cap.targetAsset"))}</span>
-        <select class="cap-select" data-cap-select="target">${optionList(cc.targetId)}</select>
-      </label>
-      ${statLine(getCapAsset(cc.targetId))}`;
-  } else if (cc.mode === "custom") {
-    const presets = [1e8, 5e8, 1e9, 5e9, 1e10, 5e10, 1e11];
-    targetControl = `
-      <label class="cap-field"><span>${escapeHtml(t("cap.customCap"))}</span>
-        <input class="cap-input" type="text" inputmode="decimal" data-cap-input="customCap" value="${cc.customCap ? escapeHtml(formatEditableNumber(cc.customCap)) : ""}" placeholder="0" />
-      </label>
-      <div class="cap-presets">${presets.map((v) => `<button class="chip-preset" type="button" data-cap-preset="${v}">${formatCompactCurrency(v).replace(/\s?\D*$/, (m) => m.trim())}</button>`).join("")}</div>`;
-  } else {
-    targetControl = `
-      <label class="cap-field"><span>${escapeHtml(t("cap.targetPrice"))}</span>
-        <input class="cap-input" type="text" inputmode="decimal" data-cap-input="targetPrice" value="${cc.targetPrice ? escapeHtml(formatEditableNumber(cc.targetPrice)) : ""}" placeholder="0" />
-      </label>`;
-  }
-
-  box.innerHTML = `
-    <p class="cap-intro">${escapeHtml(t("cap.intro"))}</p>
-    <div class="cap-modes">${modeBtn("asset", "cap.modeAsset")}${modeBtn("custom", "cap.modeCustom")}${modeBtn("inverse", "cap.modeInverse")}</div>
-    <label class="cap-field"><span>${escapeHtml(t("cap.baseAsset"))}</span>
-      <select class="cap-select" data-cap-select="base">${optionList(cc.baseId)}</select>
-    </label>
-    ${statLine(base)}
-    ${cc.mode === "asset" ? `<div class="cap-swap-row"><button class="cap-swap" type="button" data-cap-action="swap" aria-label="${escapeHtml(t("cap.swap"))}" title="${escapeHtml(t("cap.swap"))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l-4 4 4 4"/><path d="M3 14h13a4 4 0 0 0 4-4V4"/><path d="M17 14l4-4-4-4" transform="translate(0 -4)" opacity="0"/></svg><span>${escapeHtml(t("cap.swap"))}</span></button></div>` : ""}
-    ${targetControl}
-    <div id="capResult" class="cap-result" aria-live="polite"></div>
-    <div id="capImpact"></div>
-    <p class="plan-disclaimer">${escapeHtml(t("cap.disclaimer"))}</p>
-  `;
-  updateCapResult();
-}
-
-function updateCapResult() {
-  const box = document.getElementById("capResult");
-  if (!box) return;
-  const cc = state.capcmp;
-  const base = getCapAsset(cc.baseId);
-  const impactBox = document.getElementById("capImpact");
-  if (impactBox) impactBox.innerHTML = "";
-  if (!base) { box.innerHTML = `<p class="cap-warn">${escapeHtml(t("cap.noData"))}</p>`; return; }
-
-  const F = window.CryptoFinance;
-  const money = (v, d) => maskedCurrency(v, d);
-
-  // Modo inverso: capitalización necesaria para un precio objetivo.
-  if (cc.mode === "inverse") {
-    const r = F.capNeededForPrice({ targetPrice: cc.targetPrice, basePrice: base.price, baseCap: base.marketCap });
-    if (!r.ok) { box.innerHTML = `<p class="cap-warn">${escapeHtml(t("cap.enterPrice"))}</p>`; return; }
-    box.innerHTML = `
-      <div class="cap-card">
-        <div class="cap-card-head"><strong>${escapeHtml(base.symbol)} → ${money(cc.targetPrice, getPriceDigits(cc.targetPrice))}</strong></div>
-        <div class="cap-card-main"><span class="cap-card-label">${escapeHtml(t("cap.capNeeded"))}</span><strong class="cap-big" title="${escapeHtml(capFull(r.capNeeded))}">${formatCompactCurrency(r.capNeeded)}</strong></div>
-        <div class="cap-grid">
-          <div><span>${escapeHtml(t("cap.multiplier"))}</span><b>${r.multiplier.toFixed(2)}×</b></div>
-          <div><span>${escapeHtml(t("cap.variation"))}</span><b class="${r.pctChange >= 0 ? "positive" : "negative"}">${formatSignedPercent(r.pctChange)}</b></div>
-          <div><span>${escapeHtml(t("cap.capAdded"))}</span><b title="${escapeHtml(capFull(r.capAdded))}">${formatCompactCurrency(r.capAdded)}</b></div>
-          <div><span>${escapeHtml(t("cap.currentCap"))}</span><b title="${escapeHtml(capFull(base.marketCap))}">${formatCompactCurrency(base.marketCap)}</b></div>
-        </div>
-        <p class="cap-note">${escapeHtml(t("cap.inverseNote"))}</p>
-      </div>`;
-    return;
-  }
-
-  // Capitalización objetivo (activo o personalizada).
-  const targetCap = cc.mode === "custom" ? (Number(cc.customCap) || 0) : (getCapAsset(cc.targetId)?.marketCap || 0);
-  if (cc.mode === "custom" && !(targetCap > 0)) { box.innerHTML = `<p class="cap-warn">${escapeHtml(t("cap.enterCap"))}</p>`; return; }
-  if (cc.mode === "asset" && cc.targetId === cc.baseId) { box.innerHTML = `<p class="cap-warn">${escapeHtml(t("cap.sameAsset"))}</p>`; return; }
-
-  const r = F.capScenario({ basePrice: base.price, baseCap: base.marketCap, targetCap });
-  if (!r.ok) { box.innerHTML = `<p class="cap-warn">${escapeHtml(t("cap.missingData"))}</p>`; return; }
-
-  const target = cc.mode === "asset" ? getCapAsset(cc.targetId) : null;
-  const targetLabel = target ? `${escapeHtml(base.symbol)} ${escapeHtml(t("cap.withCapOf"))} ${escapeHtml(target.symbol)}` : `${escapeHtml(base.symbol)} · ${formatCompactCurrency(targetCap)}`;
-  const up = r.pctChange >= 0;
-  box.innerHTML = `
-    <div class="cap-card ${up ? "up" : "down"}">
-      <div class="cap-card-head">
-        <span class="asset-avatar">${renderAssetAvatar(base.row || { image: base.image, symbol: base.symbol })}</span>
-        <span class="cap-arrow" aria-hidden="true">→</span>
-        ${target ? `<span class="asset-avatar">${renderAssetAvatar(target.row || { image: target.image, symbol: target.symbol })}</span>` : ""}
-        <strong>${targetLabel}</strong>
-      </div>
-      <div class="cap-card-main"><span class="cap-card-label">${escapeHtml(t("cap.simPrice"))}</span><strong class="cap-big" title="${escapeHtml(maskedCurrency(r.simPrice, 8))}">${money(r.simPrice, getPriceDigits(r.simPrice))}</strong>
-        <span class="cap-chip ${up ? "positive" : "negative"}">${r.multiplier.toFixed(2)}×</span></div>
-      <div class="cap-grid">
-        <div><span>${escapeHtml(t("cap.current"))}</span><b>${money(base.price, getPriceDigits(base.price))}</b></div>
-        <div><span>${escapeHtml(t("cap.variation"))}</span><b class="${up ? "positive" : "negative"}">${formatSignedPercent(r.pctChange)}</b></div>
-        <div><span>${escapeHtml(t("cap.difference"))}</span><b class="${r.priceDiff >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(r.priceDiff, getPriceDigits(Math.abs(r.priceDiff) || 1))}</b></div>
-        <div><span>${escapeHtml(t("cap.targetCap"))}</span><b title="${escapeHtml(capFull(targetCap))}">${formatCompactCurrency(targetCap)}</b></div>
-        <div><span>${escapeHtml(t("cap.supplyUsed"))}</span><b title="${escapeHtml(capFull(r.supply))}">${capCompactNum(r.supply)} ${escapeHtml(base.symbol)}</b></div>
-        ${target && target.rank ? `<div><span>${escapeHtml(t("cap.targetRank"))}</span><b>#${target.rank}</b></div>` : ""}
-      </div>
-    </div>`;
-
-  // Impacto en la posición (si el activo base está en la cartera).
-  if (base.inPortfolio && base.row) {
-    const m = computeRowMetrics(base.row);
-    if (m.tokens > 0) {
-      const imp = F.capPositionImpact({ tokens: m.tokens, invested: m.investment, currentPrice: m.currentPrice, simPrice: r.simPrice });
-      impactBox.innerHTML = `
-        <div class="cap-impact">
-          <div class="cap-impact-head"><strong>${escapeHtml(t("cap.impactTitle"))}</strong></div>
-          <p class="cap-impact-line">${escapeHtml(t("cap.impactPhrase", { tokens: formatNumber(m.tokens, m.tokens >= 1 ? 4 : 8), symbol: base.symbol, value: maskedCurrency(imp.simValue) }))}</p>
-          <div class="cap-grid">
-            <div><span>${escapeHtml(t("cap.nowValue"))}</span><b>${maskedCurrency(imp.curValue)}</b></div>
-            <div><span>${escapeHtml(t("cap.scenarioValue"))}</span><b>${maskedCurrency(imp.simValue)}</b></div>
-            <div><span>${escapeHtml(t("cap.valueDiff"))}</span><b class="${imp.valueDiff >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(imp.valueDiff)}</b></div>
-            <div><span>${escapeHtml(t("cap.simProfit"))}</span><b class="${imp.simProfit >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(imp.simProfit)}</b></div>
-            <div><span>${escapeHtml(t("cap.simRoi"))}</span><b class="${imp.simRoiPct >= 0 ? "positive" : "negative"}">${formatSignedPercent(imp.simRoiPct)}</b></div>
-          </div>
-          <div class="cap-impact-bars">
-            <div class="cap-bar-row"><span>${escapeHtml(t("cap.now"))}</span><div class="cap-bar"><span style="width:${imp.simValue > 0 ? Math.min(100, (imp.curValue / Math.max(imp.curValue, imp.simValue)) * 100) : 0}%"></span></div></div>
-            <div class="cap-bar-row"><span>${escapeHtml(t("cap.scenario"))}</span><div class="cap-bar"><span class="scenario" style="width:${imp.simValue > 0 ? Math.min(100, (imp.simValue / Math.max(imp.curValue, imp.simValue)) * 100) : 0}%"></span></div></div>
-          </div>
-        </div>`;
-    }
-  }
-}
-
-// Historial resumido: compras/ventas por mes + acumulados (desde el ledger).
 function renderAnalyticsActivityStats() {
   const box = document.getElementById("analyticsActivityStats");
   if (!box) return;
@@ -4605,54 +4329,41 @@ function renderAnalyticsCompare(snapshot) {
 
 function renderAnalyticsCategory(snapshot) {
   const box = document.getElementById("analyticsCategory");
-  if (!box) {
-    return;
-  }
-  const alloc = getAllocationBreakdown(snapshot);
-  if (!alloc) {
+  if (!box) return;
+  const total = snapshot.totals.currentValue;
+  if (!(total > 0)) {
     box.innerHTML = `<p class="movers-empty">${escapeHtml(t("home.noData"))}</p>`;
     return;
   }
-  const rows = [
-    { label: "BTC", pct: alloc.btc, color: "#f6b34c" },
-    { label: "ETH", pct: alloc.eth, color: "#7da4ff" },
-    { label: t("alloc.stables"), pct: alloc.stable, color: "#6d9ec4" },
-    { label: t("alloc.alts"), pct: alloc.alt, color: "#3effa8" }
-  ].filter((r) => r.pct > 0.05);
-
+  // Agrupa el valor actual por sector. Solo se listan los sectores presentes.
+  const byId = new Map();
+  snapshot.items.forEach((item) => {
+    const value = item.metrics.currentValue;
+    if (!(value > 0)) return;
+    const key = getAssetSector(item.row);
+    const entry = byId.get(key) || { key, value: 0, assets: [] };
+    entry.value += value;
+    entry.assets.push(item.row.symbol || assetDisplayName(item.row));
+    byId.set(key, entry);
+  });
+  const rows = [...byId.values()]
+    .map((e) => ({ ...e, pct: (e.value / total) * 100 }))
+    .sort((a, b) => b.value - a.value);
+  if (!rows.length) {
+    box.innerHTML = `<p class="movers-empty">${escapeHtml(t("home.noData"))}</p>`;
+    return;
+  }
+  const colors = {
+    l1: "#f6b34c", l2: "#7da4ff", defi: "#3effa8", ia: "#c58bff", meme: "#ff8fc7",
+    gaming: "#5ad1ff", infra: "#8fe388", rwa: "#ffd166", privacy: "#9aa7b8",
+    payments: "#6ee7d6", exchange: "#ffa07a", stable: "#6d9ec4", otros: "#7b8b9a"
+  };
   box.innerHTML = rows.map((r) => `
     <div class="category-row">
-      <span class="category-label"><i style="background:${r.color}"></i>${escapeHtml(r.label)}</span>
-      <div class="category-bar"><span style="width:${r.pct.toFixed(1)}%;background:${r.color}"></span></div>
+      <span class="category-label"><i style="background:${colors[r.key] || colors.otros}"></i>${escapeHtml(t("sector." + r.key))}</span>
+      <div class="category-bar"><span style="width:${r.pct.toFixed(1)}%;background:${colors[r.key] || colors.otros}"></span></div>
       <strong>${r.pct.toFixed(1)}%</strong>
-    </div>
-  `).join("");
-}
-
-function renderAnalyticsConcentration(snapshot) {
-  const box = document.getElementById("analyticsConcentration");
-  if (!box) {
-    return;
-  }
-  const weights = snapshot.items
-    .filter((item) => item.metrics.currentValue > 0)
-    .map((item) => item.metrics.currentValue / (snapshot.totals.currentValue || 1) * 100)
-    .sort((a, b) => b - a);
-  if (!weights.length) {
-    box.innerHTML = `<p class="movers-empty">${escapeHtml(t("home.noData"))}</p>`;
-    return;
-  }
-  const topSum = (n) => weights.slice(0, n).reduce((s, v) => s + v, 0);
-  const rows = [
-    { label: t("analytics.top3"), value: topSum(3) },
-    { label: t("analytics.top5"), value: topSum(5) },
-    { label: t("analytics.top10"), value: topSum(10) }
-  ];
-  box.innerHTML = rows.map((r) => `
-    <div class="conc-row">
-      <span>${escapeHtml(r.label)}</span>
-      <div class="category-bar"><span style="width:${Math.min(100, r.value).toFixed(1)}%"></span></div>
-      <strong>${r.value.toFixed(1)}%</strong>
+      <small class="category-assets">${escapeHtml(r.assets.slice(0, 4).join(" · "))}${r.assets.length > 4 ? " +" + (r.assets.length - 4) : ""}</small>
     </div>
   `).join("");
 }
@@ -4671,23 +4382,11 @@ function renderAnalyticsRisk(snapshot) {
     .filter((p) => p != null);
   const avgProgress = progresses.length ? progresses.reduce((s, v) => s + v, 0) / progresses.length : null;
 
-  // Concentración (mismo criterio que el resumen).
-  const top1 = current
-    .map((i) => ({ name: assetDisplayName(i.row), pct: i.metrics.currentValue / totalValue * 100 }))
-    .sort((a, b) => b.pct - a.pct)[0] || null;
-  const riskLevel = top1 ? (top1.pct > 40 ? "high" : top1.pct > 25 ? "medium" : "low") : null;
-  const riskLabels = { low: t("analytics.riskLow"), medium: t("analytics.riskMedium"), high: t("analytics.riskHigh") };
-  const riskTones = { low: "positive", medium: "warning", high: "negative" };
-
   // Posiciones cerca del siguiente TP (<8%).
   const nearTp = getNextTpCandidates(snapshot).filter((c) => c.pct <= 8).slice(0, 5);
   // Posiciones con pérdida > 20%.
   const losers = current.filter((i) => i.metrics.pnlPct <= -20)
     .sort((a, b) => a.metrics.pnlPct - b.metrics.pnlPct).slice(0, 5);
-  // Sobreexpuestas (>40% del portafolio) → sugerencia de rebalanceo.
-  const overweight = current
-    .map((i) => ({ row: i.row, pct: i.metrics.currentValue / totalValue * 100 }))
-    .filter((i) => i.pct > 40);
 
   const listBlock = (titleKey, rows, empty) => `
     <div class="risk-list-block">
@@ -4710,21 +4409,9 @@ function renderAnalyticsRisk(snapshot) {
       <strong class="hl-pct negative">${formatPercent(i.metrics.pnlPct)}</strong>
     </article>
   `).join("");
-  const overRows = overweight.map((i) => `
-    <article class="hl-item">
-      <span class="asset-avatar">${renderAssetAvatar(i.row)}</span>
-      <div class="hl-main"><strong>${escapeHtml(assetDisplayName(i.row))}</strong><small>${escapeHtml(t("analytics.rebalanceHint"))}</small></div>
-      <strong class="hl-pct warning">${i.pct.toFixed(1)}%</strong>
-    </article>
-  `).join("");
 
   box.innerHTML = `
     <div class="risk-gauges">
-      <div class="risk-gauge">
-        <span>${escapeHtml(t("analytics.concentration"))}</span>
-        <strong class="${riskLevel ? riskTones[riskLevel] : ""}">${riskLevel ? escapeHtml(riskLabels[riskLevel]) : "--"}</strong>
-        ${top1 ? `<small>${escapeHtml(top1.name)} ${top1.pct.toFixed(1)}%</small>` : ""}
-      </div>
       <div class="risk-gauge">
         <span>${escapeHtml(t("analytics.avgTp"))}</span>
         <strong>${avgProgress != null ? avgProgress.toFixed(0) + "%" : "--"}</strong>
@@ -4733,7 +4420,6 @@ function renderAnalyticsRisk(snapshot) {
     </div>
     ${listBlock("analytics.nearTp", nearRows, t("analytics.nearTpEmpty"))}
     ${listBlock("analytics.losers", loserRows, t("analytics.losersEmpty"))}
-    ${overweight.length ? listBlock("analytics.rebalance", overRows, "") : ""}
   `;
 }
 
