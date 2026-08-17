@@ -30,6 +30,8 @@ window.APP_I18N = {
       "theme.dark": "Modo oscuro",
       "theme.oled": "Negro OLED",
       "density.compact": "Vista compacta",
+      "fab.pdf": "Descargar PDF",
+      "fab.pdfDesc": "Informe del portafolio en PDF",
       "tp.lineAria": "Linea de precio: medio, actual y objetivos TP",
       "cap.title": "Comparador de capitalizacion",
       "cap.intro": "Simula que precio tendria un activo con la capitalizacion de otro. Herramienta educativa.",

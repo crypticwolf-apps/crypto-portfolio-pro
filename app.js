@@ -362,7 +362,6 @@ const dom = {
   homeRefreshBtn: document.getElementById("homeRefreshBtn"),
   toggleBalanceBtn: document.getElementById("toggleBalanceBtn"),
   marketGrid: document.getElementById("marketGrid"),
-  homeHighlights: document.getElementById("homeHighlights"),
   autoRefreshMeta: document.getElementById("autoRefreshMeta"),
   installCard: document.getElementById("installCard"),
   shareSummaryBtn: document.getElementById("shareSummaryBtn"),
@@ -801,6 +800,9 @@ function handleFabAction(action) {
       // "Alerta" = objetivos TP de una posición: abre el editor en la
       // posición elegida (o una nueva) donde se fijan TP1/TP2/TP3.
       openTradeSheet("alert");
+      break;
+    case "pdf":
+      handleDownloadPdf();
       break;
     default:
       break;
@@ -2695,8 +2697,6 @@ function bindEvents() {
     if (event.key === "Escape") {
       if (state.rowMenuOpen) {
         closeRowMenu();
-      } else if (!document.getElementById("filtersDrawer")?.hidden) {
-        document.getElementById("filtersDrawer").querySelector("[data-filters-close]")?.click();
       } else if (!document.getElementById("tradeSheet")?.hidden) {
         closeTradeSheet();
       } else if (state.editorRowId) {
@@ -2756,8 +2756,11 @@ function loadState() {
       : DEFAULT_PREFS.autoRefreshSec;
   }
   state.prefs.hideBalance = Boolean(state.prefs.hideBalance);
-  if (state.prefs.filters && typeof state.prefs.filters === "object") {
-    state.filters = { ...state.filters, ...state.prefs.filters };
+  // El panel de filtros se retiró de Posiciones: los filtros guardados de
+  // versiones anteriores se descartan para que nunca oculten posiciones sin
+  // que exista una forma de restablecerlos. La búsqueda rápida sigue activa.
+  if (state.prefs.filters) {
+    state.prefs.filters = null;
   }
   if (state.prefs.plan && typeof state.prefs.plan === "object") {
     // Solo se conservan los datos del simulador TP (el rebalanceo se retiró).
@@ -3480,12 +3483,6 @@ function renderSummary(snapshot, insights = getPortfolioInsights(snapshot)) {
   renderMainValueCard(snapshot);
 
   const change = getPortfolio24hChange(snapshot);
-  const tpCandidates = getNextTpCandidates(snapshot);
-  const nextTp = tpCandidates[0] || null;
-  const activeCount = snapshot.items.filter(
-    (item) => item.metrics.investment > 0 || item.metrics.currentValue > 0
-  ).length;
-
   const dayItems = get24hInsightItems(snapshot);
   const bestDay = [...dayItems].sort((a, b) => b.change24h - a.change24h)[0] || null;
   const worstDay = [...dayItems].sort((a, b) => a.change24h - b.change24h)[0] || null;
@@ -3515,18 +3512,6 @@ function renderSummary(snapshot, insights = getPortfolioInsights(snapshot)) {
       value: worstDay ? `${assetDisplayName(worstDay.row)} ${formatSignedPercent(worstDay.change24h)}` : "--",
       tone: worstDay ? "negative" : ""
     },
-    {
-      icon: summaryIconSvg("assets"),
-      label: t("summary.assetsShort"),
-      value: String(activeCount),
-      tone: ""
-    },
-    {
-      icon: summaryIconSvg("target"),
-      label: t("summary.nextTpShort"),
-      value: nextTp ? `${assetDisplayName(nextTp.row)} +${nextTp.pct.toFixed(1)}%` : "--",
-      tone: nextTp ? "warning" : ""
-    }
   ];
 
   dom.summaryGrid.innerHTML = cards
@@ -3542,7 +3527,6 @@ function renderSummary(snapshot, insights = getPortfolioInsights(snapshot)) {
     .join("");
 
   renderAllocationCard(snapshot);
-  renderHomeHighlights(snapshot, insights, tpCandidates);
 }
 
 // Reparto del capital entre BTC / ETH / stables / altcoins (barra apilada).
@@ -3762,67 +3746,6 @@ function renderMarketSection() {
 }
 
 // Bloques de Inicio: mejores, peores, próximos TP y alertas (máx. 3 c/u).
-function renderHomeHighlights(snapshot, insights, tpCandidates = getNextTpCandidates(snapshot)) {
-  if (!dom.homeHighlights) {
-    return;
-  }
-
-  const positionCard = (item, mode) => {
-    const row = item.row;
-    const pctText = mode === "tp" ? `+${item.pct.toFixed(1)}%` : formatPercent(item.metrics.pnlPct);
-    const tone = mode === "tp" ? "warning" : toneClass(item.metrics.pnlPct);
-    const detail = mode === "tp"
-      ? `${item.label} · ${formatCurrency(item.target, getPriceDigits(item.target))}`
-      : maskedCurrency(item.metrics.currentValue);
-    return `
-      <article class="hl-item">
-        <span class="asset-avatar">${renderAssetAvatar(row)}</span>
-        <div class="hl-main">
-          <strong>${escapeHtml(assetDisplayName(row))}</strong>
-          <small>${escapeHtml(detail)}</small>
-        </div>
-        <strong class="hl-pct ${tone}">${escapeHtml(pctText)}</strong>
-      </article>
-    `;
-  };
-
-  const block = (titleKey, items, mode) => (items.length
-    ? `
-      <section class="hl-block">
-        <h2 class="home-section-title">${escapeHtml(t(titleKey))}</h2>
-        <div class="hl-list">${items.map((item) => positionCard(item, mode)).join("")}</div>
-      </section>
-    `
-    : "");
-
-  const alerts = state.activity.filter((item) => item.tone !== "neutral").slice(0, 3);
-  const alertsBlock = alerts.length
-    ? `
-      <section class="hl-block">
-        <h2 class="home-section-title">${escapeHtml(t("home.alerts"))}</h2>
-        <div class="hl-list">
-          ${alerts.map((item) => `
-            <article class="hl-item hl-alert">
-              <div class="hl-main">
-                <strong class="${escapeHtml(item.tone)}">${escapeHtml(item.title)}</strong>
-                <small>${escapeHtml(item.detail)}</small>
-              </div>
-              <small class="hl-time">${escapeHtml(formatDateTime(new Date(item.at)))}</small>
-            </article>
-          `).join("")}
-        </div>
-      </section>
-    `
-    : "";
-
-  dom.homeHighlights.innerHTML = [
-    block("home.best", insights.topPerformers.slice(0, 3), "pnl"),
-    block("home.worst", insights.worstPerformers.slice(0, 3), "pnl"),
-    block("home.upcomingTp", tpCandidates.slice(0, 3), "tp"),
-    alertsBlock
-  ].join("");
-}
-
 function getInsightItems(snapshot) {
   const totalValue = snapshot.totals.currentValue;
 
@@ -5429,22 +5352,6 @@ function renderPositionEditor(row) {
           <label class="editor-field"><span>TP1</span><input type="text" inputmode="decimal" data-editor-field="tp1" value="${escapeHtml(row.tp1)}" placeholder="0.00" /></label>
           <label class="editor-field"><span>TP2</span><input type="text" inputmode="decimal" data-editor-field="tp2" value="${escapeHtml(row.tp2)}" placeholder="0.00" /></label>
           <label class="editor-field"><span>TP3</span><input type="text" inputmode="decimal" data-editor-field="tp3" value="${escapeHtml(row.tp3)}" placeholder="0.00" /></label>
-        </div>
-
-        <label class="editor-check">
-          <input type="checkbox" data-editor-field="favorite" ${row.favorite ? "checked" : ""} />
-          <span>${escapeHtml(t("editor.favorite"))}</span>
-        </label>
-
-        <div class="editor-grid-2">
-          <label class="editor-field">
-            <span>${escapeHtml(t("editor.purchaseDate"))}</span>
-            <input type="date" data-editor-field="purchaseDate" value="${escapeHtml(row.purchaseDate)}" />
-          </label>
-          <label class="editor-field">
-            <span>${escapeHtml(t("editor.label"))}</span>
-            <input type="text" maxlength="40" data-editor-field="personalLabel" value="${escapeHtml(row.personalLabel)}" placeholder="${escapeHtml(t("editor.labelPlaceholder"))}" />
-          </label>
         </div>
 
         <label class="editor-field">
