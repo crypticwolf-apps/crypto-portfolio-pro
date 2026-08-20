@@ -5,7 +5,7 @@
 //  - APIs de precios .......... network-first; si la red falla se devuelve la
 //    última respuesta cacheada marcada con "X-SW-Fallback: 1" para que la app
 //    la etiquete como datos sin conexión (nunca como precio en tiempo real).
-const VERSION = "v14";
+const VERSION = "v15";
 const SHELL_CACHE = `crypto-portfolio-shell-${VERSION}`;
 const CDN_CACHE = `crypto-portfolio-cdn-${VERSION}`;
 const API_CACHE = `crypto-portfolio-api-${VERSION}`;
@@ -174,6 +174,15 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(req.url);
 
+  // Datos de precios: el proxy propio (/api/cg/, que puede ser del mismo origen
+  // cuando la web se sirve desde Vercel) o las APIs directas. Se comprueba
+  // ANTES del mismo origen para que el proxy use la estrategia de API
+  // (network-first con fallback marcado) y no la del app shell.
+  if (url.pathname.startsWith("/api/cg/") || API_HOSTS.includes(url.hostname)) {
+    event.respondWith(handleApiRequest(req));
+    return;
+  }
+
   if (url.origin === self.location.origin) {
     event.respondWith(handleShellRequest(req));
     return;
@@ -181,11 +190,6 @@ self.addEventListener("fetch", (event) => {
 
   if (CDN_HOSTS.includes(url.hostname)) {
     event.respondWith(handleCdnRequest(req));
-    return;
-  }
-
-  if (API_HOSTS.includes(url.hostname)) {
-    event.respondWith(handleApiRequest(req));
     return;
   }
 

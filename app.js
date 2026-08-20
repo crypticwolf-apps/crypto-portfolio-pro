@@ -29,7 +29,14 @@ const SEARCH_CACHE_TTL = 5 * 60 * 1000;
 const PRICE_CACHE_TTL = 25 * 1000;
 const FX_RATE_TTL = 12 * 60 * 60 * 1000;
 const FETCH_TIMEOUT = 15000;
-const COINGECKO_BASE = "https://api.coingecko.com/api/v3/";
+// Ruta preferente: un proxy serverless propio. Ahí vive la clave demo de
+// CoinGecko (server-side, nunca en este bundle), la caché compartida entre
+// usuarios y el desbloqueo del precio histórico por fecha. Si el proxy cae,
+// fetchJsonWithRetry reintenta contra CoinGecko directo (sin clave, pero la app
+// sigue funcionando). URL absoluta a propósito: así también sirve desde la APK.
+const COINGECKO_PROXY = "https://crypto-portfolio-pro-omega.vercel.app/api/cg/";
+const COINGECKO_DIRECT = "https://api.coingecko.com/api/v3/";
+const COINGECKO_BASE = COINGECKO_PROXY;
 
 // Free-tier throttle. El API público de CoinGecko admite hoy ~5-15 llamadas
 // por minuto y por IP (jul 2026): MIN_GAP=2.5s y tope de 12/min mantienen a
@@ -1494,9 +1501,11 @@ function openTradeSheet(mode, preselectRowId = null) {
 
   const select = sheet.querySelector("[data-trade-field='rowId']");
   const priceInput = sheet.querySelector("[data-trade-field='price']");
+  const dateInput = sheet.querySelector("[data-trade-field='date']");
   if (preselectRowId && select?.querySelector(`option[value="${preselectRowId}"]`)) {
     select.value = preselectRowId;
   }
+  const todayIso = new Date().toISOString().slice(0, 10);
   const syncPrice = () => {
     const row = getRowById(select.value);
     if (row && priceInput && !priceInput.value) {
@@ -1504,7 +1513,49 @@ function openTradeSheet(mode, preselectRowId = null) {
     }
     updateTradePreview(sheet);
   };
-  select?.addEventListener("change", () => { if (priceInput) priceInput.value = ""; syncPrice(); });
+
+  // Autocompletar el precio con el de la FECHA elegida. Si el usuario pone una
+  // fecha pasada, se pide el precio histórico de ese día (vía proxy con clave) y
+  // se rellena; si es hoy, se usa el precio actual. Cada disparo lleva un token
+  // para que, si se cambia la fecha varias veces seguidas, gane el último.
+  let histToken = 0;
+  const applyPriceForDate = async () => {
+    const row = getRowById(select.value);
+    if (!row || !priceInput) return;
+    const iso = dateInput?.value || todayIso;
+
+    if (iso >= todayIso || !row.coinId) {
+      // Hoy (o sin id de moneda): precio actual, sin llamar al histórico.
+      if (priceInput.dataset.autofill === "hist") priceInput.value = "";
+      delete priceInput.dataset.autofill;
+      syncPrice();
+      return;
+    }
+
+    const token = ++histToken;
+    const prev = priceInput.value;
+    priceInput.value = "";
+    priceInput.placeholder = "…";
+    const price = await fetchHistoricalPrice(row.coinId, iso, state.prefs.currency);
+    if (token !== histToken) return; // llegó una petición más nueva
+    priceInput.placeholder = "";
+    if (price != null) {
+      priceInput.value = formatEditableNumber(price);
+      priceInput.dataset.autofill = "hist";
+    } else {
+      // Sin dato histórico (falta clave, activo o fecha sin cobertura): se
+      // devuelve lo que hubiera y el usuario lo introduce a mano.
+      priceInput.value = prev;
+      delete priceInput.dataset.autofill;
+    }
+    updateTradePreview(sheet);
+  };
+
+  select?.addEventListener("change", () => {
+    if (priceInput) { priceInput.value = ""; delete priceInput.dataset.autofill; }
+    applyPriceForDate();
+  });
+  dateInput?.addEventListener("change", applyPriceForDate);
   syncPrice();
 
   sheet.addEventListener("click", (event) => {
@@ -6678,6 +6729,7 @@ const rateLimiter = (() => {
 async function fetchJsonWithRetry(url) {
   let lastError;
   let backoff = BACKOFF_BASE_MS;
+  let triedDirect = false;
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await rateLimiter.acquire();
@@ -6693,6 +6745,14 @@ async function fetchJsonWithRetry(url) {
         rateLimiter.penalty(wait);
         await new Promise((r) => window.setTimeout(r, wait));
         backoff = Math.min(BACKOFF_MAX_MS, backoff * 2);
+      } else if (!triedDirect && !status && url.startsWith(COINGECKO_PROXY)) {
+        // El proxy está CAÍDO (error de red/timeout, sin código HTTP): se
+        // reintenta UNA vez contra CoinGecko directo para no dejar la app sin
+        // datos. Se pierde la clave y la caché compartida, pero sigue viva.
+        // Un 4xx del proxy (p. ej. 401 por falta de clave) NO dispara esto:
+        // es una respuesta legítima que ir directo tampoco arreglaría.
+        triedDirect = true;
+        url = COINGECKO_DIRECT + url.slice(COINGECKO_PROXY.length);
       } else if (attempt >= 1) {
         // Error de red/HTTP no recuperable tras un reintento: se propaga.
         break;
@@ -6700,6 +6760,107 @@ async function fetchJsonWithRetry(url) {
     }
   }
   throw lastError;
+}
+
+// --- Precio histórico por fecha (coste de adquisición) ----------------------
+// CoinGecko /coins/{id}/history da el precio de un día concreto, pero requiere
+// clave: por eso va SIEMPRE por el proxy (la clave vive en el servidor). El
+// precio de un día pasado NO cambia nunca, así que se cachea de forma
+// PERMANENTE en localStorage y no se vuelve a pedir jamás.
+const HIST_PRICE_CACHE_KEY = "crypto-portfolio-histprice-v1";
+
+/** Convierte una fecha ISO (YYYY-MM-DD) al formato DD-MM-YYYY de CoinGecko. */
+function toCoinGeckoDate(isoDate) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(isoDate || ""));
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+}
+
+function readHistPriceCache() {
+  const parsed = safeParse(localStorage.getItem(HIST_PRICE_CACHE_KEY));
+  return parsed && typeof parsed === "object" ? parsed : {};
+}
+
+function writeHistPriceCache(store) {
+  try {
+    localStorage.setItem(HIST_PRICE_CACHE_KEY, JSON.stringify(store));
+  } catch {
+    // Almacenamiento lleno o no disponible: se ignora, es solo una caché.
+  }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+// CoinGecko sirve market_chart de los últimos 365 días SIN clave; más atrás
+// exige clave. Se deja un margen para no rozar el límite.
+const KEYLESS_HISTORY_DAYS = 360;
+
+/** Precio del punto de una serie [ms, precio] más cercano a un instante. */
+function nearestPrice(prices, targetMs) {
+  let best = null;
+  let bestGap = Infinity;
+  for (const point of prices) {
+    if (!Array.isArray(point) || point.length < 2) continue;
+    const gap = Math.abs(point[0] - targetMs);
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = point[1];
+    }
+  }
+  // Solo se acepta si el punto está a menos de ~2 días del objetivo.
+  if (best == null || bestGap > 2 * DAY_MS) return null;
+  return typeof best === "number" && Number.isFinite(best) && best > 0 ? best : null;
+}
+
+/**
+ * Precio de un activo en una fecha concreta, en la moneda dada.
+ *
+ * Dos vías, según la antigüedad:
+ *   - Últimos ~360 días → `market_chart/range`, que funciona SIN clave. El
+ *     autocompletado sirve ya para compras recientes sin configurar nada.
+ *   - Más atrás → `coins/{id}/history`, que requiere la clave demo en el proxy.
+ *
+ * Devuelve `null` si no se puede obtener (sin clave para fechas antiguas, activo
+ * sin id, fecha futura o sin cobertura). NUNCA inventa un valor. El resultado
+ * (incluido el "no había dato") se cachea PERMANENTE: un precio pasado no cambia.
+ */
+async function fetchHistoricalPrice(coinId, isoDate, currency) {
+  const cgDate = toCoinGeckoDate(isoDate);
+  if (!coinId || !cgDate) return null;
+  const cur = String(currency || "usd").toLowerCase();
+
+  const cacheStore = readHistPriceCache();
+  const cacheKey = `${coinId}:${cgDate}:${cur}`;
+  if (Object.prototype.hasOwnProperty.call(cacheStore, cacheKey)) {
+    const cached = cacheStore[cacheKey];
+    return typeof cached === "number" ? cached : null; // null cacheado = no había dato
+  }
+
+  const targetMs = new Date(`${isoDate}T12:00:00Z`).getTime();
+  if (!Number.isFinite(targetMs) || targetMs > Date.now()) return null;
+  const ageDays = (Date.now() - targetMs) / DAY_MS;
+
+  let price = null;
+  try {
+    if (ageDays <= KEYLESS_HISTORY_DAYS) {
+      // Ventana de ±1,5 días para asegurar puntos alrededor del objetivo.
+      const from = Math.floor((targetMs - 1.5 * DAY_MS) / 1000);
+      const to = Math.ceil((targetMs + 1.5 * DAY_MS) / 1000);
+      const url = `${COINGECKO_BASE}coins/${encodeURIComponent(coinId)}/market_chart/range?vs_currency=${encodeURIComponent(cur)}&from=${from}&to=${to}`;
+      const data = await fetchJson(url);
+      price = nearestPrice(data?.prices || [], targetMs);
+    } else {
+      const url = `${COINGECKO_BASE}coins/${encodeURIComponent(coinId)}/history?date=${cgDate}&localization=false`;
+      const data = await fetchJson(url);
+      const value = data?.market_data?.current_price?.[cur];
+      if (typeof value === "number" && Number.isFinite(value) && value > 0) price = value;
+    }
+  } catch {
+    // 401 (sin clave para fechas antiguas), 404 o red: no disponible.
+    return null;
+  }
+
+  cacheStore[cacheKey] = price;
+  writeHistPriceCache(cacheStore);
+  return price;
 }
 
 function getFxCacheKey(fromCurrency, toCurrency) {

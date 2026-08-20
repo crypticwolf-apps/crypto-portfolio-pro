@@ -7,3 +7,11 @@ crypto-portfolio-pwa/
 node_modules/
 Thumbs.db
 desktop.ini
+
+# Variables de entorno y build de Vercel
+.env
+.env.*
+!.env.example
+.vercel
+
+.vercel
