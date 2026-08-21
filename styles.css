@@ -6744,3 +6744,24 @@ details.more-fold { border-radius: var(--radius-xl); }
 
 /* Titulo del pie: entra en la misma escala que el resto de secciones. */
 :root[data-density="compact"] .app-footer h2 { font-size: 0.95rem; font-weight: 700; line-height: 1.25; }
+
+/* ═══════════════════════════════════════════════════════
+   TARJETAS DE REJILLA — mismo radio y relleno.
+   En Inicio convivian tarjetas hermanas con esquinas de 14,
+   16, 18 y 24px (resumen, accion rapida y mercado), que es
+   lo que rompia la sensacion de conjunto.
+   ═══════════════════════════════════════════════════════ */
+:root[data-density="compact"] .summary-card,
+:root[data-density="compact"] .quick-action,
+:root[data-density="compact"] .market-card,
+:root[data-density="compact"] .market-mobile-item,
+:root[data-density="compact"] .asset-mobile-card { border-radius: var(--radius-md); }
+
+:root[data-density="compact"] .summary-card,
+:root[data-density="compact"] .market-card { padding: var(--space-3) var(--space-4); }
+
+/* Ultimos valores sueltos de la auditoria: la tarjeta de insight usaba
+   7px y los campos de texto alternaban 10 y 14px. */
+:root[data-density="compact"] .insight-item { border-radius: var(--radius-md); }
+:root[data-density="compact"] .markets-search input,
+:root[data-density="compact"] .inline-input { border-radius: var(--radius-sm); }
