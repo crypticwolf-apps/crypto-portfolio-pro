@@ -1236,7 +1236,7 @@ function renderTpTool() {
     const foldKey = "asset:" + p.id;
     const head = `
       <span class="asset-avatar">${renderAssetAvatar(p.row)}</span>
-      <span class="tp-fold-txt tp-card-id"><strong>${escapeHtml(p.name)}</strong><small>${formatNumber(p.tokens, p.tokens >= 1 ? 4 : 8)} · ${escapeHtml(t("tp.avg"))} ${p.avg > 0 ? formatCurrency(p.avg, getPriceDigits(p.avg)) : "--"} · ${escapeHtml(t("tp.now"))} ${p.price > 0 ? formatCurrency(p.price, getPriceDigits(p.price)) : "--"}</small></span>
+      <span class="tp-fold-txt tp-card-id"><strong>${escapeHtml(p.name)}</strong><small>${state.prefs.hideBalance ? "••••" : formatNumber(p.tokens, p.tokens >= 1 ? 4 : 8)} · ${escapeHtml(t("tp.avg"))} ${p.avg > 0 ? maskedCurrency(p.avg, getPriceDigits(p.avg)) : "--"} · ${escapeHtml(t("tp.now"))} ${p.price > 0 ? formatCurrency(p.price, getPriceDigits(p.price)) : "--"}</small></span>
       ${sim.hasTp && !noData ? `<span class="tp-fold-badge ${sim.profit >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(sim.profit)}</span>` : ""}`;
     const configBlock = `<div class="tp-config"><div class="tp-config-legend"><span>${escapeHtml(t("tp.price"))}</span><span>${escapeHtml(t("tp.pctSell"))}</span></div>${configRows}</div>`;
 
@@ -4003,7 +4003,7 @@ function renderInsightRankingItems(items, mode) {
             : formatPercent(item.metrics.pnlPct);
           const detailValue = mode === "24h"
             ? formatCurrency(item.metrics.currentPrice, getPriceDigits(item.metrics.currentPrice))
-            : formatSignedCurrency(item.metrics.pnlUsd);
+            : maskedSignedCurrency(item.metrics.pnlUsd);
 
           return `
             <article class="insight-item">
@@ -4011,7 +4011,7 @@ function renderInsightRankingItems(items, mode) {
                 <span class="insight-item-rank">${index + 1}</span>
                 <div>
                   <strong>${escapeHtml(assetDisplayName(item.row))}</strong>
-                  <small>${escapeHtml(formatCurrency(item.metrics.currentValue))}</small>
+                  <small>${escapeHtml(maskedCurrency(item.metrics.currentValue))}</small>
                 </div>
               </div>
               <div class="insight-item-metric">
