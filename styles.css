@@ -6902,3 +6902,55 @@ details.more-fold { border-radius: var(--radius-xl); }
    --panel-soft y --field-bg pero fijos, lo que sumaba tonos sin motivo. */
 .insight-item { background: var(--panel-soft); }
 select { background-color: var(--field-bg); }
+
+/* ═══════════════════════════════════════════════════════
+   LEGIBILIDAD Y NÚMEROS ESTABLES
+   La auditoria encontro 52 etiquetas a 7,7px (demasiado
+   pequenas en un movil) y ~84 cifras sin ancho fijo, que
+   cambian de anchura al refrescarse los precios.
+   ═══════════════════════════════════════════════════════ */
+
+/* 1. Suelo de legibilidad para las micro-etiquetas en mayusculas.
+      Siguen siendo compactas, pero dejan de ser ilegibles. */
+:root[data-density="compact"] .tp-step-grid span,
+:root[data-density="compact"] .tp-summary span,
+:root[data-density="compact"] .tp-global-grid span,
+:root[data-density="compact"] .tp-config-legend,
+:root[data-density="compact"] .tp-scenario-grid span,
+:root[data-density="compact"] .cap-grid span,
+:root[data-density="compact"] .acts-totals span,
+:root[data-density="compact"] .diag-grid span,
+:root[data-density="compact"] .as-sec span,
+:root[data-density="compact"] .amc-grid dt { font-size: 0.6rem; letter-spacing: 0.04em; }
+
+:root[data-density="compact"] .tpl-tp-lbl,
+:root[data-density="compact"] .tpl-entry-lbl { font-size: 0.6rem; }
+
+/* 2. Cifras con ancho fijo en toda la app: al actualizarse los precios
+      los digitos ya no desplazan el resto de la fila. */
+.num,
+.positive,
+.negative,
+.neutral,
+.delta-chip,
+.mmi-rank,
+.hl-pct,
+.avg-dist,
+.category-row strong,
+[class*="-pct"],
+[class*="-value"],
+[class*="money"] { font-variant-numeric: tabular-nums; }
+
+/* Suelo tipografico definitivo: ninguna etiqueta baja de 0,6rem (9,6px).
+   Afectaba a subtitulos de cabecera, distintivos de ranking y la marca
+   "Superado", que quedaban entre 8,6 y 9,3px. */
+:root[data-density="compact"] .tp-fold-txt small,
+:root[data-density="compact"] .more-fold-txt small,
+:root[data-density="compact"] .rank-owned,
+:root[data-density="compact"] .tp-reached-tag,
+:root[data-density="compact"] .eyebrow { font-size: 0.6rem; }
+
+/* Iconos de interfaz en dos medidas (18px normal, 20px destacado)
+   en lugar de cuatro (18, 20, 21 y 22). */
+:root[data-density="compact"] .tab-btn:not(.tab-btn-primary) svg { width: 20px; height: 20px; }
+:root[data-density="compact"] .icon-circle-btn svg { width: 18px; height: 18px; }
