@@ -6460,6 +6460,57 @@ body.filters-open { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) { .theme-opt { transition: none; } }
 
+/* Restaurado: este bloque se perdio en la limpieza de CSS muerto y sin el
+   la cabecera de cada activo dejaba de ser flex (crecia a 116px). */
+/* ═══════════════════════════════════════════════════════
+   PLAN: secciones plegables (todo cerrado al entrar) +
+   boton global de plegar/desplegar.
+   ═══════════════════════════════════════════════════════ */
+.tp-foldall-row { display: flex; justify-content: flex-end; }
+.tp-foldall { min-height: var(--control-md); padding: 0 var(--space-4); font-size: 0.76rem; }
+
+.tp-fold { padding: 0; overflow: hidden; }
+.tp-fold-sum {
+  list-style: none; cursor: pointer;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4); min-height: 56px;
+}
+.tp-fold-sum::-webkit-details-marker { display: none; }
+.tp-fold-sum:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
+.tp-fold-txt { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.tp-fold-txt strong { font-size: 0.9rem; line-height: 1.25; }
+.tp-fold-txt small { font-size: 0.66rem; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+.tp-fold-badge {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: 0.78rem; font-weight: 700; white-space: nowrap;
+  padding: 2px var(--space-2); border-radius: 999px;
+}
+.tp-fold-badge.positive { color: var(--positive); background: var(--positive-bg); }
+.tp-fold-badge.negative { color: var(--negative); background: var(--negative-bg); }
+.tp-fold-chev { color: var(--muted); font-size: 0.8rem; flex: 0 0 auto; transition: transform var(--dur-fast) var(--ease-out); }
+.tp-fold[open] .tp-fold-chev { transform: rotate(180deg); }
+.tp-fold-body {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4);
+  border-top: 1px solid var(--line); margin-top: 0; padding-top: var(--space-3);
+}
+/* Los bloques 1 y 2 conservan su franja de color a la izquierda */
+.tp-fold.tp-block { border-left: 3px solid transparent; }
+.tp-fold.tp-block-prog { border-left-color: var(--accent); }
+.tp-fold.tp-block-full { border-left-color: var(--accent2, #a988ff); }
+.tp-fold .tp-card-id small { font-family: var(--font-mono); }
+
+@media (prefers-reduced-motion: reduce) { .tp-fold-chev { transition: none; } }
+
+/* Categoría por sector: fila con etiqueta, barra, % y activos del sector. */
+.category-row { align-items: center; }
+.category-assets {
+  grid-column: 1 / -1; font-family: var(--font-mono); font-size: 0.6rem;
+  color: var(--muted); padding-left: 18px; margin-top: -2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+
 /* ── Cuadros plegables de la pestaña Más ── */
 .more-fold { padding: 0; overflow: hidden; }
 .more-fold-sum {
@@ -6765,3 +6816,62 @@ details.more-fold { border-radius: var(--radius-xl); }
 :root[data-density="compact"] .insight-item { border-radius: var(--radius-md); }
 :root[data-density="compact"] .markets-search input,
 :root[data-density="compact"] .inline-input { border-radius: var(--radius-sm); }
+
+/* Insights: el bloque del activo no crecia, asi que el nombre se recortaba
+   con elipsis a ~70px aunque sobraran ~175px en la tarjeta ("se comian"
+   palabras con nombres largos como Ethereum o Chainlink). */
+.insight-item-main { flex: 1 1 auto; }
+.insight-item-metric { flex: 0 0 auto; text-align: right; }
+
+/* ═══════════════════════════════════════════════════════
+   PLAN · tarjeta de activo mas contenida.
+   Abierta ocupaba casi una pantalla completa. Se reduce
+   espaciado y altura de linea; no se recorta ningun texto.
+   ═══════════════════════════════════════════════════════ */
+:root[data-density="compact"] .tp-fold-body { gap: 5px; }
+
+/* Pasos de TP: cabecera y metricas mas juntas. */
+:root[data-density="compact"] .tp-steps { gap: 4px; }
+:root[data-density="compact"] .tp-step { padding: 5px 8px; }
+:root[data-density="compact"] .tp-step-top { font-size: 0.7rem; line-height: 1.2; }
+:root[data-density="compact"] .tp-step-grid { margin-top: 2px; gap: 4px; }
+:root[data-density="compact"] .tp-step-grid span { font-size: 0.48rem; line-height: 1.2; }
+:root[data-density="compact"] .tp-step-grid b { font-size: 0.7rem; line-height: 1.25; }
+
+/* Configuracion de TP: filas mas bajas manteniendo el campo pulsable. */
+:root[data-density="compact"] .tp-config { gap: 2px; padding: 6px 8px; }
+:root[data-density="compact"] .tp-config-legend { font-size: 0.48rem; }
+:root[data-density="compact"] .tp-config-price,
+:root[data-density="compact"] .tp-config-pct input { min-height: 28px; }
+:root[data-density="compact"] .tp-config-del { width: 20px; height: 20px; }
+
+/* Resumen y "si vendo el 100%": menos aire vertical. */
+:root[data-density="compact"] .tp-summary { padding: 6px 10px; gap: 2px 10px; }
+:root[data-density="compact"] .tp-summary span { font-size: 0.48rem; line-height: 1.2; }
+:root[data-density="compact"] .tp-summary b { font-size: 0.72rem; line-height: 1.25; }
+:root[data-density="compact"] .tp-full { gap: 3px 10px; }
+:root[data-density="compact"] .tp-full-grid { gap: 2px 10px; }
+:root[data-density="compact"] .tp-full-grid > div { font-size: 0.68rem; }
+:root[data-density="compact"] .tp-line { margin-bottom: 0; }
+
+/* El subtitulo de cada cabecera plegable ya no se corta: pasa a dos lineas.
+   Con una sola linea perdia el precio actual (se cortaba a mitad de palabra). */
+:root[data-density="compact"] .tp-fold-txt small,
+:root[data-density="compact"] .more-fold-txt small {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Mercados: el nombre disponia de 93px y el precio de 120, asi que se
+   comian nombres largos (Hyperliquid, Gram (prev. Toncoin)...). El nombre
+   pasa a llevarse el espacio sobrante y el precio se ajusta a su contenido. */
+:root[data-density="compact"] .mmi-head {
+  grid-template-columns: auto auto minmax(0, 1fr) max-content auto;
+}
+:root[data-density="compact"] .mmi-main strong { font-size: 0.82rem; }
+:root[data-density="compact"] .mmi-main span { font-size: 0.64rem; }
+:root[data-density="compact"] .mmi-head { column-gap: 7px; padding-left: 8px; padding-right: 8px; }
+:root[data-density="compact"] .mmi-rank { font-size: 0.62rem; }
