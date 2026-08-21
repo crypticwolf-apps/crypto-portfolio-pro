@@ -6601,3 +6601,146 @@ body.filters-open { overflow: hidden; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 :root[data-density="compact"] .tp-fold-txt { overflow: hidden; }
+
+/* ═══════════════════════════════════════════════════════
+   ARMONÍA VISUAL — jerarquía única de anchos, radios y
+   relleno. Corrige la mezcla de cajas anchas y estrechas
+   detectada en la auditoría (radios de 9 a 26px, rellenos
+   de 5 a 22px y un max-width suelto en la config de TP).
+   ═══════════════════════════════════════════════════════ */
+
+/* 1. Ancho de lectura en escritorio: el contenido dejaba de
+      tener limite util (hasta 1960px) y las tarjetas se
+      estiraban de lado a lado. */
+@media (min-width: 769px) {
+  .app-shell { max-width: var(--max-content); }
+}
+
+/* 2. Ninguna caja interior lleva su propio limite de ancho:
+      todas acompanan al bloque que las contiene. */
+.tp-config { max-width: none; }
+
+/* 3. Radios: tres niveles y solo tres.
+      Contenedor > tarjeta interior > control. */
+.panel,
+.main-value-card,
+.alloc-card,
+.install-card,
+details.tp-fold,
+details.more-fold { border-radius: var(--radius-xl); }
+
+.summary-card,
+.tp-config,
+.tp-step,
+.tp-summary,
+.tp-global-grid,
+.tp-scenario,
+.hl-item,
+.acts-totals,
+.diag-grid > div,
+.market-mobile-item,
+.asset-mobile-card { border-radius: var(--radius-md); }
+
+.as-period-row,
+.theme-picker,
+.cap-modes,
+.tp-quick-field input,
+.tp-config-price,
+.tp-config-pct input { border-radius: var(--radius-sm); }
+
+/* 4. Relleno uniforme en las tarjetas interiores: antes
+      convivian 5px 8px, 7px 10px y 14px 16px. */
+:root[data-density="compact"] .tp-config,
+:root[data-density="compact"] .tp-step,
+:root[data-density="compact"] .tp-summary,
+:root[data-density="compact"] .tp-global-grid,
+:root[data-density="compact"] .tp-scenario,
+:root[data-density="compact"] .acts-totals { padding: 8px 10px; }
+
+/* 5. La tarjeta principal mantiene su jerarquia, pero con
+      valores de la escala de espaciado. */
+.main-value-card { padding: var(--space-5) var(--space-5) var(--space-4); }
+.alloc-card { padding: var(--space-3) var(--space-4); }
+
+/* Los radios interiores tambien se declaran con el selector de densidad:
+   el bloque compacto los fijaba en 9-10px y anulaba la regla anterior. */
+:root[data-density="compact"] .tp-config,
+:root[data-density="compact"] .tp-step,
+:root[data-density="compact"] .tp-summary,
+:root[data-density="compact"] .tp-global-grid,
+:root[data-density="compact"] .tp-scenario,
+:root[data-density="compact"] .hl-item,
+:root[data-density="compact"] .asset-mobile-card,
+:root[data-density="compact"] .market-mobile-item { border-radius: var(--radius-md); }
+
+/* La tarjeta de resumen del inicio comparte el relleno interior. */
+.summary-card { padding: var(--space-3) var(--space-4); }
+
+/* ═══════════════════════════════════════════════════════
+   ALINEACIÓN INTERIOR (móvil) — todas las cajas con fondo
+   arrancan en la misma vertical. La auditoría encontraba
+   sangrados de 19, 21, 34 y 40px segun la seccion, que es
+   lo que hacia parecer unos cuadros anchos y otros estrechos.
+   ═══════════════════════════════════════════════════════ */
+
+/* 1. Envoltorio de insights: no tiene fondo propio, asi que su
+      relleno de 18px solo servia para meter las tarjetas hacia
+      dentro (quedaban 19px mas estrechas que el resto). */
+.insight-card { padding: 0; }
+
+/* 2. La franja de color de los bloques 1 y 2 pasa a sombra
+      interior: como borde real desplazaba su contenido 3px y
+      esas cajas no cuadraban con las de los activos. */
+.tp-fold.tp-block { border-left: 0; }
+.tp-fold.tp-block-prog { box-shadow: inset 3px 0 0 0 var(--accent); }
+.tp-fold.tp-block-full { box-shadow: inset 3px 0 0 0 var(--accent2, #a988ff); }
+
+/* 3. Mismo sangrado horizontal en todos los cuerpos plegables
+      que en .panel (12px), para que las cajas interiores
+      compartan eje con las del resto de pestanas. */
+:root[data-density="compact"] .tp-fold-body { padding: 6px 12px 10px; }
+:root[data-density="compact"] .more-fold-body { padding: 8px 12px 12px; }
+
+/* ═══════════════════════════════════════════════════════
+   RITMO Y TIPOGRAFÍA — una sola escala.
+   La auditoria encontro 6 tamanos de titulo para el mismo
+   nivel y 3 ritmos verticales (6, 10 y 12px) segun pestana.
+   Se declara con el prefijo de densidad (siempre activo)
+   porque las reglas previas usan ese mismo ambito y, sin el,
+   quedaban anuladas por especificidad.
+   ═══════════════════════════════════════════════════════ */
+:root[data-density="compact"] .app-shell,
+:root[data-density="compact"] .analytics-view,
+:root[data-density="compact"] #planContent,
+:root[data-density="compact"] .tab-section { gap: var(--space-2); }
+
+:root[data-density="compact"] .panel-heading h2,
+:root[data-density="compact"] .home-section-title,
+:root[data-density="compact"] .panel-heading .home-section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.004em;
+}
+:root[data-density="compact"] .tp-fold-txt strong,
+:root[data-density="compact"] .more-fold-txt strong {
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+:root[data-density="compact"] .eyebrow,
+:root[data-density="compact"] .more-fold-txt small {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+:root[data-density="compact"] .panel-heading { margin-bottom: var(--space-2); }
+
+/* El ritmo de las pestanas simples lo fijaba una regla muy especifica
+   (body[data-active-tab] .tab-section): se iguala con su misma forma. */
+:root[data-density="compact"] body[data-active-tab] .tab-section[data-tab] { gap: var(--space-2); }
+
+/* Titulo del pie: entra en la misma escala que el resto de secciones. */
+:root[data-density="compact"] .app-footer h2 { font-size: 0.95rem; font-weight: 700; line-height: 1.25; }
