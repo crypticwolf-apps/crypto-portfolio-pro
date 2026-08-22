@@ -7061,3 +7061,19 @@ select { background-color: var(--field-bg); }
 .news-card.is-skeleton .news-card-top { display: flex; gap: 8px; }
 
 @media (prefers-reduced-motion: reduce) { .news-body { transition: none; } }
+
+/* Enlaces a Crypto Atalaya (canal de Telegram y web) en el pie de Mas. */
+.footer-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.footer-link {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: var(--control-md); padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel-soft); color: var(--text-2);
+  font-size: 0.72rem; text-decoration: none;
+  transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast);
+}
+.footer-link:hover { border-color: var(--line-accent); color: var(--accent); }
+.footer-link svg { width: 16px; height: 16px; flex: 0 0 auto; }
+/* Los iconos de la cabecera de Noticias son enlaces, no botones. */
+a.icon-circle-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+@media (prefers-reduced-motion: reduce) { .footer-link { transition: none; } }
