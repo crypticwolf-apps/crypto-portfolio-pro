@@ -2614,22 +2614,29 @@ body {
 }
 
 /* Fondo con manchas de color suaves: dan algo que "refractar" al cristal */
-body {
+/* Los degradados de fondo NO van en el body con background-attachment:
+   fixed. WebKit dimensiona ese fondo contra el bloque contenedor inicial y
+   en la app instalada deja sin pintar la banda del area segura inferior: se
+   veia una franja de otro color bajo el dock, como si flotara. Una capa
+   position:fixed cubre siempre el viewport visible entero, area segura
+   incluida. Va detras de todo (z-index -1) pero por delante del color base
+   del body. */
+body { background-image: none; }
+
+.bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-image:
     radial-gradient(ellipse 55% 40% at 10% 0%, rgba(90, 171, 255, 0.17), transparent 65%),
     radial-gradient(ellipse 45% 35% at 92% 6%, rgba(62, 255, 168, 0.13), transparent 60%),
     radial-gradient(ellipse 50% 40% at 78% 62%, rgba(143, 121, 255, 0.11), transparent 65%),
     radial-gradient(ellipse 60% 45% at 12% 92%, rgba(78, 160, 255, 0.10), transparent 65%);
-  background-attachment: fixed;
 }
 
-:root[data-theme="light"] body {
-  background-image:
-    radial-gradient(ellipse 55% 40% at 10% 0%, rgba(26, 110, 199, 0.15), transparent 65%),
-    radial-gradient(ellipse 45% 35% at 92% 6%, rgba(0, 137, 94, 0.12), transparent 60%),
-    radial-gradient(ellipse 50% 40% at 78% 62%, rgba(120, 90, 220, 0.10), transparent 65%);
-  background-attachment: fixed;
-}
+/* En OLED el fondo es negro puro: la capa sobra. */
+:root[data-theme="dark"][data-oled="on"] .bg-layer { background-image: none; }
 
 /* El cristal de iOS es limpio: fuera scanlines */
 body::after {
@@ -3028,7 +3035,7 @@ select {
 
 /* ── Fondo claro más rico (una mancha cálida extra) ── */
 
-:root[data-theme="light"] body {
+:root[data-theme="light"] .bg-layer {
   background-image:
     radial-gradient(ellipse 55% 40% at 10% 0%, rgba(26, 110, 199, 0.16), transparent 65%),
     radial-gradient(ellipse 45% 35% at 92% 6%, rgba(0, 137, 94, 0.13), transparent 60%),

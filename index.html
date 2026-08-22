@@ -78,6 +78,10 @@
     </script>
   </head>
   <body>
+    <!-- Capa de fondo: los degradados vivian en el body con
+         background-attachment: fixed, que en iOS no cubre la banda del area
+         segura y dejaba una franja de otro color bajo el dock. -->
+    <div class="bg-layer" aria-hidden="true"></div>
     <nav id="tabBar" class="tab-bar" aria-label="Navegacion principal" data-i18n-aria-label="nav.ariaLabel">
       <button class="tab-btn" type="button" data-tab-target="news" aria-current="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h13v14H5a1 1 0 0 1-1-1z"/><path d="M17 8h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1"/><path d="M7 9h7M7 12h7M7 15h4"/></svg>
