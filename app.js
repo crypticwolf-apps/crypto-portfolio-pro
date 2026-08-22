@@ -172,6 +172,11 @@ const DEX_NETWORKS = {
 const TRADES_LOG_PAGE = 12;
 let tradesLogLimit = TRADES_LOG_PAGE;
 
+// Cache del recorrido de historial por fila. Arriba a proposito: init()
+// llama a renderAll() y ese camino llega aqui en cuanto alguna posicion
+// tiene historial guardado, que es el caso de cualquier usuario real.
+const rangoHistorialCache = new Map();
+
 // Temporizadores del sondeo DEX. Declarados aqui arriba a proposito: el
 // arranque llama a startDexPolling() desde init() y un "let" a mitad del
 // fichero se quedaria en zona muerta temporal.
@@ -4337,7 +4342,6 @@ function getWorst24h(snapshot, limit = 3) {
 // Recorrido del historial de una fila (rango minimo-maximo en %), memorizado.
 // Se rehace solo si cambia el historial, no en cada repintado: con precios en
 // vivo el panel se redibuja cada segundo y esto se llevaba el rato.
-const rangoHistorialCache = new Map();
 function rowHistoricalRangePct(row) {
   const bruto = row.priceHistory || [];
   const ultimo = bruto.length ? bruto[bruto.length - 1] : null;
