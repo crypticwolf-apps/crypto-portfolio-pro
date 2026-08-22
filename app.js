@@ -2300,7 +2300,7 @@ function normalizeNews(raw) {
       cats: Array.isArray(n.cats) ? n.cats : [],
       tags: Array.isArray(n.tags) ? n.tags : [],
       impacto: Number.isFinite(Number(n.impacto)) ? Number(n.impacto) : null,
-      enlace: String(n.tg || n.fuente || "").trim()
+      enlace: String(n.web || n.url || n.permalink || n.tg || n.fuente || "").trim()
     }))
     .filter((n) => n.titulo)
     .sort((a, b) => b.ts - a.ts);
@@ -2443,6 +2443,12 @@ function bindNews() {
     renderNews();
   });
   box?.addEventListener("click", (e) => {
+    const enlace = e.target.closest("a.news-link");
+    if (enlace) {
+      e.preventDefault();
+      window.open(enlace.href, "_blank", "noopener,noreferrer");
+      return;
+    }
     const r = e.target.closest('[data-news-action="retry"]');
     if (r) { fetchNews(true); return; }
     const tgl = e.target.closest("[data-news-toggle]");
@@ -9989,9 +9995,18 @@ function showToast(title, detail, tone = "neutral") {
     warning: '<svg viewBox="0 0 20 20" fill="none"><path d="M10 2L1 18h18L10 2z" stroke="#ffc947" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v4M10 14.5v.5" stroke="#ffc947" stroke-width="1.8" stroke-linecap="round"/></svg>',
     neutral: '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="#5aabff" stroke-width="1.5"/><path d="M10 6v5M10 13.5v.5" stroke="#5aabff" stroke-width="1.8" stroke-linecap="round"/></svg>'
   };
+  // Guardar, borrar o registrar algo son confirmaciones rutinarias: molesta
+  // que tapen media pantalla cuatro segundos. Se reducen a una linea breve.
+  // Los avisos y errores mantienen la tarjeta completa: ahi el detalle importa.
+  const breve = tone === "positive" || tone === "neutral";
   const toast = document.createElement("article");
-  toast.className = `toast ${tone}`;
-  toast.innerHTML = `
+  toast.className = `toast ${tone}${breve ? " is-compact" : ""}`;
+  toast.innerHTML = breve
+    ? `
+    <span class="toast-icon">${icons[tone] || icons.neutral}</span>
+    <div class="toast-content"><strong>${escapeHtml(title)}</strong></div>
+  `
+    : `
     <span class="toast-icon">${icons[tone] || icons.neutral}</span>
     <div class="toast-content">
       <strong>${escapeHtml(title)}</strong>
@@ -9999,6 +10014,11 @@ function showToast(title, detail, tone = "neutral") {
     </div>
     <div class="toast-progress"></div>
   `;
+  // Solo se mantiene el ultimo aviso rutinario: encadenar acciones no debe
+  // apilar carteles uno encima de otro.
+  if (breve) {
+    dom.toastStack.querySelectorAll(".toast.is-compact").forEach((viejo) => viejo.remove());
+  }
   dom.toastStack.appendChild(toast);
 
   window.setTimeout(() => {
@@ -10006,7 +10026,7 @@ function showToast(title, detail, tone = "neutral") {
     toast.style.transform = "translateX(40px)";
     toast.style.transition = "opacity 0.2s, transform 0.2s";
     window.setTimeout(() => toast.remove(), 200);
-  }, 4200);
+  }, breve ? 1600 : 4200);
 }
 
 function parseCsv(text) {

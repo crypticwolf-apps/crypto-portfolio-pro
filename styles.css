@@ -2340,6 +2340,20 @@ body {
   right: max(14px, env(safe-area-inset-right));
 }
 
+/* Aviso rutinario: una sola linea, sin cuerpo ni barra de progreso, y
+   estrecho para que no tape la pantalla. */
+.toast.is-compact {
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+}
+.toast.is-compact .toast-content strong { font-size: 0.78rem; }
+.toast.is-compact .toast-icon { width: 16px; height: 16px; }
+.toast.is-compact .toast-icon svg { width: 16px; height: 16px; }
+
 /* ── Menú "Más opciones" (solo móvil; en escritorio todo visible) ── */
 
 .more-actions-btn {
@@ -4167,7 +4181,7 @@ body[data-active-tab="more"] .tab-section[data-tab="more"] {
   .tab-bar {
     left: 14px;
     right: 14px;
-    bottom: calc(2px + env(safe-area-inset-bottom));
+    bottom: max(4px, calc(env(safe-area-inset-bottom) - 16px));
     border: 1px solid var(--glass-border);
     border-radius: 26px;
     padding: 6px;
@@ -7201,10 +7215,10 @@ select { background-color: var(--field-bg); }
 .news-card-head:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
 .news-card-top { display: flex; align-items: center; gap: 8px; }
 .news-cat {
-  font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase;
+  font-family: var(--font-mono); font-size: 0.68rem; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--accent-2);
 }
-.news-time { font-family: var(--font-mono); font-size: 0.62rem; color: var(--muted); margin-right: auto; }
+.news-time { font-family: var(--font-mono); font-size: 0.68rem; color: var(--muted); margin-right: auto; }
 .news-impact {
   font-family: var(--font-mono); font-size: 0.62rem; font-weight: 700;
   min-width: 26px; text-align: center; padding: 2px 6px; border-radius: 999px;
@@ -7213,7 +7227,7 @@ select { background-color: var(--field-bg); }
 .news-impact.baja { color: var(--accent-2); background: var(--accent-2-dim); }
 .news-impact.media { color: var(--warning); background: var(--warning-bg); }
 .news-impact.alta { color: var(--negative); background: var(--negative-bg); }
-.news-title { font-size: 0.82rem; font-weight: 600; line-height: 1.35; }
+.news-title { font-size: 0.95rem; font-weight: 600; line-height: 1.4; }
 
 /* Cuerpo plegado: se abre al tocar el titular. */
 .news-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-base) var(--ease-out); }
@@ -7221,15 +7235,25 @@ select { background-color: var(--field-bg); }
 .news-body > * { overflow: hidden; }
 .news-card.is-open .news-body { border-top: 1px solid var(--line); }
 .news-text, .news-analysis {
-  margin: 0; padding: 8px 12px 0; font-size: 0.72rem; line-height: 1.5; color: var(--text-2);
+  margin: 0; padding: 8px 12px 0; font-size: 0.85rem; line-height: 1.55; color: var(--text-2);
 }
 .news-analysis strong { color: var(--accent); }
 .news-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 12px 10px; }
 .news-tag {
-  font-family: var(--font-mono); font-size: 0.62rem; color: var(--muted);
-  padding: 2px 7px; border-radius: 999px; background: var(--panel-soft);
+  font-family: var(--font-mono); font-size: 0.68rem; color: var(--muted);
+  padding: 3px 8px; border-radius: 999px; background: var(--panel-soft);
 }
-.news-link { margin-left: auto; font-size: 0.72rem; color: var(--accent-2); text-decoration: none; }
+.news-link {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent-2);
+  text-decoration: none;
+  /* Area de toque comoda: antes era una linea de texto de 0,72rem. */
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-soft);
+}
 .news-link:hover { text-decoration: underline; }
 
 .news-stale {
