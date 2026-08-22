@@ -6007,6 +6007,79 @@ body.filters-open { overflow: hidden; }
 .acts-legend .sell { color: #ff7b7b; }
 
 /* ── Diagnóstico (Más) ── */
+/* ── Registro de compras y ventas (Analitica) ──
+   Fila compacta con etiqueta, activo, importe y acciones. Sin prefijo de
+   densidad porque son clases nuevas que ninguna regla compacta toca. */
+.trades-log { margin-top: var(--space-4); }
+.trades-log-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin: 0 0 var(--space-2);
+}
+.trades-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.trade-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-card);
+}
+.trade-item-tag {
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+}
+.trade-item.is-buy .trade-item-tag { color: var(--positive); background: var(--positive-bg); }
+.trade-item.is-sell .trade-item-tag { color: var(--negative); background: var(--negative-bg); }
+.trade-item-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.trade-item-main strong {
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.trade-item-main small {
+  font-size: 0.62rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.trade-item-amount {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+.trade-item-actions { flex: 0 0 auto; display: flex; gap: 4px; }
+.trade-item-actions .icon-circle-btn { width: 30px; height: 30px; }
+.trade-item-actions svg { width: 15px; height: 15px; }
+.trades-log-more { margin-top: var(--space-2); width: 100%; }
+
+@media (max-width: 360px) {
+  .trade-item { flex-wrap: wrap; row-gap: 4px; }
+  .trade-item-main { flex: 1 1 100%; order: 1; }
+  .trade-item-tag { order: 0; }
+  .trade-item-amount { order: 0; margin-left: auto; }
+  .trade-item-actions { order: 2; margin-left: auto; }
+}
+
 .diag-panel { padding: 10px 16px; }
 .diag-summary { cursor: pointer; font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.06em; padding: 6px 0; list-style: none; }
 .diag-summary::-webkit-details-marker { display: none; }

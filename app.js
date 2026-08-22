@@ -161,6 +161,12 @@ const DEX_NETWORKS = {
   ton: "ton"
 };
 
+// Cuantas operaciones del registro se listan de golpe (con boton para ver
+// mas). Arriba a proposito: renderAll() corre desde init() y alcanzaria
+// estas declaraciones antes de tiempo si vivieran junto a su funcion.
+const TRADES_LOG_PAGE = 12;
+let tradesLogLimit = TRADES_LOG_PAGE;
+
 // Temporizadores del sondeo DEX. Declarados aqui arriba a proposito: el
 // arranque llama a startDexPolling() desde init() y un "let" a mitad del
 // fichero se quedaria en zona muerta temporal.
@@ -437,6 +443,8 @@ const state = {
   plan: { tp: {}, tpAll: { p1: 30, p2: 50, p3: 100 } },
   heroVisible: true,
   editorRowId: null,
+  // Operacion del registro que se esta editando (null = alta nueva).
+  editingTradeId: null,
   rowMenuOpen: false,
   detailRowId: null,
   detailTab: "summary",
@@ -1487,14 +1495,19 @@ function openTradeSheet(mode, preselectRowId = null) {
   // Posiciones candidatas: las que ya tienen activo definido.
   const positions = state.rows.filter((row) => row.crypto.trim());
 
-  if (mode === "sell" && !positions.filter((r) => parseDecimal(r.tokens) > 0).length) {
+  if (mode === "sell" && !state.editingTradeId && !positions.filter((r) => parseDecimal(r.tokens) > 0).length) {
     showToast(t("trade.noPositionsTitle"), t("trade.noPositionsText"), "warning");
     return;
   }
 
   const titleKey = mode === "buy" ? "fab.buy" : mode === "sell" ? "fab.sell" : "fab.alert";
+  // Al editar una venta se incluye siempre su propia posicion, aunque haya
+  // quedado a cero: es la que se va a recalcular.
+  const editando = state.editingTradeId
+    ? state.trades.find((item) => item.id === state.editingTradeId)
+    : null;
   const options = (mode === "sell"
-    ? positions.filter((r) => parseDecimal(r.tokens) > 0)
+    ? positions.filter((r) => parseDecimal(r.tokens) > 0 || r.id === editando?.rowId)
     : positions)
     .map((row) => `<option value="${row.id}">${escapeHtml(assetDisplayName(row))}</option>`)
     .join("");
@@ -1707,6 +1720,8 @@ function closeTradeSheet() {
   if (!sheet) {
     return;
   }
+  // Cancelar deja la operacion original intacta: solo se olvida la edicion.
+  state.editingTradeId = null;
   sheet.classList.add("is-closing");
   window.setTimeout(() => {
     sheet.hidden = true;
@@ -1791,6 +1806,17 @@ function confirmTrade(sheet) {
   if (!(price > 0)) {
     showToast(t("trade.invalidTitle"), t("trade.invalidPrice"), "warning");
     return;
+  }
+
+  // Edicion: se retira la operacion original y se deshace su efecto antes de
+  // aplicar la nueva, para que la posicion no acumule las dos.
+  if (state.editingTradeId) {
+    const indice = state.trades.findIndex((item) => item.id === state.editingTradeId);
+    if (indice >= 0) {
+      revertTradeEffect(state.trades[indice]);
+      state.trades.splice(indice, 1);
+    }
+    state.editingTradeId = null;
   }
 
   const curTokens = parseDecimal(row.tokens);
@@ -3069,6 +3095,26 @@ function bindEvents() {
   const moreRefreshBtn = document.getElementById("moreRefreshBtn");
   if (moreRefreshBtn) {
     moreRefreshBtn.addEventListener("click", () => dom.refreshPricesBtn.click());
+  }
+
+  const tradesLog = document.getElementById("tradesLog");
+  if (tradesLog) {
+    tradesLog.addEventListener("click", (event) => {
+      const borrar = event.target.closest("[data-trade-delete]");
+      if (borrar) {
+        deleteTrade(borrar.dataset.tradeDelete);
+        return;
+      }
+      const editar = event.target.closest("[data-trade-edit]");
+      if (editar) {
+        openTradeEdit(editar.dataset.tradeEdit);
+        return;
+      }
+      if (event.target.closest("[data-trades-more]")) {
+        tradesLogLimit += TRADES_LOG_PAGE;
+        renderTradesLog();
+      }
+    });
   }
 
   if (dom.livePricesSelect) {
@@ -4558,6 +4604,7 @@ function renderAnalyticsExtras(snapshot) {
   renderAnalyticsCategory(snapshot);
   renderAnalyticsCompare(snapshot);
   renderAnalyticsActivityStats();
+  renderTradesLog();
 }
 
 function renderAnalyticsActivityStats() {
@@ -4589,6 +4636,168 @@ function renderAnalyticsActivityStats() {
     </div>
     <div class="acts-legend"><span class="buy">■ ${escapeHtml(t("analytics.buys"))}</span><span class="sell">■ ${escapeHtml(t("analytics.sells"))}</span></div>
   `;
+}
+
+/* ═══════════════════════════════════════════════════════
+   REGISTRO DE COMPRAS Y VENTAS — lista editable.
+   Cada operacion modifico la posicion cuando se creo, asi
+   que al borrarla o editarla hay que deshacer su efecto:
+   con el modelo de coste medio la vuelta atras es exacta.
+   ═══════════════════════════════════════════════════════ */
+
+function renderTradesLog() {
+  const box = document.getElementById("tradesLog");
+  if (!box) {
+    return;
+  }
+  if (!state.trades.length) {
+    box.innerHTML = "";
+    return;
+  }
+
+  const visibles = state.trades.slice(0, tradesLogLimit);
+  box.innerHTML = `
+    <h3 class="trades-log-title">${escapeHtml(t("trades.logTitle"))}</h3>
+    <ul class="trades-log-list" role="list">
+      ${visibles.map((trade) => tradeLogItemHtml(trade)).join("")}
+    </ul>
+    ${state.trades.length > visibles.length
+      ? `<button class="ghost-btn trades-log-more" type="button" data-trades-more>${escapeHtml(t("trades.showMore"))}</button>`
+      : ""}
+  `;
+}
+
+function tradeLogItemHtml(trade) {
+  const esCompra = trade.type === "buy";
+  const row = getRowById(trade.rowId);
+  const nombre = row ? assetDisplayName(row) : (trade.symbol || "--");
+  const fecha = new Date(trade.at);
+  const tokens = Number.isFinite(trade.tokens) ? formatNumber(trade.tokens, trade.tokens >= 1 ? 4 : 8) : "--";
+  const precio = Number.isFinite(trade.price) && trade.price > 0
+    ? formatCurrency(trade.price, getPriceDigits(trade.price))
+    : "--";
+  return `
+    <li class="trade-item ${esCompra ? "is-buy" : "is-sell"}" data-trade-id="${escapeHtml(trade.id)}">
+      <span class="trade-item-tag">${escapeHtml(esCompra ? t("trades.buy") : t("trades.sell"))}</span>
+      <span class="trade-item-main">
+        <strong>${escapeHtml(nombre)}</strong>
+        <small>${escapeHtml(tokens)} · ${escapeHtml(precio)} · ${escapeHtml(formatDateShort(fecha))}</small>
+      </span>
+      <span class="trade-item-amount ${esCompra ? "" : "positive"}">${maskedCurrency(trade.amount || 0)}</span>
+      <span class="trade-item-actions">
+        <button class="icon-circle-btn" type="button" data-trade-edit="${escapeHtml(trade.id)}" aria-label="${escapeHtml(t("buttons.edit"))}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+        </button>
+        <button class="icon-circle-btn" type="button" data-trade-delete="${escapeHtml(trade.id)}" aria-label="${escapeHtml(t("buttons.delete"))}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+        </button>
+      </span>
+    </li>
+  `;
+}
+
+function formatDateShort(date) {
+  try {
+    return date.toLocaleDateString(UI_LOCALES[state.prefs.language] || "es-ES", { day: "2-digit", month: "short" });
+  } catch {
+    return "--";
+  }
+}
+
+// Deshace en la posicion el efecto de una operacion ya registrada.
+// Compra: se restan los tokens y el coste que sumo.
+// Venta: se devuelven los tokens y su coste de entonces, que se deduce del
+// realizado guardado (realizado = tokens * (precio - coste medio) - comision).
+function revertTradeEffect(trade) {
+  const row = getRowById(trade.rowId);
+  if (!row) {
+    // La posicion ya no existe: solo se retira el registro.
+    return true;
+  }
+  const curTokens = parseDecimal(row.tokens);
+  const curInvestment = parseDecimal(row.investment);
+  const tokens = Number.isFinite(trade.tokens) ? trade.tokens : 0;
+  let newTokens;
+  let newInvestment;
+
+  if (trade.type === "buy") {
+    newTokens = Math.max(0, curTokens - tokens);
+    newInvestment = Math.max(0, curInvestment - (trade.amount || 0));
+  } else {
+    const costBasis = Math.max(0, (trade.amount || 0) - (trade.realized || 0) - (trade.fee || 0));
+    newTokens = curTokens + tokens;
+    newInvestment = curInvestment + costBasis;
+  }
+
+  row.tokens = newTokens > 0 ? formatEditableNumber(newTokens) : "";
+  row.investment = newTokens > 0 ? formatEditableNumber(newInvestment) : "";
+  row.entryPrice = newTokens > 0 ? formatEditableNumber(newInvestment / newTokens) : "";
+  row.derivedField = "";
+  return true;
+}
+
+// Editar = reabrir la hoja de compra/venta con los datos de la operacion.
+// Al confirmar se deshace la original y se aplica la nueva, para que la
+// posicion no acumule el efecto de las dos.
+function openTradeEdit(tradeId) {
+  const trade = state.trades.find((item) => item.id === tradeId);
+  if (!trade) {
+    return;
+  }
+  if (!getRowById(trade.rowId)) {
+    showToast(t("trades.noRowTitle"), t("trades.noRowText"), "warning");
+    return;
+  }
+
+  state.editingTradeId = tradeId;
+  openTradeSheet(trade.type, trade.rowId);
+
+  const sheet = document.getElementById("tradeSheet");
+  if (!sheet) {
+    return;
+  }
+  const set = (campo, valor) => {
+    const nodo = sheet.querySelector(`[data-trade-field='${campo}']`);
+    if (nodo && valor != null && valor !== "") {
+      nodo.value = valor;
+    }
+  };
+  set("amount", formatEditableNumber(trade.amount || 0));
+  set("price", formatEditableNumber(trade.price || 0));
+  if (trade.fee) {
+    set("fee", formatEditableNumber(trade.fee));
+  }
+  set("note", trade.note || "");
+  const fecha = new Date(trade.at);
+  if (Number.isFinite(fecha.getTime())) {
+    set("date", fecha.toISOString().slice(0, 10));
+  }
+  updateTradePreview(sheet);
+}
+
+function deleteTrade(tradeId) {
+  const index = state.trades.findIndex((trade) => trade.id === tradeId);
+  if (index < 0) {
+    return;
+  }
+  const trade = state.trades[index];
+  const row = getRowById(trade.rowId);
+  const nombre = row ? assetDisplayName(row) : (trade.symbol || "--");
+  const aviso = t("trades.confirmDelete", {
+    tipo: trade.type === "buy" ? t("trades.buy") : t("trades.sell"),
+    asset: nombre,
+    amount: formatCurrency(trade.amount || 0)
+  });
+  if (!window.confirm(aviso)) {
+    return;
+  }
+
+  revertTradeEffect(trade);
+  state.trades.splice(index, 1);
+  persistState(true);
+  renderAll();
+  pushActivity(t("trades.deletedTitle"), aviso, "neutral");
+  showToast(t("trades.deletedTitle"), t("trades.deletedText"), "positive");
 }
 
 function renderAnalyticsCompare(snapshot) {
