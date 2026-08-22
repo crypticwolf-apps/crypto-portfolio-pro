@@ -531,7 +531,7 @@ const dom = {
   marketGrid: document.getElementById("marketGrid"),
   autoRefreshMeta: document.getElementById("autoRefreshMeta"),
   installCard: document.getElementById("installCard"),
-  shareSummaryBtn: document.getElementById("shareSummaryBtn"),
+  sharePdfBtn: document.getElementById("sharePdfBtn"),
   sheetBackdrop: document.getElementById("sheetBackdrop")
 };
 
@@ -860,43 +860,6 @@ function detectIosInstallCard() {
   if (isIOS && !isStandalone) {
     dom.installCard.hidden = false;
   }
-}
-
-// ── Compartir resumen ──
-async function handleShareSummary() {
-  const snapshot = buildSnapshot();
-  const totalPnl = snapshot.totals.currentValue - snapshot.totals.investment;
-  const totalPnlPct = snapshot.totals.investment
-    ? (totalPnl / snapshot.totals.investment) * 100
-    : 0;
-  const change = getPortfolio24hChange(snapshot);
-
-  const text = [
-    getPortfolioName(),
-    `${t("home.totalValue")}: ${formatCurrency(snapshot.totals.currentValue)}`,
-    `${t("share.pnlLabel")}: ${formatSignedCurrency(totalPnl)} (${formatPercent(totalPnlPct)})`,
-    change ? `${t("share.change24hLabel")}: ${formatSignedPercent(change.pct)}` : null,
-    "https://crypticwolf-apps.github.io/crypto-portfolio-pro/"
-  ].filter(Boolean).join("\n");
-
-  if (navigator.share) {
-    try {
-      await navigator.share({ title: getPortfolioName(), text });
-      return;
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        return;
-      }
-      // Compartir nativo falló: se cae a copiar al portapapeles.
-    }
-  }
-
-  const copied = await copyTextToClipboard(text);
-  showToast(
-    copied ? t("share.copiedTitle") : t("share.errorTitle"),
-    copied ? t("share.copiedText") : t("share.errorText"),
-    copied ? "positive" : "warning"
-  );
 }
 
 // ── Bottom sheet de acciones (abierto desde las acciones rápidas de Inicio) ──
@@ -3061,10 +3024,6 @@ function bindEvents() {
   dom.exportBtn.addEventListener("click", handleExportCsv);
   dom.importBtn.addEventListener("click", () => dom.importFileInput.click());
   dom.importFileInput.addEventListener("change", handleImportCsv);
-  document.getElementById("backupJsonBtn")?.addEventListener("click", handleBackupJson);
-  const restoreInput = document.getElementById("restoreJsonInput");
-  document.getElementById("restoreJsonBtn")?.addEventListener("click", () => restoreInput?.click());
-  restoreInput?.addEventListener("change", handleRestoreJson);
   dom.toggleChartsBtn.addEventListener("click", toggleCharts);
   document.querySelectorAll("[data-theme-set]").forEach((btn) => {
     btn.addEventListener("click", () => setTheme(btn.dataset.themeSet));
@@ -3168,8 +3127,8 @@ function bindEvents() {
     });
   }
 
-  if (dom.shareSummaryBtn) {
-    dom.shareSummaryBtn.addEventListener("click", handleShareSummary);
+  if (dom.sharePdfBtn) {
+    dom.sharePdfBtn.addEventListener("click", () => handleDownloadPdf("share"));
   }
 
   document.addEventListener("keydown", (event) => {
@@ -9304,72 +9263,6 @@ function scheduleAutosave() {
   state.autosaveTimer = window.setTimeout(() => {
     persistState(false);
   }, AUTOSAVE_DELAY);
-}
-
-// ── Copia de seguridad completa en JSON (posiciones, operaciones,
-//    historial y preferencias) y su restauración con validación. ──
-function handleBackupJson() {
-  try {
-    const backup = {
-      app: "crypto-portfolio-pro",
-      kind: "backup",
-      schema: DATA_SCHEMA_VERSION,
-      exportedAt: new Date().toISOString(),
-      state: safeParse(localStorage.getItem(STORAGE_KEY)),
-      prefs: safeParse(localStorage.getItem(PREFS_KEY)),
-      history: safeParse(localStorage.getItem(HISTORY_KEY))
-    };
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `crypto-portfolio-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    showToast(t("backup.doneTitle"), t("backup.doneText"), "positive");
-  } catch (error) {
-    showToast(t("status.apiError"), t("backup.failText"), "negative");
-  }
-}
-
-function handleRestoreJson(event) {
-  const file = event.target.files && event.target.files[0];
-  event.target.value = "";
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    let data;
-    try {
-      data = JSON.parse(String(reader.result));
-    } catch {
-      showToast(t("restore.invalidTitle"), t("restore.invalidText"), "warning");
-      return;
-    }
-    // Validación de estructura: debe contener un estado con lista de posiciones.
-    const stateObj = data && typeof data === "object" ? data.state : null;
-    const rows = stateObj && Array.isArray(stateObj.rows) ? stateObj.rows : null;
-    if (!rows) {
-      showToast(t("restore.invalidTitle"), t("restore.structureText"), "warning");
-      return;
-    }
-    const nTrades = Array.isArray(stateObj.trades) ? stateObj.trades.length : 0;
-    // No se sobrescribe nada sin confirmación explícita (reemplaza los datos).
-    if (!window.confirm(t("restore.confirm", { positions: rows.length, trades: nTrades }))) {
-      return;
-    }
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stateObj));
-      if (data.prefs && typeof data.prefs === "object") localStorage.setItem(PREFS_KEY, JSON.stringify(data.prefs));
-      if (data.history && typeof data.history === "object") localStorage.setItem(HISTORY_KEY, JSON.stringify(data.history));
-      // Recarga: loadState reconstruye el estado desde el almacenamiento restaurado.
-      window.location.reload();
-    } catch {
-      showToast(t("status.apiError"), t("restore.failText"), "negative");
-    }
-  };
-  reader.readAsText(file);
 }
 
 function persistState(manual) {

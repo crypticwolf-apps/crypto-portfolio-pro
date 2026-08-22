@@ -357,6 +357,7 @@ window.APP_I18N = {
       "analytics.buys": "Compras",
       "analytics.sells": "Ventas",
       "diag.title": "Diagnostico",
+      "diag.eyebrow": "Estado",
       "diag.lastSync": "Ultima sincronizacion",
       "diag.assets": "Activos",
       "diag.activity": "Operaciones registradas",
