@@ -4334,6 +4334,45 @@ function getWorst24h(snapshot, limit = 3) {
     .slice(0, limit);
 }
 
+// Recorrido del historial de una fila (rango minimo-maximo en %), memorizado.
+// Se rehace solo si cambia el historial, no en cada repintado: con precios en
+// vivo el panel se redibuja cada segundo y esto se llevaba el rato.
+const rangoHistorialCache = new Map();
+function rowHistoricalRangePct(row) {
+  const bruto = row.priceHistory || [];
+  const ultimo = bruto.length ? bruto[bruto.length - 1] : null;
+  const firma = `${bruto.length}:${ultimo?.at || ""}:${ultimo?.price || ""}`;
+  const guardado = rangoHistorialCache.get(row.id);
+  if (guardado && guardado.firma === firma) {
+    return guardado.valor;
+  }
+
+  let valor = null;
+  const history = compactRowPriceHistory(bruto);
+  if (history.length >= 2) {
+    const prices = history
+      .map((point) => point.price)
+      .filter((price) => Number.isFinite(price) && price > 0);
+    if (prices.length >= 2) {
+      let minPrice = Infinity;
+      let maxPrice = -Infinity;
+      // Bucle en vez de Math.min(...prices): con historiales largos el spread
+      // monta un array de argumentos en cada llamada.
+      for (const price of prices) {
+        if (price < minPrice) minPrice = price;
+        if (price > maxPrice) maxPrice = price;
+      }
+      valor = {
+        pct: minPrice > 0 ? ((maxPrice - minPrice) / minPrice) * 100 : 0,
+        puntos: history.length
+      };
+    }
+  }
+
+  rangoHistorialCache.set(row.id, { firma, valor });
+  return valor;
+}
+
 function getPortfolioInsights(snapshot) {
   const currentItems = getCurrentInsightItems(snapshot);
   const items24h = get24hInsightItems(snapshot);
@@ -4343,24 +4382,15 @@ function getPortfolioInsights(snapshot) {
   const worst24h = getWorst24h(snapshot, 3);
   const volatilityItems = currentItems
     .map((item) => {
-      const history = compactRowPriceHistory(item.row.priceHistory || []);
-      if (history.length < 2) {
+      const rango = rowHistoricalRangePct(item.row);
+      if (!rango) {
         return null;
       }
-
-      const prices = history.map((point) => point.price).filter((price) => Number.isFinite(price) && price > 0);
-      if (prices.length < 2) {
-        return null;
-      }
-
-      const minPrice = Math.min(...prices);
-      const maxPrice = Math.max(...prices);
-      const historicalRangePct = minPrice > 0 ? ((maxPrice - minPrice) / minPrice) * 100 : 0;
 
       return {
         ...item,
-        historicalRangePct,
-        historicalPoints: history.length
+        historicalRangePct: rango.pct,
+        historicalPoints: rango.puntos
       };
     })
     .filter(Boolean);

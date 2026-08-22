@@ -6161,10 +6161,6 @@ body.filters-open { overflow: hidden; }
 }
 
 .diag-panel { padding: 10px 16px; }
-.diag-summary { cursor: pointer; font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.06em; padding: 6px 0; list-style: none; }
-.diag-summary::-webkit-details-marker { display: none; }
-.diag-summary::after { content: "▾"; margin-left: 8px; opacity: 0.6; }
-.diag-details[open] .diag-summary::after { content: "▴"; }
 .diag-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; padding: 10px 0 6px; }
 .diag-grid > div { display: flex; flex-direction: column; }
 .diag-grid span { font-size: 0.62rem; text-transform: uppercase; color: var(--muted); font-family: var(--font-mono); }
