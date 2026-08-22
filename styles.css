@@ -3650,6 +3650,27 @@ body[data-active-tab="more"] .tab-section[data-tab="more"] {
   .live-dot { animation: none; }
 }
 
+/* Destello del precio al llegar un tick: solo cambia el fondo de la celda,
+   asi que no reflowea nada y no puede provocar parpadeo de la lista.
+   Sin prefijo de densidad porque ninguna regla compacta toca estas clases. */
+.price-up,
+.price-down {
+  border-radius: 4px;
+  animation: price-flash 0.6s ease-out;
+}
+.price-up { --flash-color: rgba(34, 197, 94, 0.3); }
+.price-down { --flash-color: rgba(239, 68, 68, 0.3); }
+
+@keyframes price-flash {
+  0% { background-color: var(--flash-color); }
+  100% { background-color: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .price-up,
+  .price-down { animation: none; }
+}
+
 /* Tarjetas resumen mini (2x2 en móvil, fila en escritorio) */
 .summary-card.mini {
   display: flex;

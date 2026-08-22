@@ -135,6 +135,40 @@ const LIVE_FLUSH_MS = 1000;
 // Sin un solo dato en este plazo se da por fallido el proveedor y se prueba
 // el siguiente (Binance -> Kraken).
 const LIVE_HANDSHAKE_MS = 8000;
+// ── GeckoTerminal: precios de tokens DEX que ningun exchange central lista
+// (memecoins, microcaps, tokens recien salidos). Publica y sin clave, con
+// un limite de ~30 llamadas/min: se consulta en lotes y con espaciado.
+const GECKOTERMINAL_BASE = "https://api.geckoterminal.com/api/v2/";
+const GECKOTERMINAL_POLL_MS = 30 * 1000;
+const GECKOTERMINAL_BATCH = 25;
+// Contratos por activo: se resuelven una vez y se guardan un dia entero.
+const DEX_CONTRACT_CACHE_KEY = "crypto-dashboard-dex-contracts-v1";
+const DEX_CONTRACT_TTL = 24 * 60 * 60 * 1000;
+// Plataformas de CoinGecko -> redes de GeckoTerminal. Solo las que de verdad
+// mueven volumen; el resto de tokens se queda con el precio de CoinGecko.
+const DEX_NETWORKS = {
+  ethereum: "eth",
+  "binance-smart-chain": "bsc",
+  solana: "solana",
+  "polygon-pos": "polygon_pos",
+  "arbitrum-one": "arbitrum",
+  base: "base",
+  "optimistic-ethereum": "optimism",
+  avalanche: "avax",
+  sui: "sui",
+  aptos: "aptos",
+  tron: "tron",
+  ton: "ton"
+};
+
+// Temporizadores del sondeo DEX. Declarados aqui arriba a proposito: el
+// arranque llama a startDexPolling() desde init() y un "let" a mitad del
+// fichero se quedaria en zona muerta temporal.
+let dexPollTimer = null;
+let dexFirstPassTimer = null;
+
+// Margen en el que un precio vivo se considera mas fiable que el sondeo.
+const LIVE_QUOTE_FRESH_MS = 20 * 1000;
 const LIVE_RECONNECT_BASE = 2000;
 const LIVE_RECONNECT_MAX = 60000;
 // Estables: su precio es ~1 y el par contra USDT no aporta nada.
@@ -378,11 +412,15 @@ const state = {
   fxRateCache: new Map(),
   // Feed de precios en vivo (WebSocket). "provider" es el que esta sirviendo.
   live: {
+    // Libro de precios: simbolo -> ultimo dato conocido con su procedencia.
+    // Es el punto unico donde se decide que precio se muestra.
+    book: new Map(),
     socket: null,
     provider: null,
     status: "off",
     pairs: [],
     symbols: [],
+    covered: [],
     pending: new Map(),
     flushTimer: null,
     handshakeTimer: null,
@@ -2033,7 +2071,13 @@ function renderDetailSummary(row, metrics) {
     { label: t("detail.pnl24"), value: pnl24 != null ? maskedSignedCurrency(pnl24) : "--", tone: pnl24 != null ? toneClass(pnl24) : "", sub: change != null ? formatSignedPercent(change) : "" },
     { label: t("detail.weight"), value: weight != null ? `${weight.toFixed(1)}%` : "--" },
     { label: t("detail.ranking"), value: Number.isFinite(row.marketCapRank) ? `#${row.marketCapRank}` : "--" },
-    { label: t("detail.marketCap"), value: Number.isFinite(row.marketCap) ? formatCompactCurrency(row.marketCap) : "--" }
+    { label: t("detail.marketCap"), value: Number.isFinite(row.marketCap) ? formatCompactCurrency(row.marketCap) : "--" },
+    // Extremos, volumen y procedencia del dato: un dato que no existe se
+    // muestra como "--", nunca como un cero que parece real.
+    { label: t("detail.high24h"), value: Number.isFinite(row.high24h) ? formatCurrency(row.high24h, getPriceDigits(row.high24h)) : "--" },
+    { label: t("detail.low24h"), value: Number.isFinite(row.low24h) ? formatCurrency(row.low24h, getPriceDigits(row.low24h)) : "--" },
+    { label: t("detail.volume24h"), value: Number.isFinite(row.volume24h) ? formatCompactCurrency(row.volume24h) : "--" },
+    { label: t("detail.priceSource"), value: escapeHtml(priceSourceLabel(row)), sub: row.lastPriceAt ? formatRelativeTime(new Date(row.lastPriceAt).getTime()) : "" }
   ];
 
   return `
@@ -3379,6 +3423,15 @@ function createRow(partial = {}) {
     marketCap: Number.isFinite(partial.marketCap) ? partial.marketCap : null,
     marketCapRank: Number.isFinite(partial.marketCapRank) ? partial.marketCapRank : null,
     marketCapUpdatedAt: partial.marketCapUpdatedAt || null,
+    // Extremos y volumen del dia + de que fuente salio el ultimo precio.
+    high24h: Number.isFinite(partial.high24h) ? partial.high24h : null,
+    low24h: Number.isFinite(partial.low24h) ? partial.low24h : null,
+    volume24h: Number.isFinite(partial.volume24h) ? partial.volume24h : null,
+    priceSource: partial.priceSource || null,
+    // Token DEX: red + contrato, para no confundir simbolos repetidos.
+    dexNetwork: partial.dexNetwork || null,
+    dexAddress: partial.dexAddress || null,
+    dexCheckedAt: partial.dexCheckedAt || null,
     note: String(partial.note || ""),
     purchaseDate: String(partial.purchaseDate || ""),
     personalLabel: String(partial.personalLabel || ""),
@@ -6915,6 +6968,7 @@ function startLivePrices() {
     return;
   }
   openLiveSocket(state.live.triedBinance && state.live.provider === "kraken" ? "kraken" : "binance");
+  startDexPolling();
 }
 
 function stopLivePrices() {
@@ -6944,6 +6998,8 @@ function stopLivePrices() {
   }
   live.pairs = [];
   live.symbols = [];
+  live.covered = [];
+  stopDexPolling();
   setLiveStatus("off");
 }
 
@@ -7007,6 +7063,11 @@ function connectLiveSocket(provider, url, symbols, pairs) {
   live.socket = socket;
   live.symbols = symbols;
   live.pairs = pairs;
+  // Simbolos que este proveedor sirve realmente: en Binance son los pares
+  // que existen, no todos los del portafolio.
+  live.covered = provider === "binance"
+    ? pairs.map((pair) => pair.replace(/USDT$/, ""))
+    : pairs.map((pair) => pair.split("/")[0]);
   setLiveStatus("connecting", provider);
 
   // Si no llega un solo dato en el plazo, el proveedor no sirve.
@@ -7112,8 +7173,14 @@ function handleLiveMessage(provider, raw) {
     }
     const price = Number(data.c);
     const open = Number(data.o);
-    const changePct = open > 0 ? ((price - open) / open) * 100 : null;
-    applyLiveTick(pair.slice(0, -4), price, changePct);
+    applyLiveTick(pair.slice(0, -4), {
+      price,
+      changePct: open > 0 ? ((price - open) / open) * 100 : null,
+      high24h: finiteOrNull(data.h),
+      low24h: finiteOrNull(data.l),
+      volume24h: finiteOrNull(data.q),
+      source: "binance"
+    });
     return;
   }
 
@@ -7125,12 +7192,43 @@ function handleLiveMessage(provider, raw) {
     if (!symbol) {
       return;
     }
-    applyLiveTick(symbol, Number(item.last), Number.isFinite(item.change_pct) ? Number(item.change_pct) : null);
+    applyLiveTick(symbol, {
+      price: Number(item.last),
+      changePct: finiteOrNull(item.change_pct),
+      high24h: finiteOrNull(item.high),
+      low24h: finiteOrNull(item.low),
+      // Kraken da el volumen en unidades del activo, no en dinero.
+      volume24h: Number.isFinite(Number(item.volume)) && Number(item.last) > 0
+        ? Number(item.volume) * Number(item.last)
+        : null,
+      source: "kraken"
+    });
   });
 }
 
-function applyLiveTick(symbol, price, changePct) {
-  if (!(price > 0)) {
+// Ultimo dato vivo de una fila si sigue siendo reciente. Es lo que decide
+// la prioridad frente al sondeo periodico de CoinGecko.
+function freshQuoteFor(row) {
+  const symbol = liveSymbolOf(row);
+  if (!symbol) {
+    return null;
+  }
+  const entry = state.live.book.get(symbol);
+  if (!entry || Date.now() - entry.at > LIVE_QUOTE_FRESH_MS) {
+    return null;
+  }
+  return entry;
+}
+
+// Numero utilizable o null. Nunca 0 de relleno: un dato que no existe se
+// muestra como "--", no como un cero que parece real.
+function finiteOrNull(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function applyLiveTick(symbol, quote) {
+  if (!(quote?.price > 0)) {
     return;
   }
   const live = state.live;
@@ -7141,7 +7239,9 @@ function applyLiveTick(symbol, price, changePct) {
     live.retries = 0;
     setLiveStatus("live");
   }
-  live.pending.set(symbol, { price, changePct });
+  const entry = { ...quote, at: Date.now() };
+  live.book.set(symbol, entry);
+  live.pending.set(symbol, entry);
   scheduleLiveFlush();
 }
 
@@ -7181,8 +7281,8 @@ function flushLivePrices() {
     }
     const price = tick.price * rate;
     const previousPrice = row.currentPrice;
-    // Precio identico: no se repinta la fila (miniTicker emite aunque no
-    // haya cambiado nada y reescribir la tarjeta movil corta los gestos).
+    // Precio identico: no se toca el DOM (miniTicker emite cada segundo
+    // aunque no haya cambiado nada).
     if (previousPrice === price && row.priceStatus === "success") {
       return;
     }
@@ -7190,20 +7290,116 @@ function flushLivePrices() {
     if (Number.isFinite(tick.changePct)) {
       row.priceChange24h = tick.changePct;
     }
+    // Extremos y volumen del dia tal cual los da el exchange (en su moneda).
+    row.high24h = Number.isFinite(tick.high24h) ? tick.high24h * rate : row.high24h ?? null;
+    row.low24h = Number.isFinite(tick.low24h) ? tick.low24h * rate : row.low24h ?? null;
+    row.volume24h = Number.isFinite(tick.volume24h) ? tick.volume24h * rate : row.volume24h ?? null;
+    row.priceSource = tick.source;
     row.priceStatus = "success";
     row.priceMessage = "";
     row.lastPriceAt = stamp;
     // Los objetivos TP tambien se vigilan en vivo (alertsFired evita repetir).
     maybeFireTpAlerts(row, previousPrice);
-    updateLiveRowUi(row.id);
+    // Solo se repintan las celdas de precio, con destello segun la direccion;
+    // reescribir la fila entera cada segundo cortaria gestos y animaciones.
+    updateRowPriceCells(row.id, previousPrice > 0 ? Math.sign(price - previousPrice) : 0);
   });
 
   state.lastRefreshAt = Date.now();
+  scheduleDashboardRefresh();
   renderLiveIndicator();
 }
 
 // Aviso discreto en Inicio: sustituye el "actualizado hace X" mientras el
 // feed esta sirviendo, para que se vea de donde sale el precio.
+// Actualiza solo las celdas que cambian con un tick y marca la direccion
+// para el destello. Trabaja sobre la fila de la tabla y sobre la tarjeta
+// movil sin reconstruir ninguna de las dos.
+function updateRowPriceCells(rowId, direction) {
+  const row = getRowById(rowId);
+  if (!row) {
+    return;
+  }
+  const metrics = computeRowMetrics(row);
+  const containers = [
+    dom.tableBody?.querySelector(`tr[data-row-id="${rowId}"]`),
+    document.querySelector(`[data-card-row="${rowId}"]`)
+  ].filter(Boolean);
+  if (!containers.length) {
+    scheduleDashboardRefresh();
+    return;
+  }
+
+  const priceText = metrics.currentPrice > 0
+    ? formatCurrency(metrics.currentPrice, getPriceDigits(metrics.currentPrice))
+    : "--";
+  const changeValue = Number.isFinite(row.priceChange24h) ? row.priceChange24h : null;
+
+  containers.forEach((container) => {
+    const set = (role, apply) => {
+      const node = container.querySelector(`[data-role='${role}']`);
+      if (node) {
+        apply(node);
+      }
+    };
+    set("rowPrice", (node) => {
+      node.textContent = priceText;
+      flashPriceNode(node, direction);
+    });
+    set("rowChange", (node) => {
+      const suffix = node.querySelector("small") ? "<small> 24h</small>" : "";
+      node.innerHTML = `${changeValue === null ? "--" : formatSignedPercent(changeValue)}${suffix}`;
+      node.className = `${container.matches("tr") ? "numeric" : "amc-24h"} ${toneClass(changeValue || 0)}`;
+    });
+    set("rowValue", (node) => { node.textContent = maskedCurrency(metrics.currentValue); });
+    set("rowPnlAbs", (node) => {
+      node.textContent = maskedSignedCurrency(metrics.pnlUsd);
+      node.className = `money ${toneClass(metrics.pnlUsd)}`;
+    });
+    set("rowPnlPct", (node) => {
+      node.textContent = formatPercent(metrics.pnlPct);
+      node.className = `numeric ${toneClass(metrics.pnlPct)}`;
+    });
+  });
+
+  // El editor y el detalle abiertos siguen el mismo dato.
+  if (state.editorRowId === rowId) {
+    refreshEditorLiveData();
+  }
+  if (state.detailRowId === rowId) {
+    renderAssetDetail();
+  }
+}
+
+// Destello corto en la celda de precio: verde si sube, rojo si baja. Se
+// reinicia la animacion en cada tick sin acumular clases ni listeners.
+function flashPriceNode(node, direction) {
+  if (!direction) {
+    return;
+  }
+  node.classList.remove("price-up", "price-down");
+  // Forzar reflow reinicia la animacion cuando los ticks se encadenan.
+  void node.offsetWidth;
+  node.classList.add(direction > 0 ? "price-up" : "price-down");
+}
+
+// Nombre legible de la fuente del ultimo precio de una fila.
+function priceSourceLabel(row) {
+  if (row.priceSource === "binance") {
+    return "Binance";
+  }
+  if (row.priceSource === "kraken") {
+    return "Kraken";
+  }
+  if (row.priceSource === "geckoterminal") {
+    return "GeckoTerminal";
+  }
+  if (row.priceSource === "coingecko") {
+    return "CoinGecko";
+  }
+  return "--";
+}
+
 function mainUpdatedLabel() {
   if (isLiveActive()) {
     return t("live.now", { source: liveProviderLabel() });
@@ -7224,17 +7420,259 @@ function renderLiveIndicator() {
   }
 }
 
+/* ═══════════════════════════════════════════════════════
+   GECKOTERMINAL — precio de tokens DEX que no cotizan en
+   ningun exchange central. Se identifica el token por RED +
+   CONTRATO, nunca por el ticker: hay decenas de tokens que
+   comparten simbolo y el precio equivocado seria peor que
+   no tener precio.
+   ═══════════════════════════════════════════════════════ */
+
+function readDexContractCache() {
+  const parsed = safeParse(localStorage.getItem(DEX_CONTRACT_CACHE_KEY));
+  return parsed && typeof parsed === "object" ? parsed : {};
+}
+
+function writeDexContractCache(store) {
+  try {
+    localStorage.setItem(DEX_CONTRACT_CACHE_KEY, JSON.stringify(store));
+  } catch {
+    // Sin espacio: se seguira resolviendo en memoria mientras dure la sesion.
+  }
+}
+
+// Red + contrato de un activo, a partir de la ficha de CoinGecko. Se cachea
+// un dia: un contrato no cambia nunca, solo aparece la primera vez.
+async function resolveDexContract(row) {
+  if (!row.coinId) {
+    return null;
+  }
+  if (row.dexNetwork && row.dexAddress) {
+    return { network: row.dexNetwork, address: row.dexAddress };
+  }
+
+  const store = readDexContractCache();
+  const cached = store[row.coinId];
+  if (cached && Date.now() - Number(cached.at || 0) < DEX_CONTRACT_TTL) {
+    // "none" cachea tambien el resultado negativo: sin contrato conocido no
+    // hay que volver a preguntar por el mismo activo cada media hora.
+    if (cached.network === "none") {
+      return null;
+    }
+    row.dexNetwork = cached.network;
+    row.dexAddress = cached.address;
+    return { network: cached.network, address: cached.address };
+  }
+
+  const payload = await fetchJson(
+    `${COINGECKO_BASE}coins/${encodeURIComponent(row.coinId)}` +
+    "?localization=false&tickers=false&market_data=false&community_data=false&developer_data=false&sparkline=false"
+  );
+  const platforms = payload?.platforms && typeof payload.platforms === "object" ? payload.platforms : {};
+  let found = null;
+  Object.entries(platforms).forEach(([platform, address]) => {
+    if (found || !address) {
+      return;
+    }
+    const network = DEX_NETWORKS[platform];
+    if (network) {
+      found = { network, address: String(address) };
+    }
+  });
+
+  store[row.coinId] = found
+    ? { at: Date.now(), network: found.network, address: found.address }
+    : { at: Date.now(), network: "none" };
+  writeDexContractCache(store);
+
+  if (found) {
+    row.dexNetwork = found.network;
+    row.dexAddress = found.address;
+  }
+  return found;
+}
+
+// Filas que necesitan GeckoTerminal: las que el streaming no cubre. Si el
+// activo ya llega por WebSocket no se toca, que es mas rapido y gratis.
+function dexCandidateRows() {
+  return state.rows.filter((row) => {
+    if (!row.coinId || !row.crypto.trim()) {
+      return false;
+    }
+    const symbol = liveSymbolOf(row);
+    // Cubierto por el streaming (o con tick reciente): no hace falta DEX.
+    if (symbol && state.live.covered.includes(symbol)) {
+      return false;
+    }
+    return !freshQuoteFor(row);
+  });
+}
+
+// Un ciclo de precios DEX: resuelve contratos pendientes y pide en lote los
+// tokens de cada red (endpoint multi, hasta 30 direcciones por llamada).
+async function refreshDexPrices() {
+  if (!state.prefs.livePrices || isOffline() || document.visibilityState === "hidden") {
+    return;
+  }
+  const candidates = dexCandidateRows();
+  if (!candidates.length) {
+    return;
+  }
+
+  const byNetwork = new Map();
+  let lookups = 0;
+  for (const row of candidates) {
+    const alreadyKnown = Boolean(row.dexNetwork && row.dexAddress);
+    if (!alreadyKnown && lookups >= 3) {
+      continue;
+    }
+    let contract = null;
+    try {
+      if (!alreadyKnown) {
+        lookups += 1;
+      }
+      contract = await resolveDexContract(row);
+    } catch {
+      contract = null;
+    }
+    if (!contract) {
+      continue;
+    }
+    const list = byNetwork.get(contract.network) || [];
+    if (list.length < GECKOTERMINAL_BATCH) {
+      list.push({ row, address: contract.address });
+    }
+    byNetwork.set(contract.network, list);
+  }
+
+  for (const [network, entries] of byNetwork) {
+    const addresses = entries.map((entry) => entry.address).join(",");
+    let payload = null;
+    try {
+      payload = await fetchJsonDirect(
+        `${GECKOTERMINAL_BASE}networks/${encodeURIComponent(network)}/tokens/multi/${encodeURIComponent(addresses)}`,
+        8000
+      );
+    } catch {
+      continue;
+    }
+
+    const items = Array.isArray(payload?.data) ? payload.data : [];
+    items.forEach((item) => {
+      const attributes = item?.attributes || {};
+      const address = String(attributes.address || "").toLowerCase();
+      const match = entries.find((entry) => entry.address.toLowerCase() === address);
+      if (!match) {
+        return;
+      }
+      applyDexQuote(match.row, attributes);
+    });
+  }
+}
+
+function applyDexQuote(row, attributes) {
+  const price = finiteOrNull(attributes.price_usd);
+  if (!(price > 0)) {
+    return;
+  }
+  const rate = liveConversionRate();
+  if (rate === null) {
+    return;
+  }
+
+  const previousPrice = row.currentPrice;
+  const converted = price * rate;
+  // El streaming manda: si hay tick reciente del mismo activo no se pisa.
+  if (freshQuoteFor(row)) {
+    return;
+  }
+  if (previousPrice === converted && row.priceStatus === "success") {
+    return;
+  }
+
+  row.currentPrice = converted;
+  const volume = finiteOrNull(attributes.volume_usd?.h24);
+  row.volume24h = volume === null ? row.volume24h ?? null : volume * rate;
+  const marketCap = finiteOrNull(attributes.market_cap_usd) ?? finiteOrNull(attributes.fdv_usd);
+  if (marketCap !== null) {
+    row.marketCap = marketCap * rate;
+    row.marketCapUpdatedAt = new Date().toISOString();
+  }
+  row.priceSource = "geckoterminal";
+  row.priceStatus = "success";
+  row.priceMessage = "";
+  row.lastPriceAt = new Date().toISOString();
+  row.dexCheckedAt = new Date().toISOString();
+
+  maybeFireTpAlerts(row, previousPrice);
+  updateRowPriceCells(row.id, previousPrice > 0 ? Math.sign(converted - previousPrice) : 0);
+  scheduleDashboardRefresh();
+}
+
+function startDexPolling() {
+  if (dexPollTimer) {
+    return;
+  }
+  // Primera pasada temprana: el usuario con memecoins no espera 30 s a ver
+  // su precio. Se deja margen para que el WebSocket diga a que esta suscrito.
+  window.clearTimeout(dexFirstPassTimer);
+  dexFirstPassTimer = window.setTimeout(() => {
+    refreshDexPrices().catch(() => {});
+  }, 3000);
+  dexPollTimer = window.setInterval(() => {
+    refreshDexPrices().catch(() => {});
+  }, GECKOTERMINAL_POLL_MS);
+}
+
+function stopDexPolling() {
+  window.clearTimeout(dexFirstPassTimer);
+  dexFirstPassTimer = null;
+  if (dexPollTimer) {
+    window.clearInterval(dexPollTimer);
+    dexPollTimer = null;
+  }
+}
+
 function applyMarketDataToRow(row, market) {
-  row.currentPrice = typeof market.current_price === "number" ? market.current_price : null;
-  row.priceChange24h =
-    typeof market.price_change_percentage_24h === "number"
-      ? market.price_change_percentage_24h
-      : null;
+  // Orden de prioridad del precio: WebSocket > GeckoTerminal > CoinGecko.
+  // Si hay un precio en vivo reciente se conserva y de CoinGecko solo se
+  // toman los datos que el streaming no da (capitalizacion, ranking, logo).
+  const fresherQuote = freshQuoteFor(row);
+  if (!fresherQuote) {
+    row.currentPrice = typeof market.current_price === "number" ? market.current_price : null;
+    row.priceSource = "coingecko";
+    row.priceChange24h =
+      typeof market.price_change_percentage_24h === "number"
+        ? market.price_change_percentage_24h
+        : null;
+  }
+  if (row.high24h == null || !fresherQuote) {
+    row.high24h = finiteOrNull(market.high_24h);
+  }
+  if (row.low24h == null || !fresherQuote) {
+    row.low24h = finiteOrNull(market.low_24h);
+  }
+  if (row.volume24h == null || !fresherQuote) {
+    row.volume24h = finiteOrNull(market.total_volume);
+  }
   row.image = market.image || row.image;
   row.symbol = String(market.symbol || row.symbol || "").toUpperCase();
   row.resolvedName = market.name || row.resolvedName;
   row.priceStatus = row.currentPrice !== null ? "success" : "error";
   row.priceMessage = row.currentPrice !== null ? "" : t("row.noPrice");
+  if (fresherQuote) {
+    // El precio vivo ya puso su propia marca de tiempo y procedencia.
+    row.suggestions = [];
+    row.suggestionsOpen = false;
+    if (Number.isFinite(market.market_cap)) {
+      row.marketCap = market.market_cap;
+      row.marketCapUpdatedAt = new Date().toISOString();
+    }
+    if (Number.isFinite(market.market_cap_rank)) {
+      row.marketCapRank = market.market_cap_rank;
+    }
+    return;
+  }
   if (market.__fromCache) {
     // Precio cacheado: se conserva la fecha original de la sincronización
     // para no presentarlo como precio en tiempo real.
