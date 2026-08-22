@@ -112,6 +112,35 @@ const DOMINANCE_TTL = 60 * 1000;
 const FNG_TTL = 45 * 60 * 1000;
 const FNG_URL = "https://api.alternative.me/fng/?limit=1";
 const APP_TABS = ["home", "news", "plan", "analytics", "more"];
+
+// ── Precios en vivo por WebSocket ──
+// Binance manda (stream miniTicker: un mensaje por par y segundo) y Kraken
+// entra de reserva cuando Binance no conecta: bloqueo regional, corte de red
+// o proveedor caido. Los dos son publicos y de solo lectura, sin claves.
+// CoinGecko sigue siendo la fuente de verdad de capitalizacion, ranking e
+// historico; el WebSocket solo adelanta el precio y la variacion de 24h.
+// Bandera de carga perezosa de Chart.js: tiene que declararse antes de la
+// llamada a init(), que puede alcanzar ensureChartJs durante el arranque.
+let chartsLibLoading = false;
+
+const LIVE_BINANCE_WS = "wss://stream.binance.com:9443/stream";
+const LIVE_BINANCE_PAIRS_URL = "https://api.binance.com/api/v3/ticker/price";
+const LIVE_KRAKEN_WS = "wss://ws.kraken.com/v2";
+const LIVE_PAIRS_CACHE_KEY = "crypto-dashboard-live-pairs-v1";
+const LIVE_PAIRS_TTL = 24 * 60 * 60 * 1000;
+// Tope de pares por conexion: mas alla el ancho de banda no compensa.
+const LIVE_MAX_STREAMS = 40;
+// Un repintado por segundo como maximo, aunque lleguen mas mensajes.
+const LIVE_FLUSH_MS = 1000;
+// Sin un solo dato en este plazo se da por fallido el proveedor y se prueba
+// el siguiente (Binance -> Kraken).
+const LIVE_HANDSHAKE_MS = 8000;
+const LIVE_RECONNECT_BASE = 2000;
+const LIVE_RECONNECT_MAX = 60000;
+// Estables: su precio es ~1 y el par contra USDT no aporta nada.
+const LIVE_SKIP_SYMBOLS = new Set(["USDT", "USDC", "DAI", "TUSD", "FDUSD", "USDD", "BUSD", "PYUSD"]);
+// Simbolos que CoinGecko nombra distinto a los exchanges.
+const LIVE_SYMBOL_ALIASES = { MIOTA: "IOTA", XBT: "BTC" };
 // Cada pestaña recuerda su posición de scroll: al volver no hay saltos ni
 // se hereda el desplazamiento de la pestaña anterior. (Debe declararse antes
 // de la llamada a init(): las const de módulo no se izan.)
@@ -230,6 +259,7 @@ const DEFAULT_PREFS = {
   language: "es",
   portfolioName: "",
   autoRefreshSec: 1800,
+  livePrices: true,
   showCharts: true,
   chartRange: "total",
   sortBy: "marketCap",
@@ -346,6 +376,22 @@ const state = {
   hiddenColumns: new Set(),
   pendingFetches: new Map(),
   fxRateCache: new Map(),
+  // Feed de precios en vivo (WebSocket). "provider" es el que esta sirviendo.
+  live: {
+    socket: null,
+    provider: null,
+    status: "off",
+    pairs: [],
+    symbols: [],
+    pending: new Map(),
+    flushTimer: null,
+    handshakeTimer: null,
+    reconnectTimer: null,
+    retries: 0,
+    triedBinance: false,
+    lastTickAt: 0,
+    knownPairs: null
+  },
   refreshRequestId: 0,
   currencySwitchId: 0,
   filterQuery: "",
@@ -437,6 +483,8 @@ const dom = {
   mainPnlAbs: document.getElementById("mainPnlAbs"),
   mainPnlPct: document.getElementById("mainPnlPct"),
   mainUpdated: document.getElementById("mainUpdated"),
+  liveDot: document.getElementById("liveDot"),
+  livePricesSelect: document.getElementById("livePricesSelect"),
   mainSparkline: document.getElementById("mainSparkline"),
   mainSparklinePath: document.getElementById("mainSparklinePath"),
   homeStatusLine: document.getElementById("homeStatusLine"),
@@ -631,6 +679,7 @@ function init() {
   setActiveTab(state.prefs.activeTab);
   detectIosInstallCard();
   startAutoRefresh();
+  startLivePrices();
   observeChartsPanelForLazyLoad();
   observeHeroForStickyBar();
   document.querySelector(".diag-details")?.addEventListener("toggle", (e) => {
@@ -640,12 +689,11 @@ function init() {
   // Ticker ligero: refresca las etiquetas "hace X / en X" cada minuto.
   window.setInterval(() => {
     renderStatusCards();
-    if (dom.mainUpdated && state.lastRefreshAt) {
-      dom.mainUpdated.textContent = t("home.updatedAgo", {
-        time: formatRelativeTime(state.lastRefreshAt)
-      });
-    }
+    renderLiveIndicator();
     renderMarketSection();
+    // Red de seguridad del feed en vivo: si el portafolio cambio de activos
+    // (o la conexion se quedo muerta sin avisar) aqui se recompone solo.
+    syncLivePrices();
   }, 60000);
 
   window.setTimeout(() => {
@@ -3013,6 +3061,21 @@ function bindEvents() {
     moreRefreshBtn.addEventListener("click", () => dom.refreshPricesBtn.click());
   }
 
+  if (dom.livePricesSelect) {
+    dom.livePricesSelect.addEventListener("change", (event) => {
+      state.prefs.livePrices = event.target.value === "on";
+      savePreferences();
+      if (state.prefs.livePrices) {
+        startLivePrices();
+      } else {
+        stopLivePrices();
+      }
+      updateSaveMessage(
+        state.prefs.livePrices ? t("live.enabledMsg") : t("live.disabledMsg")
+      );
+    });
+  }
+
   if (dom.mobileSortSelect) {
     dom.mobileSortSelect.addEventListener("change", (event) => {
       const nextKey = event.target.value;
@@ -3144,10 +3207,16 @@ function loadState() {
     state.prefs.activeTab = "home";
   }
   state.prefs.activeTab = APP_TABS.includes(state.prefs.activeTab) ? state.prefs.activeTab : "home";
+  // Preferencia nueva: quien ya tuviera ajustes guardados entra con el feed
+  // en vivo activado, que es el comportamiento por defecto.
+  state.prefs.livePrices = state.prefs.livePrices !== false;
   state.prefs.portfolioName = sanitizePortfolioNameInput(state.prefs.portfolioName);
   state.prefs.chartRange = resolveChartRange(state.prefs.chartRange);
 
   dom.currencySelect.value = state.prefs.currency;
+  if (dom.livePricesSelect) {
+    dom.livePricesSelect.value = state.prefs.livePrices ? "on" : "off";
+  }
   dom.autoRefreshSelect.value = String(state.prefs.autoRefreshSec);
   dom.portfolioNameInput.value = getPortfolioName();
   setDefaultMessages();
@@ -3269,7 +3338,9 @@ async function handleBaseCurrencyChange(nextCurrency) {
     renderDashboardOnly();
     scheduleAutosave();
 
+    stopLivePrices();
     await refreshAllPrices({ silentWhenEmpty: true, force: true, reason: "currency-change" });
+    startLivePrices();
   } catch (error) {
     dom.currencySelect.value = previousCurrency || DEFAULT_PREFS.currency;
     showToast(t("alerts.refreshFailedTitle"), t("alerts.refreshFailedText"), "negative");
@@ -3972,9 +4043,7 @@ function renderMainValueCard(snapshot) {
     dom.mainPnlPct.className = `delta-chip ${totalPnl > 0 ? "good" : totalPnl < 0 ? "error" : "warn"}`;
   }
   if (dom.mainUpdated) {
-    dom.mainUpdated.textContent = state.lastRefreshAt
-      ? t("home.updatedAgo", { time: formatRelativeTime(state.lastRefreshAt) })
-      : t("status.noSyncYet");
+    dom.mainUpdated.textContent = mainUpdatedLabel();
   }
 
   renderMainSparkline();
@@ -5122,6 +5191,7 @@ function handleAddRow() {
   const row = createRow();
   state.rows.push(row);
   renderAll();
+  syncLivePrices();
   scheduleAutosave();
   pushActivity(t("alerts.newPositionTitle"), t("alerts.newPositionText"), "neutral");
   openPositionEditor(row.id);
@@ -6228,6 +6298,13 @@ function startAutoRefresh() {
 function bindEnvironmentEvents() {
   if (typeof document !== "undefined") {
     document.addEventListener("visibilitychange", () => {
+      // El WebSocket no sigue abierto en segundo plano: gasta bateria y datos
+      // para nada, y al volver se reconecta con precios frescos.
+      if (document.visibilityState === "visible") {
+        startLivePrices();
+      } else {
+        stopLivePrices();
+      }
       if (document.visibilityState !== "visible" || !state.prefs.autoRefreshSec) {
         return;
       }
@@ -6246,9 +6323,11 @@ function bindEnvironmentEvents() {
       // Al recuperar conexión se sincroniza siempre una vez, con force para
       // saltar la caché y no seguir mostrando los precios de la sesión offline.
       refreshAllPrices({ silentWhenEmpty: true, force: true, reason: "auto" });
+      startLivePrices();
     });
     window.addEventListener("offline", () => {
       setApiState("offline", t("status.offlineMeta"));
+      stopLivePrices();
     });
 
     // Los gráficos se recalculan al girar el dispositivo o cambiar el tamaño.
@@ -6611,6 +6690,8 @@ async function refreshAllPrices({ silentWhenEmpty = false, force = false, reason
     if (refreshRequestId === state.refreshRequestId) {
       state.syncing = false;
       setLoader(false);
+      // Con los simbolos ya resueltos se ajusta la suscripcion en vivo.
+      syncLivePrices();
     }
   }
 }
@@ -6706,6 +6787,440 @@ async function refreshMarketExtras(force = false) {
   } finally {
     state.market.loading = false;
     marketExtrasInFlight = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   PRECIOS EN VIVO — WebSocket publico de Binance con Kraken
+   de reserva. Solo lectura y sin claves: son streams abiertos.
+   El feed adelanta precio y variacion de 24h; CoinGecko sigue
+   mandando en capitalizacion, ranking, historico y en los
+   activos que ningun exchange lista.
+   ═══════════════════════════════════════════════════════ */
+
+// Simbolo de exchange de una fila (BTC, ETH...). null si no procede:
+// filas sin resolver y estables, cuyo par contra USDT no aporta nada.
+function liveSymbolOf(row) {
+  const raw = String(row?.symbol || "").trim().toUpperCase();
+  if (!raw || raw.length > 12) {
+    return null;
+  }
+  const symbol = LIVE_SYMBOL_ALIASES[raw] || raw;
+  if (LIVE_SKIP_SYMBOLS.has(symbol)) {
+    return null;
+  }
+  return /^[A-Z0-9]+$/.test(symbol) ? symbol : null;
+}
+
+// Simbolos unicos del portafolio, en el orden en que aparecen y con tope.
+function liveWantedSymbols() {
+  const seen = [];
+  state.rows.forEach((row) => {
+    const symbol = liveSymbolOf(row);
+    if (symbol && !seen.includes(symbol)) {
+      seen.push(symbol);
+    }
+  });
+  return seen.slice(0, LIVE_MAX_STREAMS);
+}
+
+// Conversion USD -> moneda base. Los pares del feed cotizan contra USDT/USD,
+// asi que en euros hace falta el cambio ya cacheado; sin el no se arranca el
+// feed (mejor el precio de CoinGecko que una cifra convertida a ojo).
+function liveConversionRate() {
+  const currency = String(state.prefs.currency || "usd").toLowerCase();
+  if (currency === "usd") {
+    return 1;
+  }
+  const rate = getCachedCurrencyConversionRate("usd", currency);
+  return Number.isFinite(rate) && rate > 0 ? rate : null;
+}
+
+function readLivePairsCache() {
+  const parsed = safeParse(localStorage.getItem(LIVE_PAIRS_CACHE_KEY));
+  if (!parsed || !Array.isArray(parsed.pairs)) {
+    return null;
+  }
+  if (Date.now() - Number(parsed.at || 0) > LIVE_PAIRS_TTL) {
+    return null;
+  }
+  return new Set(parsed.pairs);
+}
+
+// Pares USDT que Binance lista de verdad. Una sola llamada al dia: sin esta
+// comprobacion un simbolo inexistente tumbaria la conexion entera.
+async function loadBinancePairs() {
+  if (state.live.knownPairs) {
+    return state.live.knownPairs;
+  }
+  const cached = readLivePairsCache();
+  if (cached && cached.size) {
+    state.live.knownPairs = cached;
+    return cached;
+  }
+
+  const response = await fetchJsonDirect(LIVE_BINANCE_PAIRS_URL, 8000);
+  const pairs = (Array.isArray(response) ? response : [])
+    .map((item) => String(item?.symbol || ""))
+    .filter((symbol) => symbol.endsWith("USDT"));
+  if (!pairs.length) {
+    throw new Error("sin pares");
+  }
+
+  const set = new Set(pairs);
+  state.live.knownPairs = set;
+  try {
+    localStorage.setItem(LIVE_PAIRS_CACHE_KEY, JSON.stringify({ at: Date.now(), pairs }));
+  } catch {
+    // Sin espacio en localStorage: se sigue con la lista en memoria.
+  }
+  return set;
+}
+
+function setLiveStatus(status, provider = state.live.provider) {
+  state.live.status = status;
+  state.live.provider = status === "off" ? null : provider;
+  renderLiveIndicator();
+}
+
+// Etiqueta del proveedor tal y como se muestra al usuario.
+function liveProviderLabel() {
+  return state.live.provider === "kraken" ? "Kraken" : "Binance";
+}
+
+function isLiveActive() {
+  return state.live.status === "live";
+}
+
+// ── Ciclo de vida de la conexion ──
+
+function startLivePrices() {
+  if (!state.prefs.livePrices || isOffline() || typeof WebSocket !== "function") {
+    return;
+  }
+  if (document.visibilityState === "hidden") {
+    return;
+  }
+  if (state.live.socket || state.live.reconnectTimer) {
+    return;
+  }
+  if (!liveWantedSymbols().length) {
+    return;
+  }
+  // En euros hace falta el cambio cacheado; si no esta, se pide y se reintenta.
+  if (liveConversionRate() === null) {
+    fetchCurrencyConversionRate("usd", state.prefs.currency)
+      .then(() => startLivePrices())
+      .catch(() => {});
+    return;
+  }
+  openLiveSocket(state.live.triedBinance && state.live.provider === "kraken" ? "kraken" : "binance");
+}
+
+function stopLivePrices() {
+  const live = state.live;
+  window.clearTimeout(live.handshakeTimer);
+  window.clearTimeout(live.reconnectTimer);
+  window.clearTimeout(live.flushTimer);
+  live.handshakeTimer = null;
+  live.reconnectTimer = null;
+  live.flushTimer = null;
+  live.pending.clear();
+
+  const socket = live.socket;
+  live.socket = null;
+  if (socket) {
+    // Se desarman los manejadores antes de cerrar: un onclose tardio no debe
+    // disparar la reconexion de una conexion que ya hemos descartado.
+    socket.onopen = null;
+    socket.onmessage = null;
+    socket.onerror = null;
+    socket.onclose = null;
+    try {
+      socket.close();
+    } catch {
+      // Cerrar un socket que aun negocia lanza en algunos navegadores.
+    }
+  }
+  live.pairs = [];
+  live.symbols = [];
+  setLiveStatus("off");
+}
+
+// Recalcula la suscripcion: solo reconecta si la lista de simbolos cambio.
+function syncLivePrices() {
+  if (!state.prefs.livePrices) {
+    if (state.live.status !== "off") {
+      stopLivePrices();
+    }
+    return;
+  }
+  const wanted = liveWantedSymbols();
+  const current = state.live.symbols;
+  const same = wanted.length === current.length && wanted.every((symbol, i) => symbol === current[i]);
+  if (state.live.socket && same) {
+    return;
+  }
+  stopLivePrices();
+  startLivePrices();
+}
+
+function openLiveSocket(provider) {
+  const symbols = liveWantedSymbols();
+  if (!symbols.length) {
+    return;
+  }
+
+  if (provider === "binance") {
+    state.live.triedBinance = true;
+    loadBinancePairs()
+      .then((known) => {
+        const pairs = symbols.map((symbol) => `${symbol}USDT`).filter((pair) => known.has(pair));
+        if (!pairs.length) {
+          // Ningun activo del portafolio cotiza en Binance: se prueba Kraken.
+          openLiveSocket("kraken");
+          return;
+        }
+        const streams = pairs.map((pair) => `${pair.toLowerCase()}@miniTicker`).join("/");
+        connectLiveSocket("binance", `${LIVE_BINANCE_WS}?streams=${streams}`, symbols, pairs);
+      })
+      .catch(() => {
+        // Binance no responde (bloqueo regional o corte): se pasa a Kraken.
+        openLiveSocket("kraken");
+      });
+    return;
+  }
+
+  connectLiveSocket("kraken", LIVE_KRAKEN_WS, symbols, symbols.map((symbol) => `${symbol}/USD`));
+}
+
+function connectLiveSocket(provider, url, symbols, pairs) {
+  let socket;
+  try {
+    socket = new WebSocket(url);
+  } catch {
+    handleLiveFailure(provider);
+    return;
+  }
+
+  const live = state.live;
+  live.socket = socket;
+  live.symbols = symbols;
+  live.pairs = pairs;
+  setLiveStatus("connecting", provider);
+
+  // Si no llega un solo dato en el plazo, el proveedor no sirve.
+  window.clearTimeout(live.handshakeTimer);
+  live.handshakeTimer = window.setTimeout(() => {
+    if (live.socket === socket && live.status !== "live") {
+      handleLiveFailure(provider);
+    }
+  }, LIVE_HANDSHAKE_MS);
+
+  socket.onopen = () => {
+    if (provider === "kraken") {
+      // Kraken v2 responde a cada par por separado: los que no existen
+      // devuelven success:false y no tumban el resto de la suscripcion.
+      socket.send(JSON.stringify({
+        method: "subscribe",
+        params: { channel: "ticker", symbol: pairs }
+      }));
+    }
+  };
+
+  socket.onmessage = (event) => {
+    if (live.socket !== socket) {
+      return;
+    }
+    handleLiveMessage(provider, event.data);
+  };
+
+  socket.onerror = () => {
+    if (live.socket === socket) {
+      handleLiveFailure(provider);
+    }
+  };
+
+  socket.onclose = () => {
+    if (live.socket === socket) {
+      handleLiveFailure(provider);
+    }
+  };
+}
+
+// Un fallo antes del primer dato descarta el proveedor y prueba el otro; si
+// ya estaba sirviendo, se reconecta con el mismo y espera creciente.
+function handleLiveFailure(provider) {
+  const live = state.live;
+  const wasLive = live.status === "live";
+  const socket = live.socket;
+  live.socket = null;
+  window.clearTimeout(live.handshakeTimer);
+  live.handshakeTimer = null;
+  if (socket) {
+    socket.onopen = null;
+    socket.onmessage = null;
+    socket.onerror = null;
+    socket.onclose = null;
+    try {
+      socket.close();
+    } catch {
+      // Ya estaba cerrandose.
+    }
+  }
+
+  if (!state.prefs.livePrices || isOffline() || document.visibilityState === "hidden") {
+    setLiveStatus("off");
+    return;
+  }
+
+  const nextProvider = wasLive ? provider : provider === "binance" ? "kraken" : "binance";
+  if (!wasLive && provider === "kraken") {
+    // Los dos proveedores han fallado: se deja de insistir de inmediato y se
+    // reintenta con espera larga; CoinGecko sigue dando precios mientras.
+    live.retries += 1;
+  } else if (wasLive) {
+    live.retries = 0;
+  }
+
+  setLiveStatus("retry", nextProvider);
+  const delay = Math.min(LIVE_RECONNECT_BASE * 2 ** live.retries, LIVE_RECONNECT_MAX);
+  window.clearTimeout(live.reconnectTimer);
+  live.reconnectTimer = window.setTimeout(() => {
+    live.reconnectTimer = null;
+    if (!wasLive) {
+      live.retries += 1;
+    }
+    openLiveSocket(nextProvider);
+  }, wasLive ? LIVE_RECONNECT_BASE : delay);
+}
+
+function handleLiveMessage(provider, raw) {
+  const payload = safeParse(raw);
+  if (!payload) {
+    return;
+  }
+
+  if (provider === "binance") {
+    const data = payload.data || payload;
+    if (data?.e !== "24hrMiniTicker") {
+      return;
+    }
+    const pair = String(data.s || "");
+    if (!pair.endsWith("USDT")) {
+      return;
+    }
+    const price = Number(data.c);
+    const open = Number(data.o);
+    const changePct = open > 0 ? ((price - open) / open) * 100 : null;
+    applyLiveTick(pair.slice(0, -4), price, changePct);
+    return;
+  }
+
+  if (payload.channel !== "ticker" || !Array.isArray(payload.data)) {
+    return;
+  }
+  payload.data.forEach((item) => {
+    const symbol = String(item?.symbol || "").split("/")[0];
+    if (!symbol) {
+      return;
+    }
+    applyLiveTick(symbol, Number(item.last), Number.isFinite(item.change_pct) ? Number(item.change_pct) : null);
+  });
+}
+
+function applyLiveTick(symbol, price, changePct) {
+  if (!(price > 0)) {
+    return;
+  }
+  const live = state.live;
+  live.lastTickAt = Date.now();
+  if (live.status !== "live") {
+    window.clearTimeout(live.handshakeTimer);
+    live.handshakeTimer = null;
+    live.retries = 0;
+    setLiveStatus("live");
+  }
+  live.pending.set(symbol, { price, changePct });
+  scheduleLiveFlush();
+}
+
+// Los mensajes llegan por segundo y por par: se acumulan y se vuelca un solo
+// repintado cada LIVE_FLUSH_MS para no castigar el movil.
+function scheduleLiveFlush() {
+  if (state.live.flushTimer) {
+    return;
+  }
+  state.live.flushTimer = window.setTimeout(() => {
+    state.live.flushTimer = null;
+    flushLivePrices();
+  }, LIVE_FLUSH_MS);
+}
+
+function flushLivePrices() {
+  const live = state.live;
+  if (!live.pending.size) {
+    return;
+  }
+  const rate = liveConversionRate();
+  const ticks = new Map(live.pending);
+  live.pending.clear();
+  if (rate === null) {
+    return;
+  }
+
+  const stamp = new Date().toISOString();
+  state.rows.forEach((row) => {
+    const symbol = liveSymbolOf(row);
+    if (!symbol) {
+      return;
+    }
+    const tick = ticks.get(symbol);
+    if (!tick) {
+      return;
+    }
+    const price = tick.price * rate;
+    const previousPrice = row.currentPrice;
+    // Precio identico: no se repinta la fila (miniTicker emite aunque no
+    // haya cambiado nada y reescribir la tarjeta movil corta los gestos).
+    if (previousPrice === price && row.priceStatus === "success") {
+      return;
+    }
+    row.currentPrice = price;
+    if (Number.isFinite(tick.changePct)) {
+      row.priceChange24h = tick.changePct;
+    }
+    row.priceStatus = "success";
+    row.priceMessage = "";
+    row.lastPriceAt = stamp;
+    // Los objetivos TP tambien se vigilan en vivo (alertsFired evita repetir).
+    maybeFireTpAlerts(row, previousPrice);
+    updateLiveRowUi(row.id);
+  });
+
+  state.lastRefreshAt = Date.now();
+  renderLiveIndicator();
+}
+
+// Aviso discreto en Inicio: sustituye el "actualizado hace X" mientras el
+// feed esta sirviendo, para que se vea de donde sale el precio.
+function mainUpdatedLabel() {
+  if (isLiveActive()) {
+    return t("live.now", { source: liveProviderLabel() });
+  }
+  return state.lastRefreshAt
+    ? t("home.updatedAgo", { time: formatRelativeTime(state.lastRefreshAt) })
+    : t("status.noSyncYet");
+}
+
+function renderLiveIndicator() {
+  const active = isLiveActive();
+  document.body.dataset.live = active ? "on" : "off";
+  if (dom.liveDot) {
+    dom.liveDot.hidden = !active;
+  }
+  if (dom.mainUpdated) {
+    dom.mainUpdated.textContent = mainUpdatedLabel();
   }
 }
 
@@ -8125,7 +8640,6 @@ function registerChart3dTooltipPositioner() {
   };
 }
 
-let chartsLibLoading = false;
 // Fechas completas para el título del tooltip de la línea (paralelo a data).
 let lineTooltipTitles = [];
 

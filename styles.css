@@ -3627,6 +3627,29 @@ body[data-active-tab="more"] .tab-section[data-tab="more"] {
   color: var(--muted-2);
 }
 
+/* Punto de "precios en vivo": late despacio mientras el WebSocket sirve.
+   Va con su propia clase y sin variantes por densidad, asi que ninguna
+   regla de :root[data-density="compact"] lo anula. */
+.live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--positive, #16a34a);
+  vertical-align: middle;
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot { animation: none; }
+}
+
 /* Tarjetas resumen mini (2x2 en móvil, fila en escritorio) */
 .summary-card.mini {
   display: flex;

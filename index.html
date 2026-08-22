@@ -188,7 +188,7 @@
           <svg id="mainSparkline" class="mvc-sparkline" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true" hidden>
             <polyline id="mainSparklinePath" fill="none" stroke-width="1.5" points=""></polyline>
           </svg>
-          <span class="mvc-meta" id="mainUpdated">--</span>
+          <span class="mvc-meta"><span class="live-dot" id="liveDot" hidden aria-hidden="true"></span><span id="mainUpdated">--</span></span>
         </section>
 
         <section class="quick-actions" aria-label="Acciones rapidas">
@@ -419,6 +419,14 @@
               <option value="1800" data-i18n="autorefresh.30m">Cada 30 minutos</option>
               <option value="3600" data-i18n="autorefresh.1h">Cada 1 hora</option>
               <option value="86400" data-i18n="autorefresh.24h">Cada 24 horas</option>
+            </select>
+          </label>
+
+          <label class="inline-field" for="livePricesSelect">
+            <span data-i18n="controls.livePrices">Precios en vivo (WebSocket)</span>
+            <select id="livePricesSelect">
+              <option value="on" data-i18n="live.optionOn">Activados</option>
+              <option value="off" data-i18n="live.optionOff">Desactivados</option>
             </select>
           </label>
 
