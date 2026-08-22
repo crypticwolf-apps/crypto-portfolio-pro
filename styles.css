@@ -6663,6 +6663,13 @@ body.filters-open { overflow: hidden; }
 
   /* Portafolio: círculo elevado que rompe el borde superior del dock. */
   .tab-btn-primary { overflow: visible; justify-content: flex-end; padding-bottom: 2px; }
+  /* El circulo NO lleva anillo de color solido. Lo llevaba (0 0 0 4px
+     var(--bg-2)) para fingir un hueco en el dock, pero medio anillo cae
+     sobre el fondo de la pagina (--bg) y medio sobre el cristal del dock:
+     ningun color plano puede coincidir con los dos. En oscuro los dos
+     tonos son casi iguales y no se notaba; en claro (#f0f4f8 contra
+     #e4ecf4) salia un halo gris alrededor del boton. La separacion la da
+     ya la sombra proyectada. */
   .tab-btn-primary svg {
     width: 46px; height: 46px; padding: 12px;
     margin-top: -26px; margin-bottom: 1px;
@@ -6673,12 +6680,19 @@ body.filters-open { overflow: hidden; }
       0 8px 18px rgba(0, 0, 0, 0.45),
       0 2px 5px rgba(0, 0, 0, 0.35),
       inset 0 2px 3px rgba(255, 255, 255, 0.55),
-      inset 0 -3px 5px rgba(0, 60, 40, 0.35),
-      0 0 0 4px var(--bg-2);
+      inset 0 -3px 5px rgba(0, 60, 40, 0.35);
     transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
   }
-  .tab-btn-primary:active svg { transform: translateY(2px) scale(0.96); box-shadow: 0 4px 10px rgba(0,0,0,.4), inset 0 2px 3px rgba(255,255,255,.4), 0 0 0 4px var(--bg-2); }
-  .tab-btn-primary.is-active svg { box-shadow: 0 10px 22px rgba(0,0,0,.5), inset 0 2px 3px rgba(255,255,255,.6), inset 0 -3px 5px rgba(0,60,40,.35), 0 0 0 4px var(--bg-2), var(--glow-accent); }
+  .tab-btn-primary.is-active svg { box-shadow: 0 10px 22px rgba(0,0,0,.5), inset 0 2px 3px rgba(255,255,255,.6), inset 0 -3px 5px rgba(0,60,40,.35), var(--glow-accent); }
+  /* El pulsado va DESPUES de .is-active y nombra tambien esa combinacion:
+     las dos reglas tienen la misma especificidad, asi que al pulsar la
+     pestana ya activa ganaba la sombra en reposo mientras el icono si se
+     hundia, y la sombra se quedaba despegada del boton. */
+  .tab-btn-primary:active svg,
+  .tab-btn-primary.is-active:active svg {
+    transform: translateY(2px) scale(0.96);
+    box-shadow: 0 4px 10px rgba(0,0,0,.4), inset 0 2px 3px rgba(255,255,255,.4);
+  }
   .tab-btn-primary.is-active { background: transparent; }
   .tab-btn-primary span { font-size: 0.62rem; font-weight: 700; color: var(--accent); }
 }
