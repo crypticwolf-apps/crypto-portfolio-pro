@@ -79,9 +79,9 @@
   </head>
   <body>
     <nav id="tabBar" class="tab-bar" aria-label="Navegacion principal" data-i18n-aria-label="nav.ariaLabel">
-      <button class="tab-btn" type="button" data-tab-target="markets" aria-current="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-6 4 3 6-8"/><path d="M17 6h4v4"/></svg>
-        <span data-i18n="nav.markets">Mercados</span>
+      <button class="tab-btn" type="button" data-tab-target="news" aria-current="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h13v14H5a1 1 0 0 1-1-1z"/><path d="M17 8h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1"/><path d="M7 9h7M7 12h7M7 15h4"/></svg>
+        <span data-i18n="nav.news">Noticias</span>
       </button>
       <button class="tab-btn" type="button" data-tab-target="plan" aria-current="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M5 8l7-4 7 4"/><path d="M5 8l-2 5a3 3 0 0 0 6 0z"/><path d="M19 8l-2 5a3 3 0 0 0 6 0z"/></svg>
@@ -345,30 +345,22 @@
       </section>
 
       <!-- ═══ PESTAÑA MERCADOS ═══ -->
-      <section class="tab-section" data-tab="markets">
+      <section class="tab-section" data-tab="news">
         <header class="home-header">
           <div class="home-header-main">
-            <p class="portfolio-name-display" data-i18n="nav.markets">Mercados</p>
-            <p class="home-status" data-i18n="markets.subtitle">Datos reales de CoinGecko, ordenables por columna</p>
+            <p class="portfolio-name-display" data-i18n="nav.news">Noticias</p>
+            <p class="home-status" id="newsStatus" data-i18n="news.subtitle">Actualidad cripto</p>
+          </div>
+          <div class="home-header-actions">
+            <button id="newsRefreshBtn" class="icon-circle-btn" type="button" aria-label="Actualizar noticias" data-i18n-aria-label="news.refresh">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
+            </button>
           </div>
         </header>
 
-        <section class="panel markets-ranking-panel">
-          <div class="markets-search">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-            <input id="marketsSearchInput" type="search" autocomplete="off" placeholder="Buscar activo..." data-i18n-placeholder="markets.search" aria-label="Buscar activo" data-i18n-aria-label="markets.search" />
-          </div>
+        <nav class="news-filters" id="newsFilters" role="tablist" aria-label="Filtrar noticias" data-i18n-aria-label="news.filterAria"></nav>
 
-          <!-- Estado: ultima sincronizacion / datos en cache + actualizar -->
-          <div id="marketsMeta" class="markets-meta" aria-live="polite"></div>
-
-          <!-- Movil: control de orden (sin cabeceras de tabla) -->
-          <div id="marketsMobileSort" class="market-mobile-sort" role="group" aria-label="Ordenar mercado" data-i18n-aria-label="markets.sortAria"></div>
-
-          <div id="marketsRanking" class="markets-ranking"></div>
-          <div id="marketsPagination" class="markets-pagination"></div>
-          <div id="marketsLoadMore" class="markets-load-more"></div>
-        </section>
+        <div id="newsList" class="news-list"></div>
       </section>
 
       <!-- ═══ PESTAÑA PLAN ═══ -->

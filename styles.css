@@ -6976,3 +6976,88 @@ select { background-color: var(--field-bg); }
    tamano visible. */
 .tp-config-del { position: relative; }
 .tp-config-del::after { content: ""; position: absolute; inset: -8px; }
+
+/* ═══════════════════════════════════════════════════════
+   NOTICIAS — feed de Crypto Atalaya.
+   Lista compacta: titular visible y cuerpo al desplegar.
+   Usa la misma escala de radios, ritmo y tipografia.
+   ═══════════════════════════════════════════════════════ */
+.news-filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
+.news-filters::-webkit-scrollbar { display: none; }
+.news-filter {
+  flex: 0 0 auto; min-height: 32px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel-soft); color: var(--muted);
+  font: inherit; font-size: 0.72rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.news-filter span { opacity: 0.6; margin-left: 3px; font-variant-numeric: tabular-nums; }
+.news-filter.is-active { color: var(--accent); border-color: var(--line-accent); background: var(--accent-dim); }
+
+.news-list { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.news-card {
+  border: 1px solid var(--line); border-radius: var(--radius-xl);
+  background: var(--glass-inner), var(--glass-bg);
+  overflow: hidden;
+}
+.news-card-head {
+  display: flex; flex-direction: column; gap: 5px; width: 100%;
+  padding: 10px 12px; border: none; background: none; color: var(--text);
+  text-align: left; cursor: pointer; font: inherit;
+}
+.news-card-head:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
+.news-card-top { display: flex; align-items: center; gap: 8px; }
+.news-cat {
+  font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--accent-2);
+}
+.news-time { font-family: var(--font-mono); font-size: 0.62rem; color: var(--muted); margin-right: auto; }
+.news-impact {
+  font-family: var(--font-mono); font-size: 0.62rem; font-weight: 700;
+  min-width: 26px; text-align: center; padding: 2px 6px; border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.news-impact.baja { color: var(--accent-2); background: var(--accent-2-dim); }
+.news-impact.media { color: var(--warning); background: var(--warning-bg); }
+.news-impact.alta { color: var(--negative); background: var(--negative-bg); }
+.news-title { font-size: 0.82rem; font-weight: 600; line-height: 1.35; }
+
+/* Cuerpo plegado: se abre al tocar el titular. */
+.news-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-base) var(--ease-out); }
+.news-card.is-open .news-body { grid-template-rows: 1fr; }
+.news-body > * { overflow: hidden; }
+.news-card.is-open .news-body { border-top: 1px solid var(--line); }
+.news-text, .news-analysis {
+  margin: 0; padding: 8px 12px 0; font-size: 0.72rem; line-height: 1.5; color: var(--text-2);
+}
+.news-analysis strong { color: var(--accent); }
+.news-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 12px 10px; }
+.news-tag {
+  font-family: var(--font-mono); font-size: 0.62rem; color: var(--muted);
+  padding: 2px 7px; border-radius: 999px; background: var(--panel-soft);
+}
+.news-link { margin-left: auto; font-size: 0.72rem; color: var(--accent-2); text-decoration: none; }
+.news-link:hover { text-decoration: underline; }
+
+.news-stale {
+  margin: 0; padding: 8px 12px; border-radius: var(--radius-md);
+  background: var(--warning-bg); color: var(--warning); font-size: 0.72rem; line-height: 1.4;
+}
+.news-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: var(--space-8) var(--space-4); text-align: center;
+}
+.news-empty strong { font-size: 0.95rem; }
+.news-empty p { margin: 0; color: var(--muted); font-size: 0.72rem; line-height: 1.5; }
+
+/* Esqueleto de carga con la forma final (sin saltos al llegar los datos). */
+.news-card.is-skeleton { padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+.news-sk { display: block; height: 10px; border-radius: 999px; background: var(--panel-hover); }
+.news-sk-cat { width: 68px; }
+.news-sk-time { width: 44px; }
+.news-sk-title { height: 13px; width: 88%; }
+.news-sk-line { width: 100%; }
+.news-sk-line.short { width: 62%; }
+.news-card.is-skeleton .news-card-top { display: flex; gap: 8px; }
+
+@media (prefers-reduced-motion: reduce) { .news-body { transition: none; } }
