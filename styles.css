@@ -6007,6 +6007,53 @@ body.filters-open { overflow: hidden; }
 .acts-legend .sell { color: #ff7b7b; }
 
 /* ── Diagnóstico (Más) ── */
+/* ── Alertas guardadas (Ajustes) y hoja de alta ── */
+.alerts-box { margin-bottom: var(--space-3); }
+.alerts-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-card);
+}
+.alert-item-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.alert-item-main strong {
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.alert-item-main small { font-size: 0.62rem; color: var(--muted); }
+.alert-item-actions { flex: 0 0 auto; display: flex; gap: 4px; }
+.alert-item-actions .icon-circle-btn { width: 30px; height: 30px; }
+.alert-item-actions svg { width: 15px; height: 15px; }
+
+/* Selector de que vigilar: TP1/TP2/TP3 o un precio suelto. */
+.alert-kind { display: flex; gap: 6px; flex-wrap: wrap; }
+.alert-kind-chip {
+  flex: 1 1 auto;
+  min-width: 58px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-card);
+  color: var(--text-2);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.alert-kind-chip.is-active {
+  color: var(--accent);
+  border-color: var(--line-accent);
+  background: var(--accent-dim);
+}
+.alert-tp-suggest { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.alert-suggest-label { font-size: 0.62rem; color: var(--muted); width: 100%; }
+
 /* ── Registro de compras y ventas (Analitica) ──
    Fila compacta con etiqueta, activo, importe y acciones. Sin prefijo de
    densidad porque son clases nuevas que ninguna regla compacta toca. */
