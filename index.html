@@ -96,31 +96,16 @@
         <span data-i18n="nav.analytics">Analitica</span>
       </button>
       <button class="tab-btn" type="button" data-tab-target="more" aria-current="false">
-        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
-        <span data-i18n="nav.more">Mas</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.1 13.6a7.6 7.6 0 0 0 0-3.2L21 9l-1.9-3.3-2.2.9a7.5 7.5 0 0 0-2.8-1.6l-.4-2.5h-3.4l-.4 2.5a7.5 7.5 0 0 0-2.8 1.6l-2.2-.9L3 9l1.9 1.4a7.6 7.6 0 0 0 0 3.2L3 15l1.9 3.3 2.2-.9a7.5 7.5 0 0 0 2.8 1.6l.4 2.5h3.4l.4-2.5a7.5 7.5 0 0 0 2.8-1.6l2.2.9L21 15z"/></svg>
+        <span data-i18n="nav.settings">Ajustes</span>
       </button>
     </nav>
 
     <div id="fabSheet" class="fab-sheet" hidden>
       <div class="fab-sheet-backdrop" data-fab-close></div>
-      <div class="fab-sheet-panel" role="dialog" aria-modal="true" aria-label="Anadir">
+      <div class="fab-sheet-panel" role="dialog" aria-modal="true" aria-label="Ajustes">
         <div class="fab-sheet-grip" aria-hidden="true"></div>
         <h2 class="fab-sheet-title" data-i18n="fab.title">Que deseas hacer?</h2>
-        <button class="fab-option" type="button" data-fab-action="new">
-          <span class="fab-option-icon accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
-          <span class="fab-option-text"><strong data-i18n="fab.new">Nueva posicion</strong><small data-i18n="fab.newDesc">Anadir un nuevo activo al portafolio</small></span>
-          <span class="fab-option-chevron" aria-hidden="true">›</span>
-        </button>
-        <button class="fab-option" type="button" data-fab-action="buy">
-          <span class="fab-option-icon positive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
-          <span class="fab-option-text"><strong data-i18n="fab.buy">Registrar compra</strong><small data-i18n="fab.buyDesc">Anadir una compra de un activo</small></span>
-          <span class="fab-option-chevron" aria-hidden="true">›</span>
-        </button>
-        <button class="fab-option" type="button" data-fab-action="sell">
-          <span class="fab-option-icon negative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg></span>
-          <span class="fab-option-text"><strong data-i18n="fab.sell">Registrar venta</strong><small data-i18n="fab.sellDesc">Anadir una venta de un activo</small></span>
-          <span class="fab-option-chevron" aria-hidden="true">›</span>
-        </button>
         <button class="fab-option" type="button" data-fab-action="alert">
           <span class="fab-option-icon warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
           <span class="fab-option-text"><strong data-i18n="fab.alert">Anadir alerta</strong><small data-i18n="fab.alertDesc">Crear una alerta de precio</small></span>
@@ -129,6 +114,16 @@
         <button class="fab-option" type="button" data-fab-action="pdf">
           <span class="fab-option-icon accent2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><rect x="4" y="17" width="16" height="4" rx="1.5"/></svg></span>
           <span class="fab-option-text"><strong data-i18n="fab.pdf">Descargar PDF</strong><small data-i18n="fab.pdfDesc">Informe del portafolio en PDF</small></span>
+          <span class="fab-option-chevron" aria-hidden="true">›</span>
+        </button>
+        <button class="fab-option" type="button" data-fab-action="sharePdf">
+          <span class="fab-option-icon accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5l6.8-4"/><path d="M8.6 13.5l6.8 4"/></svg></span>
+          <span class="fab-option-text"><strong data-i18n="fab.sharePdf">Compartir PDF</strong><small data-i18n="fab.sharePdfDesc">Enviarlo sin descargarlo</small></span>
+          <span class="fab-option-chevron" aria-hidden="true">›</span>
+        </button>
+        <button class="fab-option" type="button" data-fab-action="export">
+          <span class="fab-option-icon positive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>
+          <span class="fab-option-text"><strong data-i18n="fab.export">Exportar CSV</strong><small data-i18n="fab.exportDesc">Guardar tus posiciones en CSV</small></span>
           <span class="fab-option-chevron" aria-hidden="true">›</span>
         </button>
         <button class="fab-option" type="button" data-fab-action="import">
@@ -198,8 +193,8 @@
 
         <section class="quick-actions" aria-label="Acciones rapidas">
           <button class="quick-action" type="button" id="quickAddBtn">
-            <span class="qa-icon accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
-            <span data-i18n="quick.add">Anadir</span>
+            <span class="qa-icon accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.1 13.6a7.6 7.6 0 0 0 0-3.2L21 9l-1.9-3.3-2.2.9a7.5 7.5 0 0 0-2.8-1.6l-.4-2.5h-3.4l-.4 2.5a7.5 7.5 0 0 0-2.8 1.6l-2.2-.9L3 9l1.9 1.4a7.6 7.6 0 0 0 0 3.2L3 15l1.9 3.3 2.2-.9a7.5 7.5 0 0 0 2.8 1.6l.4 2.5h3.4l.4-2.5a7.5 7.5 0 0 0 2.8-1.6l2.2.9L21 15z"/></svg></span>
+            <span data-i18n="quick.settings">Ajustes</span>
           </button>
           <button class="quick-action" type="button" data-quick="buy">
             <span class="qa-icon positive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
@@ -209,9 +204,9 @@
             <span class="qa-icon negative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg></span>
             <span data-i18n="quick.sell">Vender</span>
           </button>
-          <button class="quick-action" type="button" data-quick="plan">
-            <span class="qa-icon accent2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg></span>
-            <span data-i18n="quick.plan">Plan</span>
+          <button class="quick-action" type="button" data-quick="new">
+            <span class="qa-icon accent2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+            <span data-i18n="quick.asset">Activo</span>
           </button>
         </section>
 

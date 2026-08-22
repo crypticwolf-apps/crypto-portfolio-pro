@@ -250,7 +250,8 @@ const TRIAD_FIELDS = ["investment", "tokens", "entryPrice"];
 const SORT_OPTIONS = [
   { key: "marketCap", labelKey: "sort.marketCap" },
   { key: "currentValue", labelKey: "sort.positionValue" },
-  { key: "pnlPct", labelKey: "sort.pnl" },
+  { key: "pnlPct", labelKey: "sort.pnlPct" },
+  { key: "pnlUsd", labelKey: "sort.pnlUsd" },
   { key: "change24h", labelKey: "sort.change24h" },
   { key: "investment", labelKey: "sort.invested" },
   { key: "asset", labelKey: "sort.name" }
@@ -827,8 +828,10 @@ function bindFab() {
   document.querySelectorAll("[data-quick]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const action = btn.dataset.quick;
-      if (action === "plan") {
-        setActiveTab("plan");
+      if (action === "new") {
+        // Nueva posicion directa: ya estamos en Portafolio, asi que se evita
+        // pasar por handleFabAction para no forzar el scroll al principio.
+        handleAddRow();
       } else {
         handleFabAction(action);
       }
@@ -879,6 +882,13 @@ function handleFabAction(action) {
       break;
     case "pdf":
       handleDownloadPdf();
+      break;
+    case "sharePdf":
+      // Mismo informe, pero entregado a la hoja de compartir del sistema.
+      handleDownloadPdf("share");
+      break;
+    case "export":
+      handleExportCsv();
       break;
     default:
       break;
@@ -5725,7 +5735,9 @@ function buildPdfPieChartImage(snapshot) {
 }
 
 let pdfBuilding = false;
-async function handleDownloadPdf() {
+// mode: "download" guarda el fichero; "share" lo entrega a la hoja de
+// compartir del sistema y solo descarga si el dispositivo no la admite.
+async function handleDownloadPdf(mode = "download") {
   if (pdfBuilding) return;
   const snapshot = buildSnapshot();
   const meaningfulItems = snapshot.items.filter(
@@ -6029,12 +6041,53 @@ async function handleDownloadPdf() {
 
     drawPdfFooter(doc, pageWidth, pageHeight, margin, 1);
 
-    doc.save(`portfolio-resumen-${sanitizeFilenamePart(portfolioName)}-${formatFileDate(now)}.pdf`);
+    const pdfName = `portfolio-resumen-${sanitizeFilenamePart(portfolioName)}-${formatFileDate(now)}.pdf`;
+    if (mode === "share") {
+      const shared = await sharePdfFile(doc, pdfName, portfolioName);
+      if (!shared) {
+        showToast(t("pdf.shareFallbackTitle"), t("pdf.shareFallbackText"), "warning");
+        doc.save(pdfName);
+      }
+    } else {
+      doc.save(pdfName);
+    }
   } catch (error) {
     showToast(t("pdf.exportErrorTitle"), t("pdf.exportErrorText"), "negative");
   } finally {
     pdfBuilding = false;
     setLoader(false);
+  }
+}
+
+// Web Share API nivel 2: manda el PDF como fichero a la hoja del sistema,
+// sin pasar por la carpeta de descargas. Devuelve false cuando el navegador
+// no admite compartir ficheros (escritorio, Firefox) o cuando la llamada
+// se rechaza porque el gesto del usuario ya caduco mientras se generaba el
+// informe; en ambos casos quien llama cae a la descarga de siempre.
+async function sharePdfFile(doc, filename, portfolioName) {
+  if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+    return false;
+  }
+  if (typeof navigator.canShare !== "function" || typeof File !== "function") {
+    return false;
+  }
+
+  let file;
+  try {
+    file = new File([doc.output("blob")], filename, { type: "application/pdf" });
+  } catch {
+    return false;
+  }
+  if (!navigator.canShare({ files: [file] })) {
+    return false;
+  }
+
+  try {
+    await navigator.share({ files: [file], title: portfolioName });
+    return true;
+  } catch (error) {
+    // Cancelar la hoja es una decision del usuario: no se descarga nada.
+    return error?.name === "AbortError";
   }
 }
 
