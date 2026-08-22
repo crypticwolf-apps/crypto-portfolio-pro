@@ -824,7 +824,14 @@ function renderDiagnostics() {
     [t("diag.activity"), String(state.activity.length)],
     [t("diag.stored"), storedBytes >= 0 ? `${(storedBytes / 1024).toFixed(1)} KB` : "--"],
     [t("diag.priceCache"), String(state.priceCache.size)],
-    [t("diag.historyPoints"), String(state.history.length)]
+    [t("diag.historyPoints"), String(state.history.length)],
+    // Estado del feed en vivo: es lo primero que hay que mirar cuando los
+    // precios "no van" (proveedor bloqueado, sin suscripciones, apagado).
+    [t("diag.liveStatus"), liveStatusLabel()],
+    [t("diag.liveSymbols"), state.live.covered.length
+      ? `${state.live.covered.length}/${state.live.symbols.length}`
+      : "0"],
+    [t("diag.liveLastTick"), state.live.lastTickAt ? formatRelativeTime(state.live.lastTickAt) : "--"]
   ];
   grid.innerHTML = cells
     .map(([label, value]) => `<div><span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b></div>`)
@@ -6934,6 +6941,11 @@ function setLiveStatus(status, provider = state.live.provider) {
   state.live.status = status;
   state.live.provider = status === "off" ? null : provider;
   renderLiveIndicator();
+  // Si el panel de diagnostico esta a la vista, que refleje el cambio al
+  // momento: es donde se mira cuando los precios no llegan.
+  if (state.prefs.activeTab === "more") {
+    renderDiagnostics();
+  }
 }
 
 // Etiqueta del proveedor tal y como se muestra al usuario.
@@ -7135,6 +7147,7 @@ function handleLiveFailure(provider) {
     return;
   }
 
+  live.covered = [];
   const nextProvider = wasLive ? provider : provider === "binance" ? "kraken" : "binance";
   if (!wasLive && provider === "kraken") {
     // Los dos proveedores han fallado: se deja de insistir de inmediato y se
@@ -7381,6 +7394,24 @@ function flashPriceNode(node, direction) {
   // Forzar reflow reinicia la animacion cuando los ticks se encadenan.
   void node.offsetWidth;
   node.classList.add(direction > 0 ? "price-up" : "price-down");
+}
+
+// Estado del feed en vivo en una linea, para el panel de diagnostico.
+function liveStatusLabel() {
+  if (!state.prefs.livePrices) {
+    return t("diag.liveOff");
+  }
+  const provider = liveProviderLabel();
+  if (state.live.status === "live") {
+    return `${t("diag.liveOk")} (${provider})`;
+  }
+  if (state.live.status === "connecting") {
+    return `${t("diag.liveConnecting")} (${provider})`;
+  }
+  if (state.live.status === "retry") {
+    return `${t("diag.liveRetry")} (${provider})`;
+  }
+  return t("diag.liveDown");
 }
 
 // Nombre legible de la fuente del ultimo precio de una fila.
