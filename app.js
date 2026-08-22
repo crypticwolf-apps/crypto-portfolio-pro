@@ -2423,10 +2423,6 @@ function renderNews() {
         <div class="news-body">
           ${n.cuerpo ? `<p class="news-text">${escapeHtml(n.cuerpo)}</p>` : ""}
           ${n.analisis ? `<p class="news-analysis"><strong>${escapeHtml(t("news.analysis"))}</strong> ${escapeHtml(n.analisis)}</p>` : ""}
-          <div class="news-foot">
-            ${n.tags.slice(0, 4).map((tg) => `<span class="news-tag">${escapeHtml(tg)}</span>`).join("")}
-            ${n.enlace ? `<a class="news-link" href="${escapeHtml(n.enlace)}" target="_blank" rel="noopener noreferrer">${escapeHtml(t("news.source"))}</a>` : ""}
-          </div>
         </div>
       </article>`;
   }).join("");
@@ -2443,12 +2439,6 @@ function bindNews() {
     renderNews();
   });
   box?.addEventListener("click", (e) => {
-    const enlace = e.target.closest("a.news-link");
-    if (enlace) {
-      e.preventDefault();
-      window.open(enlace.href, "_blank", "noopener,noreferrer");
-      return;
-    }
     const r = e.target.closest('[data-news-action="retry"]');
     if (r) { fetchNews(true); return; }
     const tgl = e.target.closest("[data-news-toggle]");
