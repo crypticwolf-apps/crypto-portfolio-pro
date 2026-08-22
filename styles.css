@@ -3373,7 +3373,7 @@ select {
 }
 
 body[data-active-tab="home"] .tab-section[data-tab="home"],
-body[data-active-tab="markets"] .tab-section[data-tab="markets"],
+body[data-active-tab="news"] .tab-section[data-tab="news"],
 body[data-active-tab="plan"] .tab-section[data-tab="plan"],
 body[data-active-tab="analytics"] .tab-section[data-tab="analytics"],
 body[data-active-tab="more"] .tab-section[data-tab="more"] {
@@ -4111,7 +4111,7 @@ body[data-active-tab="more"] .tab-section[data-tab="more"] {
   .tab-bar {
     left: 14px;
     right: 14px;
-    bottom: calc(10px + env(safe-area-inset-bottom));
+    bottom: calc(2px + env(safe-area-inset-bottom));
     border: 1px solid var(--glass-border);
     border-radius: 26px;
     padding: 6px;
