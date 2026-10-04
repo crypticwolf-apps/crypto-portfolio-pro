@@ -47,17 +47,17 @@ const FETCH_TIMEOUT = 15000;
 // fetchJsonWithRetry reintenta contra CoinGecko directo (sin clave, pero la app
 // sigue funcionando).
 //
-// Servida desde Vercel, la app y su proxy comparten origen: ruta relativa y
-// nos ahorramos el salto entre dominios (una resolución DNS y un preflight
-// menos por arranque). Desde la APK (origin file://) y desde el espejo de
-// GitHub Pages no hay /api propio, así que ahí se usa la URL absoluta.
+// Servida por web, la app y su proxy comparten origen en Vercel: ruta
+// relativa y nos ahorramos el salto entre dominios (una resolución DNS y un
+// preflight menos por arranque). La APK abre los ficheros con origin
+// file://, donde no hay servidor propio, así que ahí se usa la absoluta.
+// (Si algún día se vuelve a publicar en un host sin /api —GitHub Pages, por
+// ejemplo—, hay que excluirlo aquí para que no pida una ruta que no existe.)
 const COINGECKO_PROXY_ABS = "https://crypto-portfolio-pro-omega.vercel.app/api/cg/";
-const COINGECKO_PROXY = (() => {
-  const sirveApi = typeof location !== "undefined"
-    && (location.protocol === "https:" || location.protocol === "http:")
-    && !location.hostname.endsWith("github.io");
-  return sirveApi ? "/api/cg/" : COINGECKO_PROXY_ABS;
-})();
+const COINGECKO_PROXY = typeof location !== "undefined"
+  && (location.protocol === "https:" || location.protocol === "http:")
+  ? "/api/cg/"
+  : COINGECKO_PROXY_ABS;
 const COINGECKO_DIRECT = "https://api.coingecko.com/api/v3/";
 const COINGECKO_BASE = COINGECKO_PROXY;
 

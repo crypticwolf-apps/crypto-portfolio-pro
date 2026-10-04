@@ -14,8 +14,7 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
   `finance.js` (cálculos puros + tests con Vitest), `sw.js`.
 - **Repositorio:** `crypticwolf-apps/crypto-portfolio-pro` (**público**, no metas
   secretos). Se publica en GitHub Pages mediante un workflow de Actions.
-- **Web:** https://cartera.cryptoatalaya.com/ (Vercel, despliegue desde main)
-- **Espejo:** https://crypticwolf-apps.github.io/crypto-portfolio-pro/ (GitHub Pages, mismo repo)
+- **Web:** https://cartera.cryptoatalaya.com/ (Vercel, unico sitio vivo; despliega solo en cada push a main)
 - **Idioma:** todo en español y sin acentos en código e i18n, por convención previa.
 
 ## Reglas de trabajo (importantes)
