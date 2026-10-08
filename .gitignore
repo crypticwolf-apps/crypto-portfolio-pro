@@ -3,7 +3,10 @@ icono.png
 android-build/
 APK/
 crypto-portfolio-pwa/
-.claude/
+.claude/*
+# ...salvo el arranque de las sesiones de Claude Code en la nube
+!.claude/settings.json
+!.claude/hooks/
 node_modules/
 Thumbs.db
 desktop.ini
