@@ -107,6 +107,9 @@ function handleDetailAction(action) {
     case "edit":
       openPositionEditor(rowId);
       break;
+    case "walletSync":
+      syncWallet(row.walletId, { manual: true });
+      break;
     case "menu":
       openRowMenu(rowId, document.querySelector("[data-detail-action='menu']"));
       break;
@@ -164,8 +167,10 @@ function renderAssetDetail() {
       <div class="detail-body">${renderDetailTab(row, metrics)}</div>
 
       <footer class="detail-foot">
-        <button class="detail-foot-btn buy" type="button" data-detail-action="buy">${escapeHtml(t("detail.buy"))}</button>
-        <button class="detail-foot-btn sell" type="button" data-detail-action="sell">${escapeHtml(t("detail.sell"))}</button>
+        ${isWalletRow(row)
+          ? `<button class="detail-foot-btn buy span-2" type="button" data-detail-action="walletSync">${escapeHtml(t("wallet.syncOne"))}</button>`
+          : `<button class="detail-foot-btn buy" type="button" data-detail-action="buy">${escapeHtml(t("detail.buy"))}</button>
+        <button class="detail-foot-btn sell" type="button" data-detail-action="sell">${escapeHtml(t("detail.sell"))}</button>`}
         <button class="detail-foot-btn" type="button" data-detail-action="edit">${escapeHtml(t("buttons.edit"))}</button>
         <button class="detail-foot-btn" type="button" data-detail-action="menu">${escapeHtml(t("buttons.moreShort"))}</button>
       </footer>

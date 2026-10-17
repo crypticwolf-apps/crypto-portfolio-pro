@@ -12,8 +12,10 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 - **Qué es:** PWA de cartera de criptomonedas en JavaScript vanilla, **sin build**.
   Ficheros: `index.html`, la app en **`js/`** (18 scripts por tema: `config.js`
   primero, `arranque.js` el último), `styles.css`, `i18n.js`, `finance.js`
-  (cálculos puros + tests con Vitest), `sw.js`, y `api/cg.js` (proxy serverless
-  de CoinGecko; la clave va en `COINGECKO_API_KEY` en Vercel).
+  (cálculos puros + tests con Vitest), `wallet-core.js` (lógica pura de
+  billeteras + tests), `sw.js`, `api/cg.js` (proxy de CoinGecko; clave en
+  `COINGECKO_API_KEY`) y `api/wallet.js` (lector de billeteras; clave en
+  `ALCHEMY_API_KEY`). Las claves solo en variables de entorno de Vercel.
 - **Scripts clásicos, no módulos ES:** la APK abre la app desde `file://` y ahí
   `import`/`export` no cargan. Los 18 ficheros comparten el ámbito global y se
   ejecutan en el orden de `index.html`. Reglas en la cabecera de `js/config.js`;
@@ -99,8 +101,20 @@ centro del menú inferior, destacado y sobresaliendo.
 - **Noticias** del feed de Crypto Atalaya (`cryptoatalaya.com/data/feed.json`,
   CORS `*` en `/data/*`). Sin etiquetas ni enlace a la fuente en la tarjeta.
 - **Ordenación:** "Rentabilidad %" (`pnlPct`) y "Ganancia en dinero" (`pnlUsd`).
+- **Billeteras (fase 1):** se pega una dirección pública (Ethereum y 6 redes
+  compatibles, Solana o Bitcoin) desde Activo +, el menú ⚙ o Ajustes →
+  Billeteras; vista previa con casillas y basura oculta; coste "lo pongo yo" o
+  "precio de hoy". Reglas: la cantidad la marca la blockchain (sin Comprar/Vender
+  en esas posiciones, cantidad bloqueada en el editor); si bajan los tokens el
+  coste baja en proporción; si suben, lo nuevo entra al precio del momento.
+  Los tokens se identifican por **red + contrato, nunca por nombre o símbolo**
+  (`isDexOnlyRow`): un "USDC" falso no puede valer como el real. Frases semilla
+  y claves privadas se detectan, se borran del campo y se avisa.
 
 ## Pendiente
+
+- **Billeteras, fase 2:** xpub de Bitcoin (Ledger/Trezor), escanear QR, coste
+  estimado por fecha de llegada de cada token, más redes (Tron, TON, Sui).
 
 - **Fase 4 de precios:** ATH, ATL, supply, categorías, descripción y enlaces
   oficiales de CoinGecko en el detalle del activo.

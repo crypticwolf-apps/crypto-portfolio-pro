@@ -17,7 +17,7 @@
 const STORAGE_KEY = "crypto-dashboard-rows-v3";
 // Versión del esquema de datos guardados. Subirla cuando cambie la forma del
 // payload y añadir la migración correspondiente en migrateStoredPayload().
-const DATA_SCHEMA_VERSION = 1;
+const DATA_SCHEMA_VERSION = 2;
 // Memo por fila: computeRowMetrics se invoca decenas de veces por repintado
 // (tabla, resumen, analítica, plan). La firma cubre todas sus entradas, así
 // el cache se invalida solo cuando cambia algún dato de la fila.
@@ -75,6 +75,16 @@ const COINGECKO_PROXY = typeof location !== "undefined"
   ? "/api/cg/"
   : COINGECKO_PROXY_ABS;
 const COINGECKO_DIRECT = "https://api.coingecko.com/api/v3/";
+// Lector de billeteras (api/wallet.js): mismo criterio que el de CoinGecko,
+// relativo en la web y absoluto en la APK. La clave de Alchemy vive en Vercel.
+const WALLET_PROXY = typeof location !== "undefined"
+  && (location.protocol === "https:" || location.protocol === "http:")
+  ? "/api/wallet"
+  : "https://crypto-portfolio-pro-omega.vercel.app/api/wallet";
+const MAX_WALLETS = 20;
+// Al abrir la app se vuelven a leer las billeteras que lleven mas de esto
+// sin actualizarse (el saldo cambia poco; los precios ya van en vivo aparte).
+const WALLET_STALE_MS = 10 * 60 * 1000;
 const COINGECKO_BASE = COINGECKO_PROXY;
 
 // Free-tier throttle. El API público de CoinGecko admite hoy ~5-15 llamadas
@@ -395,6 +405,9 @@ const state = {
   trades: [],
   // Alertas de precio guardadas (por activo, para todos, o del valor total).
   alerts: [],
+  // Billeteras leidas por direccion publica. Sus posiciones son filas
+  // normales con walletId; la cantidad la marca la blockchain.
+  wallets: [],
   history: [],
   autosaveTimer: null,
   autoRefreshTimer: null,

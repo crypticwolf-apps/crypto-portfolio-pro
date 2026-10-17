@@ -17,7 +17,8 @@ Aplicación web (PWA instalable) para gestionar inversiones en criptomonedas: ta
 ## Estructura
 
 - Carpeta raíz y `crypto-portfolio-pwa/`: la app (copias sincronizadas). `index.html`, `js/` (la app en 18 scripts por tema, cargados en orden), `i18n.js`, `finance.js`, `styles.css`, `sw.js`, `manifest.webmanifest`, iconos.
-- `tests/`: pruebas de extremo a extremo en navegador (`npm run test:e2e`); `finance.test.js` con Vitest. Se ejecutan solas en cada push (GitHub Actions).
+- `wallet-core.js` y `api/wallet.js`: lector de billeteras (lógica pura en el navegador y servidor en Vercel que consulta Alchemy y mempool.space; clave `ALCHEMY_API_KEY`).
+- `tests/`: pruebas de extremo a extremo en navegador (`npm run test:e2e`) y unitarias con Vitest (`finance.test.js`, `tests/*.test.js`). Se ejecutan solas en cada push (GitHub Actions).
 - `android-build/`: proyecto Capacitor para generar el APK (la web vive en `android-build/www`). Ver `crypto-portfolio-pwa/COMO-GENERAR-APK.md`.
 
 ## Uso

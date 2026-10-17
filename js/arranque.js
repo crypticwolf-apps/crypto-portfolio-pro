@@ -11,6 +11,7 @@ function init() {
   applyTheme();
   applyDensity();
   bindEvents();
+  bindWallets();
   bindEnvironmentEvents();
   applyBalanceVisibility();
   renderAll();
@@ -42,6 +43,8 @@ function init() {
       return;
     }
     refreshAllPrices({ silentWhenEmpty: true, force: false });
+    // Billeteras: se releen solas si llevan un rato sin actualizarse.
+    syncStaleWallets();
   }, 140);
 }
 
@@ -87,6 +90,7 @@ function setActiveTab(tab) {
   if (nextTab === "more") {
     renderDiagnostics();
     renderAlertsPanel();
+    renderWalletsPanel();
   }
 
   savePreferences();
@@ -227,6 +231,9 @@ function handleFabAction(action) {
       break;
     case "export":
       handleExportCsv();
+      break;
+    case "wallet":
+      openWalletSheet();
       break;
     default:
       break;

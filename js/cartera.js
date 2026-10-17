@@ -221,7 +221,7 @@ function portfolioMobileCardHtml(row, totalValue = 0) {
         <span class="amc-avatar asset-avatar">${renderAssetAvatar(row)}</span>
         <span class="amc-id">
           <strong class="amc-name">${escapeHtml(assetDisplayName(row))}</strong>
-          <small class="amc-sym">${escapeHtml(row.symbol || t("row.noAsset"))}</small>
+          <small class="amc-sym">${escapeHtml(row.symbol || t("row.noAsset"))}${walletBadgeHtml(row)}</small>
         </span>
         <span class="amc-value">
           <strong class="money" data-role="rowValue">${maskedCurrency(metrics.currentValue)}</strong>
@@ -243,8 +243,10 @@ function portfolioMobileCardHtml(row, totalValue = 0) {
           </dl>
           <div class="amc-tps">${tpChips}</div>
           <div class="amc-actions">
-            <button class="primary-btn amc-btn" type="button" data-card-action="buy" data-row-id="${row.id}">${escapeHtml(t("quick.buy"))}</button>
-            <button class="primary-btn amc-btn amc-sell" type="button" data-card-action="sell" data-row-id="${row.id}">${escapeHtml(t("quick.sell"))}</button>
+            ${isWalletRow(row)
+              ? `<button class="primary-btn amc-btn amc-wide" type="button" data-card-action="walletSync" data-row-id="${row.id}">${escapeHtml(t("wallet.syncOne"))}</button>`
+              : `<button class="primary-btn amc-btn" type="button" data-card-action="buy" data-row-id="${row.id}">${escapeHtml(t("quick.buy"))}</button>
+            <button class="primary-btn amc-btn amc-sell" type="button" data-card-action="sell" data-row-id="${row.id}">${escapeHtml(t("quick.sell"))}</button>`}
             <button class="ghost-btn amc-btn" type="button" data-card-action="edit" data-row-id="${row.id}">${escapeHtml(t("buttons.edit"))}</button>
             <button class="ghost-btn amc-btn amc-delete" type="button" data-card-action="delete" data-row-id="${row.id}">${escapeHtml(t("menu.delete"))}</button>
           </div>
@@ -446,7 +448,7 @@ function renderRow(row, totalValue = 0) {
           <div class="asset-avatar" data-role="assetAvatar">${renderAssetAvatar(row)}</div>
           <div class="asset-id">
             <strong data-role="assetName">${escapeHtml(assetDisplayName(row))}</strong>
-            <small data-role="assetSub">${escapeHtml(row.resolvedName && row.symbol ? row.resolvedName : t("row.noAsset"))}</small>
+            <small data-role="assetSub">${escapeHtml(row.resolvedName && row.symbol ? row.resolvedName : t("row.noAsset"))}</small>${walletBadgeHtml(row)}
           </div>
           ${row.favorite ? '<span class="fav-dot" aria-hidden="true">★</span>' : ""}
         </div>
@@ -1017,7 +1019,9 @@ function recalcPositionTriad(row, editedField) {
     target = others.find((field) => !(parseDecimal(row[field]) > 0));
   }
 
-  if (!target) {
+  // En una posicion de billetera la cantidad la marca la blockchain: el
+  // calculo automatico nunca la toca (el coste y el precio de entrada si).
+  if (!target || (isWalletRow(row) && target === "tokens")) {
     return;
   }
 
@@ -1116,6 +1120,7 @@ function bindPortfolioMobile() {
         case "sell": openTradeSheet("sell", rowId); break;
         case "edit": openPositionEditor(rowId); break;
         case "delete": deletePositionWithUndo(rowId); break;
+        case "walletSync": syncWallet(getRowById(rowId)?.walletId, { manual: true }); break;
         default: break;
       }
     }
@@ -1144,6 +1149,9 @@ function deletePositionWithUndo(rowId) {
   const index = state.rows.findIndex((item) => item.id === rowId);
   state.lastDeleted = { row: { ...row }, index };
   state.rows = state.rows.filter((item) => item.id !== rowId);
+  // Borrar una posicion de billetera = no la quiero en la cartera: la
+  // siguiente lectura no la vuelve a proponer (deshacer lo revierte).
+  setWalletKeyIgnored(row, true);
   state.expandedCards.delete(rowId);
   clearTimersForRow(rowId);
   if (state.detailRowId === rowId) {
@@ -1173,6 +1181,7 @@ function undoDelete() {
   if (!state.lastDeleted) return;
   const { row, index } = state.lastDeleted;
   state.rows.splice(Math.min(index, state.rows.length), 0, row);
+  setWalletKeyIgnored(row, false);
   state.lastDeleted = null;
   renderAll();
   scheduleAutosave();

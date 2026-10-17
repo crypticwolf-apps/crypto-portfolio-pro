@@ -60,7 +60,8 @@ function comprobarVersionesCdn() {
 // ── Datos simulados ──
 const MONEDAS = [
   ["bitcoin", "BTC", "Bitcoin", 60000], ["ethereum", "ETH", "Ethereum", 2500], ["solana", "SOL", "Solana", 150],
-  ["cardano", "ADA", "Cardano", 0.5], ["chainlink", "LINK", "Chainlink", 15], ["pepe", "PEPE", "Pepe", 0.00001]
+  ["cardano", "ADA", "Cardano", 0.5], ["chainlink", "LINK", "Chainlink", 15], ["pepe", "PEPE", "Pepe", 0.00001],
+  ["usd-coin", "USDC", "USDC", 1]
 ];
 const MERCADO = MONEDAS.map(([id, s, n, p], i) => ({
   id, symbol: s.toLowerCase(), name: n, image: "", current_price: p, market_cap: 1e12 / (i + 1), market_cap_rank: i + 1,
@@ -75,6 +76,26 @@ const NOTICIAS = Array.from({ length: 6 }, (_, i) => ({
   analisis: "Analisis.", cat: i % 2 ? "Mercado" : "Protocolos", tags: ["BTC"], impacto: i + 3
 }));
 const PEPE = "0x6982508145454ce325ddbe47a25d4ec3d2311933";
+// Billetera de prueba. "SOL" falso: token sin listar con el MISMO simbolo que
+// Solana; tiene que valorarse por su contrato (0,5) y nunca como SOL (150).
+const EVM_ADDR = "0x8ba1f109551bd432803012645ac136ddd64dba72";
+const SOL_FALSO = "0x9999999999999999999999999999999999999999";
+const USDC_FALSO = "0x1111111111111111111111111111111111111111";
+// GeckoTerminal da 0,52 (Alchemy dijo 0,5 al leer la billetera): asi se ve
+// que el precio por contrato manda despues de importar.
+const PRECIOS_CONTRATO = { [PEPE]: "0.0000123", [SOL_FALSO]: "0.52" };
+function activosEvm(version) {
+  const lista = [
+    { network: "eth", contract: null, symbol: "ETH", name: "Ethereum", amount: version === 1 ? "1.5" : "0.75", priceUsd: 2500, coinId: "ethereum" },
+    { network: "base", contract: null, symbol: "ETH", name: "Ethereum", amount: "0.5", priceUsd: 2500, coinId: "ethereum" },
+    { network: "base", contract: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", symbol: "USDC", name: "USD Coin", amount: "250", priceUsd: 1, coinId: "usd-coin" },
+    { network: "base", contract: SOL_FALSO, symbol: "SOL", name: "Solana de mentira", amount: "100", priceUsd: 0.5, coinId: null },
+    { network: "base", contract: USDC_FALSO, symbol: "USDC", name: "<b>Reclama</b> tu premio", amount: "1000000", priceUsd: null, coinId: null },
+    { network: "eth", contract: "0x514910771af9ca656af840dff83e8264ecf986ca", symbol: "LINK", name: "Chainlink", amount: "0.0001", priceUsd: 15, coinId: "chainlink" }
+  ];
+  if (version >= 2) lista.push({ network: "eth", contract: "0xc00e94cb662c3520282e6f5717214004a7f26888", symbol: "ADA", name: "Cardano", amount: "1000", priceUsd: 0.5, coinId: "cardano" });
+  return lista;
+}
 
 function respuestaCoinGecko(ruta) {
   if (ruta === "coins/markets") return MERCADO;
@@ -90,6 +111,7 @@ function respuestaCoinGecko(ruta) {
 async function simularRed(ctx, { proxyCaido = false } = {}) {
   const json = (r, body) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   const directas = [];
+  const billetera = { version: 1, llamadas: [] };
   await ctx.route("**/api/cg/**", (r) => proxyCaido ? r.abort()
     : json(r, respuestaCoinGecko(new URL(r.request().url()).pathname.replace(/^.*\/api\/cg\//, ""))));
   await ctx.route("**api.coingecko.com/**", (r) => {
@@ -99,13 +121,26 @@ async function simularRed(ctx, { proxyCaido = false } = {}) {
   });
   await ctx.route("**/cryptoatalaya.com/data/feed.json", (r) => json(r, NOTICIAS));
   await ctx.route("**/api/v3/ticker/price**", (r) => json(r, ["BTCUSDT", "ETHUSDT", "SOLUSDT", "ADAUSDT", "LINKUSDT"].map((symbol) => ({ symbol, price: "1" }))));
-  await ctx.route("**api.geckoterminal.com/**", (r) => json(r, { data: [{ attributes: { address: PEPE, price_usd: "0.0000123", volume_usd: { h24: "1000000" }, market_cap_usd: "5000000000" } }] }));
+  await ctx.route("**api.geckoterminal.com/**", (r) => {
+    const pedidas = decodeURIComponent(new URL(r.request().url()).pathname.split("/multi/")[1] || "").toLowerCase().split(",");
+    const data = pedidas.filter((a) => PRECIOS_CONTRATO[a]).map((a) => ({ attributes: { address: a, price_usd: PRECIOS_CONTRATO[a], volume_usd: { h24: "1000000" }, market_cap_usd: "5000000" } }));
+    return json(r, { data });
+  });
+  // Lector de billeteras (api/wallet.js) con estado: version 2 = la billetera
+  // cambio (vendio ETH y recibio ADA).
+  await ctx.route("**/api/wallet?**", (r) => {
+    const q = new URL(r.request().url()).searchParams;
+    billetera.llamadas.push(`${q.get("chain")}:${q.get("address")}`);
+    if (q.get("chain") === "solana") return r.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "missing_key" }) });
+    if (q.get("chain") === "bitcoin") return json(r, { chain: "bitcoin", address: q.get("address"), assets: [{ network: "bitcoin", contract: null, symbol: "BTC", name: "Bitcoin", decimals: 8, amount: "0.25", priceUsd: null, logo: null, coinId: "bitcoin" }], failedNetworks: [] });
+    return json(r, { chain: "evm", address: q.get("address"), assets: activosEvm(billetera.version), failedNetworks: [] });
+  });
   await ctx.route("**api.alternative.me/**", (r) => json(r, { data: [{ value: "55", value_classification: "Greed", timestamp: String(Math.floor(Date.now() / 1000)) }] }));
   for (const lib of CDN) {
     await ctx.route(lib.patron, (r) => r.fulfill({ path: path.join(MODULOS, lib.paquete, lib.fichero), contentType: "application/javascript" }));
   }
   await ctx.route("**fonts.g*/**", (r) => r.abort());
-  return directas;
+  return { directas, billetera };
 }
 
 async function simularWebSockets(page) {
@@ -128,6 +163,9 @@ async function simularWebSockets(page) {
 // Cartera realista. Con datos virgenes hay caminos que no se recorren: asi se
 // colo un fallo de arranque que dejaba la app en blanco con datos reales.
 function sembrarCartera() {
+  // Solo la primera vez en la pestana: una recarga debe encontrar lo guardado.
+  if (sessionStorage.getItem("e2e-sembrado")) return;
+  sessionStorage.setItem("e2e-sembrado", "1");
   const historial = (p) => Array.from({ length: 80 }, (_, j) => ({ at: new Date(Date.now() - j * 3600000).toISOString(), price: p * (1 + Math.sin(j / 5) / 10) }));
   const rows = [
     { id: "r-btc", crypto: "bitcoin", coinId: "bitcoin", symbol: "BTC", resolvedName: "Bitcoin", investment: "3000", tokens: "0.05", tp1: "70000", tp2: "80000", tp3: "90000", favorite: true, note: "nota <img src=x onerror=window.__xss=1>", priceHistory: historial(60000) },
@@ -160,7 +198,7 @@ function anotar(grupo, nombre, error) {
 
 async function abrirApp(navegador, url, { ancho = 375, sembrar = true, proxyCaido = false } = {}) {
   const ctx = await navegador.newContext({ viewport: { width: ancho, height: 780 }, isMobile: true, hasTouch: true, serviceWorkers: "block", acceptDownloads: true });
-  const directas = await simularRed(ctx, { proxyCaido });
+  const { directas, billetera } = await simularRed(ctx, { proxyCaido });
   const page = await ctx.newPage();
   page.setDefaultTimeout(6000);
   const errores = [];
@@ -171,7 +209,7 @@ async function abrirApp(navegador, url, { ancho = 375, sembrar = true, proxyCaid
   if (sembrar) await page.addInitScript(sembrarCartera);
   await page.goto(url);
   await page.waitForTimeout(3500);
-  return { ctx, page, errores, directas };
+  return { ctx, page, errores, directas, billetera };
 }
 
 async function paso(grupo, nombre, app, fn) {
@@ -349,6 +387,186 @@ async function casosSueltos(navegador, url) {
   await caido.ctx.close();
 }
 
+// ── Lector de billeteras ──
+const SEED = "abandon ability able about above absent absorb abstract absurd abuse access accident";
+const filasBilletera = (page) => page.evaluate(() => state.rows.filter((r) => r.walletId).map((r) => ({
+  id: r.id, key: r.walletKey, symbol: r.symbol, tokens: r.tokens, investment: r.investment,
+  price: r.currentPrice, source: r.priceSource, dex: r.dexAddress, walletId: r.walletId
+})));
+
+async function casosBilletera(navegador, url, ancho) {
+  const g = `billetera ${ancho}px`;
+  const app = await abrirApp(navegador, url, { ancho });
+  const { page } = app;
+  const campo = '#walletSheet [data-wallet-field="address"]';
+  const aviso = () => page.evaluate(() => {
+    const n = document.querySelector('#walletSheet [data-wallet-role="detect"]');
+    return { cls: n?.className || "", txt: n?.textContent || "" };
+  });
+  const paso2 = (nombre, fn) => paso(g, nombre, app, fn);
+  const abrirPanel = async () => {
+    await page.click('[data-tab-target="more"]'); await page.waitForTimeout(400);
+    await page.evaluate(() => { document.querySelector(".wallets-panel").open = true; });
+    await page.waitForTimeout(200);
+  };
+
+  await paso2("abrir desde el menu del engranaje", async () => {
+    await page.click('[data-tab-target="home"]'); await page.waitForTimeout(300);
+    await page.click("#quickAddBtn"); await page.waitForTimeout(300);
+    await page.click('[data-fab-action="wallet"]'); await page.waitForTimeout(400);
+    const alto = await page.evaluate(() => document.querySelector("#walletSheet .editor-panel")?.getBoundingClientRect().height || 0);
+    if (!(alto > 0)) throw new Error("la hoja no se ve");
+    const d = await desborde(page); if (d) throw new Error(d);
+  });
+  await paso2("frase semilla: se borra del campo y avisa", async () => {
+    await page.fill(campo, SEED);
+    const a = await aviso();
+    if (await page.inputValue(campo)) throw new Error("la frase sigue escrita en el campo");
+    if (!/is-danger/.test(a.cls) || !/semilla/.test(a.txt)) throw new Error(`aviso: "${a.txt}"`);
+    if (!(await page.isDisabled("[data-wallet-read]"))) throw new Error("deja leer con una frase semilla");
+  });
+  await paso2("clave privada: se borra del campo y avisa", async () => {
+    await page.fill(campo, "0x" + "4f".repeat(32));
+    const a = await aviso();
+    if (await page.inputValue(campo)) throw new Error("la clave sigue escrita en el campo");
+    if (!/is-danger/.test(a.cls) || !/clave privada/.test(a.txt)) throw new Error(`aviso: "${a.txt}"`);
+  });
+  await paso2("xpub: aviso de fase 2, sin leer", async () => {
+    await page.fill(campo, "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8");
+    if (!/is-warn/.test((await aviso()).cls)) throw new Error("sin aviso");
+    if (!(await page.isDisabled("[data-wallet-read]"))) throw new Error("deja leer una xpub");
+  });
+  await paso2("direccion EVM: se reconoce y se lee", async () => {
+    await page.fill(campo, EVM_ADDR.replace(/[a-f]/g, (c) => c.toUpperCase()).replace("0X", "0x"));
+    if (!/is-ok/.test((await aviso()).cls)) throw new Error("no la reconoce");
+    await page.fill('#walletSheet [data-wallet-field="name"]', "Ledger <img src=x onerror=window.__xss=1>");
+    await page.click("[data-wallet-read]"); await page.waitForTimeout(1500);
+    if (!(await page.$('#walletSheet [data-wallet-step="preview"]'))) throw new Error("no llega a la vista previa");
+  });
+  await paso2("vista previa: agrupa redes y oculta la basura", async () => {
+    const leer = () => page.evaluate(() => {
+      const items = [...document.querySelectorAll("#walletSheet .wallet-asset")];
+      const vis = items.filter((li) => li.getBoundingClientRect().height > 0);
+      return {
+        total: items.length,
+        visibles: vis.map((li) => li.querySelector(".wallet-asset-id").textContent.replace(/\s+/g, " ").trim()),
+        marcados: vis.filter((li) => li.querySelector("input").checked).length,
+        html: document.querySelectorAll("#walletSheet .wallet-asset b").length
+      };
+    });
+    const r = await leer();
+    // ETH (Ethereum + Base en una), USDC y el "SOL" sin listar; el USDC falso
+    // sin precio y el polvo de LINK quedan ocultos.
+    if (r.total !== 5 || r.visibles.length !== 3 || r.marcados !== 3) throw new Error(JSON.stringify(r));
+    if (!r.visibles.some((v) => /Ethereum · Base/.test(v))) throw new Error("ETH no se agrupa: " + r.visibles.join(" / "));
+    if (r.html) throw new Error("HTML del nombre de un token pintado");
+    await page.click("[data-wallet-toggle-hidden]"); await page.waitForTimeout(200);
+    const r2 = await leer();
+    if (r2.visibles.length !== 5 || r2.marcados !== 3) throw new Error("ocultos: " + JSON.stringify(r2));
+    const d = await desborde(page); if (d) throw new Error(d);
+    await page.click("[data-wallet-toggle-hidden]");
+  });
+  let ethId = "";
+  await paso2("importar al precio de hoy", async () => {
+    await page.click('[data-wallet-cost="today"]');
+    await page.click("[data-wallet-import]"); await page.waitForTimeout(900);
+    const filas = await filasBilletera(page);
+    if (filas.length !== 3) throw new Error(`posiciones importadas: ${filas.length}`);
+    const eth = filas.find((f) => f.key === "cg:ethereum");
+    ethId = eth?.id || "";
+    if (Number(eth?.tokens) !== 2 || Math.abs(Number(eth?.investment) - 5000) > 1) throw new Error(`ETH: ${eth?.tokens} tokens, coste ${eth?.investment}`);
+    const chips = await page.evaluate(() => [...document.querySelectorAll(".asset-mobile-card .wallet-chip")].map((c) => c.textContent.trim()));
+    if (chips.length !== 3 || !chips.every((c) => c.startsWith("Ledger"))) throw new Error("etiquetas: " + chips.join(" / "));
+  });
+  await paso2("token sin listar: precio por contrato, nunca por simbolo", async () => {
+    await page.waitForTimeout(2500); // entran ticks de SOLUSDT (150) por el WebSocket
+    const falso = (await filasBilletera(page)).find((f) => f.dex === SOL_FALSO);
+    if (!falso) throw new Error("no se importo");
+    if (Math.abs(Number(falso.price) - 0.52) > 1e-9 || falso.source !== "geckoterminal") throw new Error(`precio ${falso.price} (${falso.source})`);
+  });
+  await paso2("posicion de billetera: sin comprar ni vender y cantidad bloqueada", async () => {
+    await page.click('[data-tab-target="home"]'); await page.waitForTimeout(300);
+    const card = `.asset-mobile-card[data-card-row="${ethId}"]`;
+    await page.click(`${card} [data-card-toggle]`); await page.waitForTimeout(300);
+    const acciones = await page.evaluate((sel) => [...document.querySelectorAll(sel + " [data-card-action]")].map((b) => b.dataset.cardAction), card);
+    if (acciones.includes("buy") || acciones.includes("sell") || !acciones.includes("walletSync")) throw new Error("acciones: " + acciones.join(","));
+    await page.click('[data-quick="buy"]'); await page.waitForTimeout(400);
+    const opciones = await page.evaluate(() => [...document.querySelectorAll("#tradeSheet [data-trade-field='rowId'] option")].map((o) => o.value));
+    const deBilletera = (await filasBilletera(page)).map((f) => f.id);
+    if (opciones.some((v) => deBilletera.includes(v))) throw new Error("la compra ofrece posiciones de billetera");
+    await cerrarHoja(page); await page.waitForTimeout(300);
+    await page.click(`${card} [data-card-action="edit"]`); await page.waitForTimeout(500);
+    const bloqueo = await page.evaluate(() => ({
+      tokens: document.querySelector('#positionEditorPortal [data-editor-field="tokens"]').readOnly,
+      crypto: document.querySelector('#positionEditorPortal [data-editor-field="crypto"]').readOnly
+    }));
+    if (!bloqueo.tokens || !bloqueo.crypto) throw new Error("se puede editar la cantidad o el activo");
+    await page.fill('#positionEditorPortal [data-editor-field="investment"]', "4000"); await page.waitForTimeout(200);
+    const eth = (await filasBilletera(page)).find((f) => f.id === ethId);
+    if (eth.tokens !== "2" || eth.investment !== "4000") throw new Error(`tras editar el coste: ${eth.tokens} / ${eth.investment}`);
+    await page.click("#positionEditorPortal [data-editor-close]"); await page.waitForTimeout(400);
+  });
+  await paso2("actualizar: si bajan los tokens, el coste baja en proporcion", async () => {
+    app.billetera.version = 2; // vendio 0,75 ETH y recibio 1000 ADA
+    await abrirPanel();
+    const meta = await page.evaluate(() => document.querySelector(".wallet-item")?.textContent.replace(/\s+/g, " ") || "");
+    if (!/3 activos/.test(meta)) throw new Error("panel: " + meta);
+    await page.click("[data-wallet-sync]"); await page.waitForTimeout(1800);
+    const eth = (await filasBilletera(page)).find((f) => f.id === ethId);
+    // 1,25 de 2 tokens: el coste (4000) baja a 2500, el coste medio no cambia.
+    if (Number(eth.tokens) !== 1.25 || Math.abs(Number(eth.investment) - 2500) > 0.01) throw new Error(`ETH: ${eth.tokens} / ${eth.investment}`);
+    const nuevo = await page.evaluate(() => document.querySelector(".wallet-item-new")?.textContent || "");
+    if (!/1 activos nuevos/.test(nuevo)) throw new Error(`aviso de nuevos: "${nuevo}"`);
+    const d = await desborde(page); if (d) throw new Error(d);
+  });
+  await paso2("revisar: entra lo nuevo y no se duplica lo importado", async () => {
+    await page.click("[data-wallet-review]"); await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => ({
+      ya: document.querySelectorAll("#walletSheet .wallet-asset.is-linked").length,
+      marcados: [...document.querySelectorAll("#walletSheet [data-wallet-pick]:checked")].map((i) => i.dataset.walletPick)
+    }));
+    if (r.ya !== 3 || r.marcados.join() !== "cg:cardano") throw new Error(JSON.stringify(r));
+    await page.click("[data-wallet-import]"); await page.waitForTimeout(800);
+    const filas = await filasBilletera(page);
+    const ada = filas.find((f) => f.key === "cg:cardano");
+    if (filas.length !== 4 || !ada || ada.investment !== "") throw new Error(`filas ${filas.length}, ADA coste "${ada?.investment}"`);
+  });
+  await paso2("red sin clave configurada: aviso claro", async () => {
+    await page.click("#addWalletBtn"); await page.waitForTimeout(400);
+    await page.fill(campo, "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU");
+    await page.click("[data-wallet-read]"); await page.waitForTimeout(1200);
+    const txt = await page.evaluate(() => document.querySelector("#walletSheet .editor-body")?.textContent || "");
+    if (!/clave de Alchemy/.test(txt)) throw new Error("mensaje: " + txt.trim().slice(0, 120));
+    await page.click('#walletSheet .icon-circle-btn[data-wallet-close]'); await page.waitForTimeout(300);
+  });
+  await paso2("Bitcoin: entra aparte del BTC manual", async () => {
+    await page.click("#addWalletBtn"); await page.waitForTimeout(400);
+    await page.fill(campo, "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq");
+    await page.click("[data-wallet-read]"); await page.waitForTimeout(1500);
+    await page.click("[data-wallet-import]"); await page.waitForTimeout(800);
+    const btc = await page.evaluate(() => state.rows.filter((r) => r.symbol === "BTC").map((r) => `${r.walletId ? "billetera" : "manual"}:${r.tokens}`));
+    if (btc.sort().join() !== "billetera:0.25,manual:0.05") throw new Error(btc.join(" / "));
+  });
+  await paso2("al recargar sigue todo y no se relee de golpe", async () => {
+    const antes = app.billetera.llamadas.length;
+    await page.reload(); await page.waitForTimeout(3500);
+    const r = await page.evaluate(() => ({ billeteras: state.wallets.length, chips: document.querySelectorAll(".asset-mobile-card .wallet-chip").length }));
+    if (r.billeteras !== 2 || r.chips !== 5) throw new Error(JSON.stringify(r));
+    if (app.billetera.llamadas.length !== antes) throw new Error("se releyo sin haber pasado el tiempo");
+  });
+  await paso2("quitar una billetera borra solo sus posiciones", async () => {
+    await abrirPanel();
+    await page.click("[data-wallet-delete]"); await page.waitForTimeout(600);
+    const r = await page.evaluate(() => ({ billeteras: state.wallets.length, deBilletera: state.rows.filter((x) => x.walletId).length, manuales: state.rows.filter((x) => !x.walletId).length }));
+    if (r.billeteras !== 1 || r.deBilletera !== 1 || r.manuales !== 6) throw new Error(JSON.stringify(r));
+  });
+  await paso2("sin HTML inyectado en nombres de billetera ni de tokens", async () => {
+    const r = await page.evaluate(() => ({ xss: window.__xss === 1, img: document.querySelectorAll("img[src='x']").length }));
+    if (r.xss || r.img) throw new Error(JSON.stringify(r));
+  });
+  await app.ctx.close();
+}
+
 const desfases = comprobarVersionesCdn();
 if (desfases.length) anotar("versiones", "librerias del CDN alineadas con package.json", desfases.join(" | "));
 else anotar("versiones", "librerias del CDN alineadas con package.json", null);
@@ -359,6 +577,7 @@ const navegador = await chromium.launch();
 try {
   await casosSueltos(navegador, url);
   for (const ancho of [375, 320]) await recorridoCompleto(navegador, url, ancho);
+  for (const ancho of [375, 320]) await casosBilletera(navegador, url, ancho);
 } finally {
   await navegador.close();
   servidor.close();

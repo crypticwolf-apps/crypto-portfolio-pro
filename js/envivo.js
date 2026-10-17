@@ -15,6 +15,11 @@
 // Simbolo de exchange de una fila (BTC, ETH...). null si no procede:
 // filas sin resolver y estables, cuyo par contra USDT no aporta nada.
 function liveSymbolOf(row) {
+  // Un token de billetera sin id de CoinGecko no se cotiza por simbolo: solo
+  // por su contrato (un "ETH" falso no puede recibir el precio de ETH).
+  if (isDexOnlyRow(row)) {
+    return null;
+  }
   const raw = String(row?.symbol || "").trim().toUpperCase();
   if (!raw || raw.length > 12) {
     return null;
@@ -583,6 +588,11 @@ function priceSourceLabel(row) {
   if (row.priceSource === "coingecko") {
     return "CoinGecko";
   }
+  if (row.priceSource === "alchemy") {
+    // Precio que trajo la lectura de la billetera, hasta que llegue el de
+    // GeckoTerminal por contrato.
+    return "Alchemy";
+  }
   return "--";
 }
 
@@ -630,11 +640,11 @@ function writeDexContractCache(store) {
 // Red + contrato de un activo, a partir de la ficha de CoinGecko. Se cachea
 // un dia: un contrato no cambia nunca, solo aparece la primera vez.
 async function resolveDexContract(row) {
-  if (!row.coinId) {
-    return null;
-  }
   if (row.dexNetwork && row.dexAddress) {
     return { network: row.dexNetwork, address: row.dexAddress };
+  }
+  if (!row.coinId) {
+    return null;
   }
 
   const store = readDexContractCache();
@@ -682,7 +692,7 @@ async function resolveDexContract(row) {
 // activo ya llega por WebSocket no se toca, que es mas rapido y gratis.
 function dexCandidateRows() {
   return state.rows.filter((row) => {
-    if (!row.coinId || !row.crypto.trim()) {
+    if (!isDexOnlyRow(row) && (!row.coinId || !row.crypto.trim())) {
       return false;
     }
     const symbol = liveSymbolOf(row);
@@ -696,11 +706,13 @@ function dexCandidateRows() {
 
 // Un ciclo de precios DEX: resuelve contratos pendientes y pide en lote los
 // tokens de cada red (endpoint multi, hasta 30 direcciones por llamada).
-async function refreshDexPrices() {
-  if (!state.prefs.livePrices || isOffline() || document.visibilityState === "hidden") {
+// rows + force: ciclo puntual para esas filas aunque el feed en vivo este
+// apagado (los tokens de billetera sin CoinGecko no tienen otro precio).
+async function refreshDexPrices({ rows = null, force = false } = {}) {
+  if (isOffline() || (!force && (!state.prefs.livePrices || document.visibilityState === "hidden"))) {
     return;
   }
-  const candidates = dexCandidateRows();
+  const candidates = rows || dexCandidateRows();
   if (!candidates.length) {
     return;
   }
@@ -772,7 +784,7 @@ function applyDexQuote(row, attributes) {
   if (freshQuoteFor(row)) {
     return;
   }
-  if (previousPrice === converted && row.priceStatus === "success") {
+  if (previousPrice === converted && row.priceStatus === "success" && row.priceSource === "geckoterminal") {
     return;
   }
 

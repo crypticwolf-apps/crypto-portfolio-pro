@@ -11,8 +11,16 @@ function openTradeSheet(mode, preselectRowId = null) {
   if (!sheet) {
     return;
   }
-  // Posiciones candidatas: las que ya tienen activo definido.
-  const positions = state.rows.filter((row) => row.crypto.trim());
+  // Posiciones de billetera: la cantidad la marca la blockchain, no se
+  // compra ni se vende a mano (la siguiente lectura lo pisaria).
+  if ((mode === "buy" || mode === "sell") && !state.editingTradeId && isWalletRow(getRowById(preselectRowId))) {
+    showToast(t("wallet.tradeBlockedTitle"), t("wallet.tradeBlockedText"), "warning");
+    return;
+  }
+  // Posiciones candidatas: las que ya tienen activo definido (en compras y
+  // ventas, solo las manuales).
+  const positions = state.rows.filter((row) => row.crypto.trim() && (mode === "alert" || !isWalletRow(row)));
+  const walletRowsHidden = mode !== "alert" && state.rows.some((row) => isWalletRow(row));
 
   if (mode === "sell" && !state.editingTradeId && !positions.filter((r) => parseDecimal(r.tokens) > 0).length) {
     showToast(t("trade.noPositionsTitle"), t("trade.noPositionsText"), "warning");
@@ -70,6 +78,7 @@ function openTradeSheet(mode, preselectRowId = null) {
         <input type="text" data-trade-field="note" maxlength="140" placeholder="${escapeHtml(t("trade.notesPlaceholder"))}" />
       </label>
       <p class="editor-secondary trade-calc" data-trade-role="preview"></p>
+      ${walletRowsHidden ? `<p class="editor-secondary">${escapeHtml(t("wallet.tradeNote"))}</p>` : ""}
     `;
 
   const alertBlock = mode === "alert"

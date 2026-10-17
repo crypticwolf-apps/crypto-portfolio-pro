@@ -20,6 +20,18 @@ function bindPositionEditor() {
       closePositionEditor();
       return;
     }
+    if (event.target.closest("[data-editor-wallet]")) {
+      // La fila vacia recien creada sobra: la billetera crea las suyas.
+      const blank = getRowById(state.editorRowId);
+      closePositionEditor();
+      if (blank && !blank.crypto.trim() && !String(blank.tokens).trim() && !String(blank.investment).trim() && state.rows.length > 1) {
+        state.rows = state.rows.filter((item) => item.id !== blank.id);
+        renderAll();
+        scheduleAutosave();
+      }
+      openWalletSheet();
+      return;
+    }
     const suggestion = event.target.closest("[data-editor-coin]");
     if (suggestion) {
       selectEditorCoin(suggestion.dataset.editorCoin);
@@ -89,6 +101,11 @@ function closePositionEditor() {
 
 function renderPositionEditor(row) {
   const metrics = computeRowMetrics(row);
+  const wallet = isWalletRow(row) ? getWalletById(row.walletId) : null;
+  // Posicion nueva y vacia (recien creada con "Activo +"): se ofrece leerla de
+  // una billetera en lugar de escribirla a mano.
+  const isBlankNew = !wallet && !row.crypto.trim() && !String(row.tokens).trim() && !String(row.investment).trim();
+  const lockAttr = wallet ? "readonly aria-readonly=\"true\"" : "";
   editorPortal.innerHTML = `
     <div class="editor-backdrop"></div>
     <form class="editor-panel" id="positionEditorForm" role="dialog" aria-modal="true" aria-label="${escapeHtml(t("editor.title"))}">
@@ -103,17 +120,22 @@ function renderPositionEditor(row) {
       </header>
 
       <div class="editor-body">
+        ${isBlankNew ? `
+        <button type="button" class="ghost-btn editor-wallet-btn" data-editor-wallet>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2"/><path d="M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3"/><path d="M21 12h-5a2 2 0 0 0 0 4h5z"/></svg>
+          <span><strong>${escapeHtml(t("wallet.fromEditor"))}</strong><small>${escapeHtml(t("wallet.fromEditorHint"))}</small></span>
+        </button>` : ""}
         <label class="editor-field">
           <span>${escapeHtml(t("editor.asset"))}</span>
-          <input type="text" data-editor-field="crypto" autocomplete="off" placeholder="${escapeHtml(t("row.assetPlaceholder"))}" value="${escapeHtml(row.crypto)}" />
+          <input type="text" data-editor-field="crypto" autocomplete="off" placeholder="${escapeHtml(t("row.assetPlaceholder"))}" value="${escapeHtml(row.crypto)}" ${lockAttr} />
           <div class="editor-suggestions" data-editor-role="suggestions" hidden></div>
-          <small class="editor-hint" data-editor-role="assetHint">${escapeHtml(editorAssetHint(row))}</small>
+          <small class="editor-hint" data-editor-role="assetHint">${escapeHtml(wallet ? t("wallet.editorHint", { wallet: walletDisplayName(wallet) }) : editorAssetHint(row))}</small>
         </label>
 
         <div class="editor-grid-2">
           <label class="editor-field">
             <span>${escapeHtml(t("table.fields.tokens"))}</span>
-            <input type="text" inputmode="decimal" data-editor-field="tokens" value="${escapeHtml(row.tokens)}" placeholder="0.00" />
+            <input type="text" inputmode="decimal" data-editor-field="tokens" value="${escapeHtml(row.tokens)}" placeholder="0.00" ${lockAttr} />
           </label>
           <label class="editor-field">
             <span>${escapeHtml(t("editor.investment"))}</span>
@@ -184,7 +206,7 @@ function refreshEditorLiveData() {
     capNode.textContent = editorCapInfo(row);
   }
   const hintNode = editorPortal.querySelector("[data-editor-role='assetHint']");
-  if (hintNode && document.activeElement?.dataset?.editorField !== "crypto") {
+  if (hintNode && !isWalletRow(row) && document.activeElement?.dataset?.editorField !== "crypto") {
     hintNode.textContent = editorAssetHint(row);
   }
 }
@@ -195,6 +217,12 @@ function handleEditorFieldInput(input) {
     return;
   }
   const field = input.dataset.editorField;
+
+  // Cantidad y activo de una billetera: solo lectura (por si el navegador
+  // dejara escribir en un campo readonly).
+  if (isWalletRow(row) && (field === "crypto" || field === "tokens")) {
+    return;
+  }
 
   if (field === "crypto") {
     // Cambiar el texto del activo NO borra inversión/tokens/TP: solo marca
@@ -385,10 +413,15 @@ function handleRowMenuAction(rowId, action) {
       refreshSingleRow(rowId, true);
       break;
     case "duplicate": {
+      // La copia es siempre manual: dos filas con la misma clave de billetera
+      // se pisarian al sincronizar.
       const copy = createRow({
         ...row,
         id: undefined,
-        personalLabel: row.personalLabel
+        personalLabel: row.personalLabel,
+        walletId: null,
+        walletKey: "",
+        walletParts: []
       });
       const index = state.rows.findIndex((item) => item.id === rowId);
       state.rows.splice(index + 1, 0, copy);
@@ -403,6 +436,7 @@ function handleRowMenuAction(rowId, action) {
         return;
       }
       state.rows = state.rows.filter((item) => item.id !== rowId);
+      setWalletKeyIgnored(row, true);
       if (!state.rows.length) {
         state.rows.push(createRow());
       }

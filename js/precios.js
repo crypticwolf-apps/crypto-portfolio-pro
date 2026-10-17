@@ -131,6 +131,12 @@ async function refreshSingleRow(rowId, force) {
     return;
   }
 
+  if (isDexOnlyRow(row)) {
+    await refreshDexPrices({ rows: [row], force: true }).catch(() => {});
+    updateLiveRowUi(rowId);
+    return;
+  }
+
   if (!row.coinId && row.crypto.trim()) {
     await resolveBestMatchForRow(rowId);
     return;
@@ -209,7 +215,7 @@ async function refreshAllPrices({ silentWhenEmpty = false, force = false, reason
   setApiState("syncing", t("alerts.refreshAll", { count: actionableRows.length }));
 
   actionableRows.forEach((row) => {
-    if (row.crypto.trim()) {
+    if (row.crypto.trim() && !isDexOnlyRow(row)) {
       row.priceStatus = "loading";
       row.priceMessage = t("status.syncing");
     }
@@ -217,7 +223,9 @@ async function refreshAllPrices({ silentWhenEmpty = false, force = false, reason
   renderTableBody();
 
   try {
-    const unresolvedRows = actionableRows.filter((row) => !row.coinId && row.crypto.trim());
+    // Los tokens de billetera sin id de CoinGecko no se buscan por nombre:
+    // se valoran por contrato mas abajo.
+    const unresolvedRows = actionableRows.filter((row) => !row.coinId && row.crypto.trim() && !isDexOnlyRow(row));
     const resolved = await Promise.all(
       unresolvedRows.map(async (row) => ({
         rowId: row.id,
@@ -279,6 +287,14 @@ async function refreshAllPrices({ silentWhenEmpty = false, force = false, reason
       applyMarketDataToRow(row, market);
       maybeFireTpAlerts(row, previousPrice);
     });
+
+    // Tokens de billetera que CoinGecko no lista: precio por red + contrato
+    // en GeckoTerminal, haya o no precios en vivo activados. En paralelo: no
+    // frena el repintado (cada precio que llega pinta su propia tarjeta).
+    const dexOnly = state.rows.filter(isDexOnlyRow);
+    if (dexOnly.length) {
+      refreshDexPrices({ rows: dexOnly, force: true }).catch(() => {});
+    }
 
     const servedFromCache = [...marketMap.values()].some((market) => market && market.__fromCache);
 

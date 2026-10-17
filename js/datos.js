@@ -12,6 +12,11 @@ function migrateStoredPayload(payload) {
   if (from >= DATA_SCHEMA_VERSION) return payload;
   // v0 → v1: payloads previos a la versión de esquema; forma compatible,
   // solo se etiqueta. Futuras migraciones se encadenan aquí.
+  // v1 → v2: llegan las billeteras. Las filas antiguas son manuales (sin
+  // walletId), así que basta con estrenar la lista vacía.
+  if (from < 2 && !Array.isArray(payload.wallets)) {
+    payload.wallets = [];
+  }
   payload.schema = DATA_SCHEMA_VERSION;
   return payload;
 }
@@ -28,6 +33,16 @@ function loadState() {
   state.activity = Array.isArray(payload?.activity) ? payload.activity.slice(0, MAX_ACTIVITY_ITEMS) : [];
   state.trades = Array.isArray(payload?.trades) ? payload.trades.slice(0, MAX_TRADES) : [];
   state.alerts = Array.isArray(payload?.alerts) ? payload.alerts.slice(0, MAX_ALERTS).map(normalizeAlert).filter(Boolean) : [];
+  state.wallets = Array.isArray(payload?.wallets) ? payload.wallets.slice(0, MAX_WALLETS).map(normalizeWallet).filter(Boolean) : [];
+  // Una fila que apunta a una billetera que ya no existe pasa a ser manual.
+  const walletIds = new Set(state.wallets.map((wallet) => wallet.id));
+  state.rows.forEach((row) => {
+    if (row.walletId && !walletIds.has(row.walletId)) {
+      row.walletId = null;
+      row.walletKey = "";
+      row.walletParts = [];
+    }
+  });
   state.history = Array.isArray(history?.points) ? compactHistoryPoints(history.points) : [];
   const storedTheme = prefs && (prefs.theme === "light" || prefs.theme === "dark") ? prefs.theme : null;
   state.prefs = {
@@ -257,6 +272,17 @@ function createRow(partial = {}) {
     dexNetwork: partial.dexNetwork || null,
     dexAddress: partial.dexAddress || null,
     dexCheckedAt: partial.dexCheckedAt || null,
+    // Posicion leida de una billetera: la cantidad la marca la blockchain.
+    // walletKey identifica el activo dentro de la billetera (id de CoinGecko
+    // o red + contrato) y walletParts guarda el desglose por red.
+    walletId: partial.walletId ? String(partial.walletId) : null,
+    walletKey: partial.walletId ? String(partial.walletKey || "") : "",
+    walletParts: partial.walletId && Array.isArray(partial.walletParts)
+      ? partial.walletParts
+          .filter((part) => part && typeof part.network === "string" && Number.isFinite(Number(part.amount)))
+          .slice(0, 12)
+          .map((part) => ({ network: part.network, amount: Number(part.amount) }))
+      : [],
     note: String(partial.note || ""),
     purchaseDate: String(partial.purchaseDate || ""),
     personalLabel: String(partial.personalLabel || ""),
@@ -578,6 +604,46 @@ function getRowById(rowId) {
   return state.rows.find((row) => row.id === rowId);
 }
 
+// Posicion leida de una billetera: la cantidad la marca la blockchain, asi
+// que no admite compras ni ventas a mano.
+function isWalletRow(row) {
+  return Boolean(row?.walletId);
+}
+
+// Token de billetera que CoinGecko no lista: solo se valora por red + contrato
+// (GeckoTerminal). NUNCA se busca por nombre ni por simbolo: un token basura
+// llamado "USDC" acabaria valorado como el USDC de verdad.
+function isDexOnlyRow(row) {
+  return Boolean(row?.walletId && !row.coinId);
+}
+
+function normalizeWallet(raw) {
+  if (!raw || typeof raw !== "object" || !raw.id) {
+    return null;
+  }
+  const chain = ["evm", "solana", "bitcoin"].includes(raw.chain) ? raw.chain : null;
+  const address = String(raw.address || "").trim();
+  if (!chain || !address) {
+    return null;
+  }
+  const strings = (list, max) => (Array.isArray(list) ? list : []).filter((item) => typeof item === "string").slice(0, max);
+  return {
+    id: String(raw.id),
+    name: String(raw.name || "").trim().slice(0, 40),
+    chain,
+    address,
+    createdAt: Number(raw.createdAt) || Date.now(),
+    syncedAt: Number(raw.syncedAt) || 0,
+    status: raw.status === "error" ? "error" : "ok",
+    errorCode: raw.errorCode ? String(raw.errorCode).slice(0, 40) : "",
+    // Activos con valor que aun no estan en la cartera (para "Revisar").
+    pendingNew: Number.isFinite(raw.pendingNew) ? Math.max(0, raw.pendingNew) : 0,
+    // Los que el usuario dejo fuera a proposito: no se vuelven a proponer.
+    ignoredKeys: strings(raw.ignoredKeys, 300),
+    failedNetworks: strings(raw.failedNetworks, 12)
+  };
+}
+
 function compactRowPriceHistory(points) {
   const now = Date.now();
   const normalized = points
@@ -795,11 +861,19 @@ function persistState(manual) {
         note: row.note,
         purchaseDate: row.purchaseDate,
         personalLabel: row.personalLabel,
-        alertsFired: row.alertsFired
+        alertsFired: row.alertsFired,
+        // Red + contrato: imprescindible en tokens que CoinGecko no lista,
+        // que solo se pueden valorar por contrato.
+        dexNetwork: row.dexNetwork,
+        dexAddress: row.dexAddress,
+        walletId: row.walletId,
+        walletKey: row.walletKey,
+        walletParts: row.walletParts
       })),
       activity: state.activity.slice(0, MAX_ACTIVITY_ITEMS),
       trades: state.trades.slice(0, MAX_TRADES),
-      alerts: state.alerts.slice(0, MAX_ALERTS)
+      alerts: state.alerts.slice(0, MAX_ALERTS),
+      wallets: state.wallets.slice(0, MAX_WALLETS)
     };
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
