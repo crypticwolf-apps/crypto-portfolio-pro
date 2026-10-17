@@ -303,7 +303,6 @@ const CHART_RANGE_WINDOWS = {
   "1y": 365 * 24 * 60 * 60 * 1000,
   total: Infinity
 };
-const CHART_RANGE_ORDER = ["1m", "1h", "1d", "1w", "1mo", "6mo", "1y", "total"];
 
 const CURRENCY_META = {
   usd: { code: "USD", label: "USD", locale: "en-US" },
@@ -332,7 +331,6 @@ const DEFAULT_PREFS = {
   plan: null
 };
 
-const TOGGLEABLE_COLUMNS = ["priority", "targets", "tpSignal"];
 // Trío inversión/tokens/entrada: con dos datos se deriva el tercero.
 const TRIAD_FIELDS = ["investment", "tokens", "entryPrice"];
 // Opciones del selector de orden (móvil y escritorio). Incluye claves que
@@ -568,8 +566,6 @@ const dom = {
   sheetBackdrop: document.getElementById("sheetBackdrop")
 };
 
-init();
-
 function t(key, vars = {}) {
   const language = state?.prefs?.language && TRANSLATIONS[state.prefs.language]
     ? state.prefs.language
@@ -648,31 +644,6 @@ function formatRelativeTime(timestampMs, future = false) {
     return t(future ? "time.inHours" : "time.hours", { n: hours });
   }
   return t("time.days", { n: Math.floor(hours / 24) });
-}
-
-// Etiqueta bajo la celda de posición: indica qué campo del trío se está
-// calculando automáticamente (o el origen de la entrada si no hay ninguno).
-function getAutoFieldLabel(row, metrics) {
-  if (row.derivedField === "investment") {
-    return t("table.fields.autoInvestment");
-  }
-  if (row.derivedField === "tokens") {
-    return t("table.fields.autoTokens");
-  }
-  if (row.derivedField === "entryPrice") {
-    return t("table.fields.entryDerived");
-  }
-  return getEntrySourceLabel(metrics.entrySource);
-}
-
-function getEntrySourceLabel(source) {
-  if (source === "manual") {
-    return t("table.fields.entryManual");
-  }
-  if (source === "derived") {
-    return t("table.fields.entryDerived");
-  }
-  return t("table.fields.entryMissing");
 }
 
 function getPortfolioName() {
@@ -2469,12 +2440,6 @@ function bindNews() {
   });
 }
 
-function renderMarketsTab() {
-  // Trae el top por capitalización si la caché está caducada (una sola llamada).
-  fetchTopMarkets();
-  renderMarketsRanking();
-}
-
 // Blocklist de activos que no aportan a una tabla general de mercado:
 // stablecoins y derivados envueltos/tokenizados/con staking líquido.
 const WRAPPED_SYMBOLS = new Set([
@@ -4000,31 +3965,6 @@ function getPortfolio24hChange(snapshot) {
   return base > 0 ? { pct: (delta / base) * 100, delta } : null;
 }
 
-// Posiciones con su siguiente TP pendiente, ordenadas por cercanía.
-function getNextTpCandidates(snapshot) {
-  return snapshot.items
-    .map(({ row, metrics }) => {
-      if (!(metrics.currentPrice > 0)) {
-        return null;
-      }
-      const targets = [["TP1", metrics.tp1], ["TP2", metrics.tp2], ["TP3", metrics.tp3]]
-        .filter(([, value]) => value > 0);
-      const next = targets.find(([, value]) => metrics.currentPrice < value);
-      if (!next) {
-        return null;
-      }
-      return {
-        row,
-        metrics,
-        label: next[0],
-        target: next[1],
-        pct: (next[1] / metrics.currentPrice - 1) * 100
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.pct - b.pct);
-}
-
 function summaryIconSvg(name) {
   const icons = {
     invested: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M15 9.2c-.6-.8-1.7-1.2-3-1.2-1.8 0-3 .8-3 2s1.2 1.7 3 2 3 .8 3 2-1.2 2-3 2c-1.3 0-2.4-.4-3-1.2"/></svg>',
@@ -4516,56 +4456,6 @@ function renderInsights(insights) {
   ];
 
   dom.insightsRankingsGrid.innerHTML = rankingCards.map(renderRankingCard).join("");
-}
-
-// Rentabilidad del portafolio en una ventana temporal según el historial.
-function getHistoryChangePct(windowMs) {
-  const points = state.history.filter((point) => point.currency === state.prefs.currency);
-  if (points.length < 2) {
-    return null;
-  }
-  const last = Number(points[points.length - 1].total || 0);
-  if (!(last > 0)) {
-    return null;
-  }
-  const cutoff = Date.now() - windowMs;
-  let base = null;
-  for (const point of points) {
-    if (new Date(point.at).getTime() >= cutoff) {
-      base = Number(point.total || 0);
-      break;
-    }
-  }
-  if (base === null) {
-    return null;
-  }
-  if (!(base > 0)) {
-    base = Number(points[0].total || 0);
-  }
-  return base > 0 ? ((last - base) / base) * 100 : null;
-}
-
-// Máxima caída pico-valle registrada en el historial disponible.
-function getMaxDrawdownPct() {
-  const values = state.history
-    .filter((point) => point.currency === state.prefs.currency)
-    .map((point) => Number(point.total || 0))
-    .filter((value) => value > 0);
-  if (values.length < 2) {
-    return null;
-  }
-  let peak = values[0];
-  let maxDrawdown = 0;
-  for (const value of values) {
-    if (value > peak) {
-      peak = value;
-    }
-    const drawdown = ((peak - value) / peak) * 100;
-    if (drawdown > maxDrawdown) {
-      maxDrawdown = drawdown;
-    }
-  }
-  return maxDrawdown;
 }
 
 // Resumen de Analítica: ROI, rentabilidad por periodos, drawdown,
@@ -6395,20 +6285,6 @@ function drawPdfGradientLine(doc, x, y, width) {
   }
 }
 
-function getChartRangeLabel(range) {
-  const labels = {
-    "1h": t("charts.range1h"),
-    "1d": t("charts.range1d"),
-    "1w": t("charts.range1w"),
-    "1mo": t("charts.range1mo"),
-    "6mo": t("charts.range6mo"),
-    "1y": t("charts.range1y"),
-    total: t("charts.rangeTotal")
-  };
-
-  return labels[resolveChartRange(range)] || labels.total;
-}
-
 function buildPdfPieChartImage(snapshot) {
   if (typeof Chart === "undefined") return null;
   const meaningfulItems = snapshot.items.filter(
@@ -7001,19 +6877,6 @@ function bindEnvironmentEvents() {
   }
 }
 
-function queueSuggestionLookup(rowId, query) {
-  clearSearchTimer(rowId);
-  if (!query.trim()) {
-    return;
-  }
-
-  const timerId = window.setTimeout(() => {
-    fetchRowSuggestions(rowId, query);
-  }, SEARCH_DELAY);
-
-  state.searchTimers.set(rowId, timerId);
-}
-
 function clearSearchTimer(rowId) {
   const timerId = state.searchTimers.get(rowId);
   if (timerId) {
@@ -7040,51 +6903,6 @@ function clearAllTimers() {
   state.blurTimers.forEach((timerId) => window.clearTimeout(timerId));
   state.searchTimers.clear();
   state.blurTimers.clear();
-}
-
-async function fetchRowSuggestions(rowId, query) {
-  clearSearchTimer(rowId);
-  const row = getRowById(rowId);
-  if (!row || normalizeSearchText(row.crypto) !== normalizeSearchText(query)) {
-    return;
-  }
-
-  const nonce = Date.now() + Math.random();
-  row.lookupNonce = nonce;
-  row.priceStatus = "loading";
-  row.priceMessage = t("row.searching");
-  updateLiveRowUi(row.id);
-
-  try {
-    const coins = await searchCoins(query);
-    const liveRow = getRowById(rowId);
-    if (!liveRow || liveRow.lookupNonce !== nonce) {
-      return;
-    }
-
-    liveRow.suggestions = coins.slice(0, 6);
-    liveRow.suggestionsOpen = liveRow.suggestions.length > 0;
-    if (!coins.length) {
-      liveRow.priceStatus = "not_found";
-      liveRow.priceMessage = t("row.noMatches");
-    } else {
-      liveRow.priceStatus = "idle";
-      liveRow.priceMessage = "";
-    }
-
-    updateLiveRowUi(rowId);
-  } catch (error) {
-    const liveRow = getRowById(rowId);
-    if (!liveRow || liveRow.lookupNonce !== nonce) {
-      return;
-    }
-
-    liveRow.suggestions = [];
-    liveRow.suggestionsOpen = false;
-    liveRow.priceStatus = "error";
-    liveRow.priceMessage = t("status.apiError");
-    updateLiveRowUi(rowId);
-  }
 }
 
 async function resolveBestMatchForRow(rowId) {
@@ -9078,88 +8896,6 @@ function getTpStatus(metrics) {
   return { tone: "error", label: t("row.farTarget", { target: nextTarget.label }), score: ratio };
 }
 
-// Progreso hacia el siguiente TP en % (100 = alcanzado, null = sin datos).
-function getTpProgressPct(metrics) {
-  const targets = [metrics.tp1, metrics.tp2, metrics.tp3].filter((value) => value > 0);
-  if (!targets.length || !(metrics.currentPrice > 0)) {
-    return null;
-  }
-  const next = targets.find((value) => metrics.currentPrice < value);
-  if (!next) {
-    return 100;
-  }
-  return Math.max(0, Math.min(100, (metrics.currentPrice / next) * 100));
-}
-
-// "#4 · 1,3 B$" — ranking y capitalización global del activo.
-function formatCapLine(row) {
-  if (!Number.isFinite(row.marketCap)) {
-    return "";
-  }
-  const rank = Number.isFinite(row.marketCapRank) ? `#${row.marketCapRank} · ` : "";
-  return `${rank}${formatCompactCurrency(row.marketCap)}`;
-}
-
-// Resumen corto del siguiente objetivo para la tarjeta móvil:
-// "TP1 a +18.0%", "TP3 alcanzado" o "Sin objetivo".
-function getNextTpSummary(metrics, tpStatus = getTpStatus(metrics)) {
-  const targets = [
-    { label: "TP1", value: metrics.tp1 },
-    { label: "TP2", value: metrics.tp2 },
-    { label: "TP3", value: metrics.tp3 }
-  ].filter((target) => target.value > 0);
-
-  if (!targets.length) {
-    return t("row.noTarget");
-  }
-
-  if (!(metrics.currentPrice > 0)) {
-    return tpStatus.label;
-  }
-
-  const next = targets.find((target) => metrics.currentPrice < target.value);
-  if (!next) {
-    return t("row.targetReached", { target: targets[targets.length - 1].label });
-  }
-
-  const pct = (next.value / metrics.currentPrice - 1) * 100;
-  return t("row.nextTpAway", { target: next.label, pct: pct.toFixed(1) });
-}
-
-function renderTpSignal(tpStatus) {
-  return `
-    <span class="signal-badge ${tpStatus.tone}">
-      <span class="signal-dot" aria-hidden="true"></span>
-      ${escapeHtml(tpStatus.label)}
-    </span>
-  `;
-}
-
-function getValidationMessage(metrics) {
-  if (!metrics.investment && !metrics.tokens) {
-    return { text: t("validation.completeInvestmentTokens"), tone: "info" };
-  }
-
-  if (metrics.investment > 0 && metrics.tokens <= 0) {
-    return { text: t("validation.missingTokens"), tone: "error" };
-  }
-
-  if (metrics.tokens > 0 && metrics.investment <= 0) {
-    return { text: t("validation.missingInvestment"), tone: "error" };
-  }
-
-  if (metrics.entryPrice > 0) {
-    const lowerTarget = [metrics.tp1, metrics.tp2, metrics.tp3]
-      .filter((value) => value > 0)
-      .some((value) => value < metrics.entryPrice);
-    if (lowerTarget) {
-      return { text: t("validation.tpBelowEntry"), tone: "error" };
-    }
-  }
-
-  return { text: t("validation.consistent"), tone: "info" };
-}
-
 function renderAssetAvatar(row) {
   if (row.image) {
     return `<img src="${escapeHtml(row.image)}" alt="${escapeHtml(assetDisplayName(row))}" />`;
@@ -9167,116 +8903,6 @@ function renderAssetAvatar(row) {
 
   const label = String(row.symbol || row.crypto || "?").slice(0, 3).toUpperCase();
   return `<span>${escapeHtml(label)}</span>`;
-}
-
-function renderLookupMeta(row) {
-  if (!row.crypto.trim()) {
-    return t("row.coingeckoPending");
-  }
-
-  if (row.priceStatus === "loading") {
-    return t("row.searching");
-  }
-
-  if (row.priceStatus === "success") {
-    return escapeHtml(`${row.resolvedName || row.crypto}${row.symbol ? ` (${row.symbol})` : ""}`);
-  }
-
-  if (row.priceStatus === "not_found") {
-    return t("row.noMatches");
-  }
-
-  if (row.priceStatus === "error") {
-    return escapeHtml(row.priceMessage || t("status.apiError"));
-  }
-
-  if (row.resolvedName) {
-    return escapeHtml(row.resolvedName);
-  }
-
-  return t("row.readyToSearch");
-}
-
-function renderSuggestions(row) {
-  if (!row.suggestions.length) {
-    return "";
-  }
-
-  return row.suggestions
-    .map(
-      (coin) => `
-        <button
-          class="suggestion-btn"
-          type="button"
-          data-action="select-suggestion"
-          data-row-id="${row.id}"
-          data-coin-id="${escapeHtml(coin.id)}"
-        >
-          <img src="${escapeHtml(coin.thumb || "")}" alt="${escapeHtml(coin.name)}" />
-          <span>
-            <strong>${escapeHtml(coin.name)}</strong>
-            <span class="suggestion-symbol">${escapeHtml(String(coin.symbol || "").toUpperCase())}</span>
-          </span>
-          <span class="suggestion-rank">
-            ${coin.market_cap_rank ? t("row.rank", { rank: coin.market_cap_rank }) : t("row.noRank")}
-          </span>
-        </button>
-      `
-    )
-    .join("");
-}
-
-function renderPriceCell(row) {
-  if (!row.crypto.trim()) {
-    return `<span class="empty-cell">${escapeHtml(t("row.noAsset"))}</span>`;
-  }
-
-  if (row.priceStatus === "loading") {
-    return `
-      <span class="price-badge warn">
-        <span class="loader-dot" aria-hidden="true"></span>
-        ${escapeHtml(t("row.querying"))}
-      </span>
-    `;
-  }
-
-  if (row.priceStatus === "not_found") {
-    return `<span class="price-badge warn">${escapeHtml(t("row.notFound"))}</span>`;
-  }
-
-  if (row.priceStatus === "error") {
-    return `<span class="price-badge error">${escapeHtml(row.priceMessage || t("status.apiError"))}</span>`;
-  }
-
-  if (typeof row.currentPrice === "number") {
-    const deltaTone =
-      row.priceChange24h > 0 ? "good" : row.priceChange24h < 0 ? "error" : "warn";
-
-    return `
-      <div class="price-stack">
-        <strong class="money">${formatCurrency(row.currentPrice, getPriceDigits(row.currentPrice))}</strong>
-        <span class="delta-chip ${deltaTone}">
-          24h ${formatSignedPercent(row.priceChange24h || 0)}
-        </span>
-        <span class="price-subline">${row.lastPriceAt ? escapeHtml(t("row.sync", { time: formatClock(new Date(row.lastPriceAt)) })) : "CoinGecko"}</span>
-      </div>
-    `;
-  }
-
-  return `<span class="empty-cell">${escapeHtml(t("row.noPrice"))}</span>`;
-}
-
-function lookupToneClass(row) {
-  if (row.priceStatus === "success") {
-    return "good";
-  }
-  if (row.priceStatus === "loading" || row.priceStatus === "not_found") {
-    return "warn";
-  }
-  if (row.priceStatus === "error") {
-    return "error";
-  }
-  return "";
 }
 
 function getRowById(rowId) {
@@ -10331,3 +9957,11 @@ function safeParse(value) {
     return null;
   }
 }
+
+// ── Arranque ──
+// init() va AL FINAL del fichero a proposito. Las funciones se elevan, pero
+// las const/let de modulo no: si init() corriera antes de que se evaluase
+// alguna, el primer acceso lanzaria un ReferenceError (zona muerta temporal)
+// y la app se quedaria en blanco. Paso cuatro veces mientras init() estaba a
+// mitad del fichero; aqui ya no puede pasar, se declare donde se declare.
+init();

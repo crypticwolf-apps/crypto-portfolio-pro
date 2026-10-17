@@ -10,10 +10,11 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 
 - **Carpeta:** `D:\Mega\Proyectos\Proyecto mixto\Portafolio Crypto`
 - **Qué es:** PWA de cartera de criptomonedas en JavaScript vanilla, **sin build**.
-  Ficheros: `index.html`, `app.js` (~8.400 líneas), `styles.css`, `i18n.js`,
-  `finance.js` (cálculos puros + tests con Vitest), `sw.js`.
+  Ficheros: `index.html`, `app.js` (~10.000 líneas), `styles.css`, `i18n.js`,
+  `finance.js` (cálculos puros + tests con Vitest), `sw.js`, y `api/cg.js`
+  (proxy serverless de CoinGecko; la clave va en `COINGECKO_API_KEY` en Vercel).
 - **Repositorio:** `crypticwolf-apps/crypto-portfolio-pro` (**público**, no metas
-  secretos). Se publica en GitHub Pages mediante un workflow de Actions.
+  secretos). Vercel despliega solo en cada push a `main`.
 - **Web:** https://cartera.cryptoatalaya.com/ (Vercel, unico sitio vivo; despliega solo en cada push a main)
 - **Idioma:** todo en español y sin acentos en código e i18n, por convención previa.
 
@@ -23,9 +24,9 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
    ficheros tocados a `crypto-portfolio-pwa\` y `android-build\www\`.
 2. **Subir al terminar cada bloque:** `git add` → `commit` → `git fetch` +
    `git rebase origin/main` → `push`. Nunca `--force`.
-3. **Verificar el despliegue:** `gh run list --limit 1`. GitHub falla a veces con
-   429/503 al descargar sus propias acciones; se arregla con
-   `gh run rerun --failed` (no es fallo del código).
+3. **Verificar el despliegue:** Vercel publica su resultado en el commit de
+   GitHub. `gh api repos/crypticwolf-apps/crypto-portfolio-pro/commits/<sha>/status`
+   debe dar `state: success` con contexto `Vercel`.
 4. **Verificar en el navegador antes de dar nada por bueno**, comprobando
    **visibilidad real** (altura > 0), no solo que el HTML exista en el DOM.
 
@@ -39,8 +40,14 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
   **enumera los nombres uno a uno**
   (`body[data-active-tab="X"] .tab-section[data-tab="X"]`). Si añades o renombras
   una pestaña hay que añadirla ahí, o quedará invisible aunque su HTML exista.
-- **TDZ:** `init()` se llama a mitad de `app.js` (~línea 350). Cualquier `const`
-  que se use en el arranque debe declararse **antes** de esa llamada.
+- **TDZ (resuelto de raíz):** `init()` está ahora en la **última línea** de
+  `app.js`, así que toda `const`/`let` de módulo existe antes del arranque. Rompió
+  la app en blanco cuatro veces mientras estaba a mitad del fichero. **No volver
+  a subir la llamada.**
+- **Probar con datos reales:** arrancar con datos de demostración vírgenes no
+  recorre todos los caminos (sin historial de precios, sin operaciones, sin
+  alertas). Un fallo de arranque pasó todas las pruebas así y rompió la app de
+  verdad. Las pruebas de arranque deben sembrar historial, operaciones y alertas.
 - **Borrados en bloque:** limpiar por rangos ya se ha llevado por delante
   funciones y estilos vecinos dos veces. Tras cualquier limpieza, comprobar que
   las clases clave conservan estilos (`.tp-fold-sum`, `.more-fold-sum`,
@@ -64,71 +71,32 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 
 ## Estado actual
 
-Pestañas: **Portafolio · Noticias · Plan · Analítica · Más**. Portafolio va en el
-centro del menú inferior, destacado y sobresaliendo con relieve 3D.
+Pestañas: **Noticias · Plan · Portafolio · Analítica · Ajustes**. Portafolio en el
+centro del menú inferior, destacado y sobresaliendo.
 
-**Noticias** lee el feed del proyecto hermano *Crypto Atalaya*
-(`https://cryptoatalaya.com/data/feed.json`), generado por su bot de Telegram.
-Solo lectura, sin claves. El CORS ya está habilitado en el Caddy de ese servidor
-(`Access-Control-Allow-Origin: *` limitado a `/data/*`; `/api/*` no lo lleva a
-propósito). Muestra hora, categoría, titular e impacto 0-100, con cuerpo
-desplegable, filtros por categoría y copia local para leer sin conexión.
+- **Acciones rápidas:** Ajustes ⚙ · Comprar · Vender · Activo +.
+- **Menú del engranaje:** Añadir alerta · Descargar PDF · Compartir PDF ·
+  Exportar CSV · Importar CSV.
+- **Precios en vivo:** WebSocket de Binance (Kraken de reserva), GeckoTerminal
+  para tokens DEX por red + contrato, CoinGecko para el resto y para metadatos.
+  Interruptor y estado en Ajustes → Preferencias y Diagnóstico.
+- **Alertas** guardadas, editables y borrables (Ajustes → Alertas): por TP de un
+  activo, por TP en todos los activos, por precio, o por valor total de cartera.
+- **Compras y ventas** editables y borrables en Analítica; borrar o editar
+  deshace su efecto exacto sobre la posición.
+- **Noticias** del feed de Crypto Atalaya (`cryptoatalaya.com/data/feed.json`,
+  CORS `*` en `/data/*`). Sin etiquetas ni enlace a la fuente en la tarjeta.
+- **Ordenación:** "Rentabilidad %" (`pnlPct`) y "Ganancia en dinero" (`pnlUsd`).
 
-Acciones rápidas actuales de Portafolio: **Añadir · Comprar · Vender · Plan**.
-El menú inferior "Añadir" (lo abre `#quickAddBtn`) contiene: Nueva posición,
-Registrar compra, Registrar venta, Añadir alerta, Descargar PDF, Importar CSV.
+## Pendiente
 
-> Ya hecho en la sesión anterior: en la cabecera de **Noticias** hay enlaces al
-> canal de Telegram y a la web de Crypto Atalaya, y el pie de "Más" describe el
-> canal con ambos enlaces.
-
-## Lo que quiero hacer ahora
-
-### 1. Acciones rápidas de Portafolio
-
-- **Sustituir el botón "Plan" por uno de "Añadir activo"**: icono **símbolo +** y
-  debajo la etiqueta **"Activo"**. Debe crear una posición nueva directamente
-  (ya existe `handleAddRow`).
-- **Cambiar el botón "Añadir"** (`#quickAddBtn`): icono de **engranaje** y
-  etiqueta **"Ajustes"**. Sigue abriendo el mismo menú inferior.
-
-Resultado: **Ajustes ⚙ · Comprar · Vender · Activo +**
-
-### 2. Menú inferior (barra de navegación)
-
-Sustituir la pestaña **"Más"** (icono de tres puntos) por **"Ajustes"** con icono
-de **engranaje**, a juego con el botón anterior.
-
-> Los dos "Ajustes" son **independientes a propósito**: el de acciones rápidas
-> abre el menú inferior y la pestaña lleva a la seccion de preferencias. No hay
-> que unificarlos.
-
-### 3. Menú "Añadir" (el que abre el engranaje)
-
-- **Quitar** "Nueva posición" (ahora tiene su propio botón +).
-- **Quitar** "Registrar compra" y "Registrar venta" (redundantes: ya están en las
-  acciones rápidas).
-- **Añadir** "Exportar CSV" (ya existe `handleExportCsv`).
-- **Añadir** "Compartir PDF": enviar el PDF **directamente** con la hoja de
-  compartir del móvil (Web Share API con ficheros,
-  `navigator.canShare({ files })`), **sin descargarlo**. Si el dispositivo no lo
-  admite, caer a la descarga actual. Base: `handleDownloadPdf`.
-
-Resultado del menú: **Añadir alerta · Descargar PDF · Compartir PDF ·
-Exportar CSV · Importar CSV**.
-
-### 4. Ordenación de Posiciones
-
-La opción actual **"Beneficio / Pérdida"** (`sort.pnl`) ordena en realidad por
-**porcentaje** (`pnlPct`), lo cual confunde.
-
-- Renombrarla a algo inequívoco de rendimiento, p. ej. **"Rentabilidad %"**.
-- **Añadir una opción nueva** que ordene por **beneficio/pérdida en dinero total**
-  de cada activo (`metrics.pnlUsd`), con nombre distinto y claro, p. ej.
-  **"Ganancia en dinero"**.
-
-`SORT_OPTIONS` está en `app.js`; el `switch` de comparación cerca de la línea
-7288; las etiquetas en `i18n.js` (`sort.*`).
+- **Franja bajo el dock en iOS (app instalada):** sin resolver. Dos diagnósticos
+  fallidos sin poder reproducirlo. Hace falta inspeccionarlo en el propio iPhone
+  (Safari → Desarrollo → el iPhone) para ver qué elemento pinta esa banda.
+- **Fase 4 de precios:** ATH, ATL, supply, categorías, descripción y enlaces
+  oficiales de CoinGecko en el detalle del activo.
+- **GitHub Pages:** el workflow ya no existe, pero la copia vieja sigue servida
+  hasta poner Settings → Pages → Source en *None*.
 
 ## Cómo quiero que trabajes
 

@@ -97,8 +97,9 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  // La clave va en CABECERA, no en la URL: una URL con secreto acaba en
+  // registros de proxies y servidores. CoinGecko acepta las dos formas.
   const key = process.env.COINGECKO_API_KEY;
-  if (key) params.set('x_cg_demo_api_key', key);
 
   const query = params.toString();
   const target = `${CG_BASE}${cgPath}${query ? `?${query}` : ''}`;
@@ -120,7 +121,7 @@ module.exports = async function handler(req, res) {
     let upstream;
     try {
       upstream = await fetch(target, {
-        headers: { accept: 'application/json' },
+        headers: { accept: 'application/json', ...(key ? { 'x-cg-demo-api-key': key } : {}) },
         signal: controller.signal,
       });
     } finally {
