@@ -2628,6 +2628,11 @@ body { background-image: none; }
   inset: 0;
   z-index: -1;
   pointer-events: none;
+  /* Abajo del todo tiene que quedar el color base liso: es el mismo que se
+     manda como theme-color, y Safari pinta su barra inferior con el. Si aqui
+     queda un tinte, se ve una franja con borde duro bajo el dock. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 96%);
+  mask-image: linear-gradient(to bottom, #000 72%, transparent 96%);
   background-image:
     radial-gradient(ellipse 55% 40% at 10% 0%, rgba(90, 171, 255, 0.17), transparent 65%),
     radial-gradient(ellipse 45% 35% at 92% 6%, rgba(62, 255, 168, 0.13), transparent 60%),
@@ -4192,11 +4197,11 @@ body[data-active-tab="more"] .tab-section[data-tab="more"] {
     border: 1px solid var(--glass-border);
     border-radius: 26px;
     padding: 6px;
-    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 12px 36px rgba(1, 6, 14, 0.45);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 -6px 22px -8px rgba(1, 6, 14, 0.55);
   }
 
   :root[data-theme="light"] .tab-bar {
-    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 12px 36px rgba(14, 40, 70, 0.16);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 -6px 22px -8px rgba(14, 40, 70, 0.18);
   }
 
   .tab-btn {
