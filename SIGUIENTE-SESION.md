@@ -113,6 +113,17 @@ centro del menú inferior, destacado y sobresaliendo.
 
 ## Pendiente
 
+- **Activar el lector de Ethereum/Solana (lo hace el usuario):** Alchemy no
+  dejaba crear cuenta. Cuando se pueda: dashboard.alchemy.com → crear app →
+  copiar la API Key → Vercel → Settings → Environment Variables →
+  `ALCHEMY_API_KEY` → **Redeploy** (sin redeploy no se aplica). Hasta entonces
+  Bitcoin funciona y Ethereum/Solana muestran el aviso "falta la clave".
+  Después, **probar con una dirección real**: el formato de Alchemy se sacó de
+  su herramienta oficial (`@alchemy/mcp-server`), no de una respuesta real.
+  Si algo no cuadra, el normalizador es `normalizeAlchemyTokens` en
+  `api/wallet.js` (con pruebas en `tests/wallet-proxy.test.js`).
+- **Clave de CoinGecko:** `COINGECKO_API_KEY` en Vercel sigue sin poner
+  (funciona sin ella, con menos límite y sin precio histórico por fecha).
 - **Billeteras, fase 2:** xpub de Bitcoin (Ledger/Trezor), escanear QR, coste
   estimado por fecha de llegada de cada token, más redes (Tron, TON, Sui).
 
