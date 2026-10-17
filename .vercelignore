@@ -1,0 +1,3 @@
+# Lo que no forma parte de la web publicada: pruebas e integracion continua.
+tests/
+.github/
