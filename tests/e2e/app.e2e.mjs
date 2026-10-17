@@ -5,7 +5,7 @@
 // flujos criticos a 375 y 320 px. Toda la red esta simulada: CoinGecko, el
 // feed de noticias, Binance (REST y WebSocket), GeckoTerminal y el CDN, cuyos
 // ficheros se sirven desde node_modules con la MISMA version que piden las URL
-// de app.js (se comprueba al empezar).
+// de la app en js/ (se comprueba al empezar).
 //
 // Uso: npm run test:e2e  (necesita Chromium: npx playwright-core install chromium)
 // Sale con codigo 1 si falla cualquier paso, para que la integracion continua
@@ -46,12 +46,13 @@ const CDN = [
   { patron: "**/jspdf-autotable@*/**", paquete: "jspdf-autotable", fichero: "dist/jspdf.plugin.autotable.min.js" }
 ];
 function comprobarVersionesCdn() {
-  const app = fs.readFileSync(path.join(RAIZ, "app.js"), "utf8");
+  const dir = path.join(RAIZ, "js");
+  const app = fs.readdirSync(dir).filter((f) => f.endsWith(".js")).map((f) => fs.readFileSync(path.join(dir, f), "utf8")).join("\n");
   const desfases = [];
   for (const { paquete } of CDN) {
     const enApp = app.match(new RegExp(`cdn\\.jsdelivr\\.net/npm/${paquete.replace(".", "\\.")}@([\\d.]+)`))?.[1];
     const instalada = JSON.parse(fs.readFileSync(path.join(MODULOS, paquete, "package.json"), "utf8")).version;
-    if (enApp !== instalada) desfases.push(`${paquete}: app.js pide ${enApp}, package.json instala ${instalada}`);
+    if (enApp !== instalada) desfases.push(`${paquete}: la app pide ${enApp}, package.json instala ${instalada}`);
   }
   return desfases;
 }

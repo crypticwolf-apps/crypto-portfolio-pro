@@ -10,9 +10,15 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 
 - **Carpeta:** `D:\Mega\Proyectos\Proyecto mixto\Portafolio Crypto`
 - **Qué es:** PWA de cartera de criptomonedas en JavaScript vanilla, **sin build**.
-  Ficheros: `index.html`, `app.js` (~10.000 líneas), `styles.css`, `i18n.js`,
-  `finance.js` (cálculos puros + tests con Vitest), `sw.js`, y `api/cg.js`
-  (proxy serverless de CoinGecko; la clave va en `COINGECKO_API_KEY` en Vercel).
+  Ficheros: `index.html`, la app en **`js/`** (18 scripts por tema: `config.js`
+  primero, `arranque.js` el último), `styles.css`, `i18n.js`, `finance.js`
+  (cálculos puros + tests con Vitest), `sw.js`, y `api/cg.js` (proxy serverless
+  de CoinGecko; la clave va en `COINGECKO_API_KEY` en Vercel).
+- **Scripts clásicos, no módulos ES:** la APK abre la app desde `file://` y ahí
+  `import`/`export` no cargan. Los 18 ficheros comparten el ámbito global y se
+  ejecutan en el orden de `index.html`. Reglas en la cabecera de `js/config.js`;
+  un fichero nuevo va en `index.html` (antes de `arranque.js`) y en `APP_SHELL`
+  de `sw.js`.
 - **Repositorio:** `crypticwolf-apps/crypto-portfolio-pro` (**público**, no metas
   secretos). Vercel despliega solo en cada push a `main`.
 - **Web:** https://cartera.cryptoatalaya.com/ (Vercel, unico sitio vivo; despliega solo en cada push a main)
@@ -21,7 +27,8 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 ## Reglas de trabajo (importantes)
 
 1. **Tres copias:** la raíz es la fuente. Tras cada cambio hay que copiar los
-   ficheros tocados a `crypto-portfolio-pwa\` y `android-build\www\`.
+   ficheros tocados a `crypto-portfolio-pwa\` y `android-build\www\` (la
+   carpeta `js\` entera; el antiguo `app.js` ya no se usa).
 2. **Subir al terminar cada bloque:** `git add` → `commit` → `git fetch` +
    `git rebase origin/main` → `push`. Nunca `--force`.
 3. **Verificar el despliegue:** Vercel publica su resultado en el commit de
@@ -29,6 +36,10 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
    debe dar `state: success` con contexto `Vercel`.
 4. **Verificar en el navegador antes de dar nada por bueno**, comprobando
    **visibilidad real** (altura > 0), no solo que el HTML exista en el DOM.
+5. **Pruebas:** `npm install` y `npm run test:all` (Vitest + recorrido completo
+   en Chromium a 375 y 320 px con datos realistas, `tests/e2e/app.e2e.mjs`).
+   GitHub Actions las pasa solas en cada push: si sale una cruz roja en el
+   commit, algo se ha roto. Vercel publica igualmente, no espera a las pruebas.
 
 ## Trampas ya conocidas (no repetirlas)
 
@@ -40,10 +51,11 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
   **enumera los nombres uno a uno**
   (`body[data-active-tab="X"] .tab-section[data-tab="X"]`). Si añades o renombras
   una pestaña hay que añadirla ahí, o quedará invisible aunque su HTML exista.
-- **TDZ (resuelto de raíz):** `init()` está ahora en la **última línea** de
-  `app.js`, así que toda `const`/`let` de módulo existe antes del arranque. Rompió
-  la app en blanco cuatro veces mientras estaba a mitad del fichero. **No volver
-  a subir la llamada.**
+- **TDZ (resuelto de raíz):** `init()` está en la **última línea** de
+  `js/arranque.js`, el último script, así que toda `const`/`let` existe antes
+  del arranque. Rompió la app en blanco cuatro veces cuando estaba a mitad del
+  antiguo `app.js`. **No moverla.** Y ningún fichero puede usar al cargar (fuera
+  de una función) algo declarado en un fichero posterior.
 - **Probar con datos reales:** arrancar con datos de demostración vírgenes no
   recorre todos los caminos (sin historial de precios, sin operaciones, sin
   alertas). Un fallo de arranque pasó todas las pruebas así y rompió la app de
@@ -90,9 +102,6 @@ centro del menú inferior, destacado y sobresaliendo.
 
 ## Pendiente
 
-- **Franja bajo el dock en iOS (app instalada):** sin resolver. Dos diagnósticos
-  fallidos sin poder reproducirlo. Hace falta inspeccionarlo en el propio iPhone
-  (Safari → Desarrollo → el iPhone) para ver qué elemento pinta esa banda.
 - **Fase 4 de precios:** ATH, ATL, supply, categorías, descripción y enlaces
   oficiales de CoinGecko en el detalle del activo.
 - **GitHub Pages:** el workflow ya no existe, pero la copia vieja sigue servida

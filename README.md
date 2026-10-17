@@ -16,7 +16,8 @@ Aplicación web (PWA instalable) para gestionar inversiones en criptomonedas: ta
 
 ## Estructura
 
-- Carpeta raíz y `crypto-portfolio-pwa/`: la app (copias sincronizadas). `index.html`, `app.js`, `i18n.js`, `styles.css`, `sw.js`, `manifest.webmanifest`, iconos.
+- Carpeta raíz y `crypto-portfolio-pwa/`: la app (copias sincronizadas). `index.html`, `js/` (la app en 18 scripts por tema, cargados en orden), `i18n.js`, `finance.js`, `styles.css`, `sw.js`, `manifest.webmanifest`, iconos.
+- `tests/`: pruebas de extremo a extremo en navegador (`npm run test:e2e`); `finance.test.js` con Vitest. Se ejecutan solas en cada push (GitHub Actions).
 - `android-build/`: proyecto Capacitor para generar el APK (la web vive en `android-build/www`). Ver `crypto-portfolio-pwa/COMO-GENERAR-APK.md`.
 
 ## Uso

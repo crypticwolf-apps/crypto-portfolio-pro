@@ -66,7 +66,27 @@
 
     <script src="./i18n.js" defer></script>
     <script src="./finance.js" defer></script>
-    <script src="./app.js" defer></script>
+    <!-- La app, en scripts clasicos que comparten el ambito global y se
+         ejecutan en este orden (defer). config.js primero; arranque.js el
+         ultimo, porque llama a init(). Reglas en la cabecera de config.js. -->
+    <script src="./js/config.js" defer></script>
+    <script src="./js/utilidades.js" defer></script>
+    <script src="./js/datos.js" defer></script>
+    <script src="./js/red.js" defer></script>
+    <script src="./js/precios.js" defer></script>
+    <script src="./js/envivo.js" defer></script>
+    <script src="./js/cartera.js" defer></script>
+    <script src="./js/editor.js" defer></script>
+    <script src="./js/detalle.js" defer></script>
+    <script src="./js/operaciones.js" defer></script>
+    <script src="./js/alertas.js" defer></script>
+    <script src="./js/plan.js" defer></script>
+    <script src="./js/analitica.js" defer></script>
+    <script src="./js/mercados.js" defer></script>
+    <script src="./js/noticias.js" defer></script>
+    <script src="./js/graficos.js" defer></script>
+    <script src="./js/exportar.js" defer></script>
+    <script src="./js/arranque.js" defer></script>
 
     <script>
       // PWA registration (skipped on file:// where SW is unsupported)

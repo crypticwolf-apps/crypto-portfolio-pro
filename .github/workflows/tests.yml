@@ -27,7 +27,7 @@ jobs:
         run: npm install --no-audit --no-fund --no-package-lock
 
       - name: Sintaxis de los scripts
-        run: for f in app.js i18n.js finance.js sw.js api/cg.js; do node --check "$f"; done
+        run: for f in js/*.js i18n.js finance.js sw.js api/cg.js; do node --check "$f"; done
 
       - name: Calculos financieros (Vitest)
         run: npx vitest run
