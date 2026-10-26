@@ -33,6 +33,14 @@ function walletNetworksText(parts) {
   return labels.join(" · ");
 }
 
+// De donde vino el precio de un token sin listar, segun quien leyo la billetera.
+function walletPriceSource(mode) {
+  if (mode === "coinstats") {
+    return "coinstats";
+  }
+  return mode === "public" ? "geckoterminal" : "alchemy";
+}
+
 // Cantidad de tokens como texto decimal plano (sin "5e-9"), que es lo que
 // guardan las filas y lo que entiende parseDecimal.
 function walletAmountText(value) {
@@ -295,6 +303,7 @@ function renderWalletSheet() {
             ${hidden.map(walletHoldingHtml).join("")}
           </ul>
           ${!shown.length && hidden.length ? `<p class="editor-secondary">${escapeHtml(t("wallet.onlyHidden"))}</p>` : ""}
+          ${shown.some((h) => !h.coinId && !h.linked) ? `<p class="editor-secondary" data-wallet-role="unlistedNote">${escapeHtml(t("wallet.unlistedNote"))}</p>` : ""}
           ${hidden.length ? `<button type="button" class="wallet-toggle-hidden" data-wallet-toggle-hidden>${escapeHtml(t(d.showHidden ? "wallet.hideHidden" : "wallet.showHidden", { n: hidden.length }))}</button>` : ""}`
         : `<p class="movers-empty">${escapeHtml(t("wallet.empty"))}</p>`}
       ${picked.length ? `
@@ -398,7 +407,9 @@ async function loadWalletPreview() {
         const linked = linkedKeys.has(holding.key);
         // Lo que se dejo fuera a proposito no vuelve marcado ni a la vista.
         const visible = holding.visible && !ignored.has(holding.key);
-        return { ...holding, linked, visible, checked: !linked && visible };
+        // Lo que CoinGecko no lista sale visible pero SIN marcar: suele ser
+        // un token regalado para estafar. Se marca a mano si se reconoce.
+        return { ...holding, linked, visible, checked: !linked && visible && Boolean(holding.coinId) };
       })
       .sort((a, b) => (b.value || 0) - (a.value || 0));
     d.address = data.address || d.address;
@@ -500,7 +511,7 @@ function importWalletDraft() {
       walletKey: h.key,
       walletParts: h.parts,
       currentPrice: h.price,
-      priceSource: h.price !== null && !h.market ? "alchemy" : null,
+      priceSource: h.price !== null && !h.market ? walletPriceSource(d.source) : null,
       priceStatus: h.price !== null ? "success" : "idle",
       lastPriceAt: h.price !== null ? new Date().toISOString() : null
     });
@@ -581,6 +592,17 @@ async function syncWallet(walletId, { manual = false } = {}) {
         priceNow: row.currentPrice
       });
       row.walletParts = holding ? holding.parts : [];
+      // Token sin listar en CoinGecko: si GeckoTerminal no lo cotiza, el
+      // precio que trae la lectura de la billetera lo mantiene al dia.
+      if (holding && isDexOnlyRow(row) && holding.priceUsd > 0 && row.priceSource !== "geckoterminal" && !freshQuoteFor(row)) {
+        const rate = liveConversionRate();
+        if (rate) {
+          row.currentPrice = holding.priceUsd * rate;
+          row.priceSource = walletPriceSource(data.mode);
+          row.priceStatus = "success";
+          row.lastPriceAt = new Date().toISOString();
+        }
+      }
       if (result.change === "same") {
         return;
       }

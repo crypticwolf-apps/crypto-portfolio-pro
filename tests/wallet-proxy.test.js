@@ -393,3 +393,112 @@ describe("handler sin cuenta", () => {
     expect(res.body.assets[0]).toMatchObject({ coinId: "solana", amount: "1" });
   });
 });
+
+// ── CoinStats (forma tomada de una respuesta real de /wallet/balance) ──
+
+describe("CoinStats", () => {
+  const DEGEN = "0x4ed4e862860bed51a9570b96d89af5e1b0efefed";
+  const CG = {
+    byContract: W.buildCoinGeckoMap([
+      { id: "degen-base", symbol: "degen", platforms: { base: DEGEN } },
+      { id: "binance-bridged-usdt-bnb-smart-chain", symbol: "usdt", platforms: { "binance-smart-chain": "0x55d398326f99059ff775485246999027b3197955" } }
+    ]),
+    byId: W.buildCoinIndex([
+      { id: "degen-base", symbol: "degen", name: "Degen", platforms: {} },
+      { id: "dolphin-2", symbol: "pod", name: "Dolphin", platforms: {} },
+      { id: "otra-cosa", symbol: "zzz", name: "Otra", platforms: {} }
+    ])
+  };
+  const REAL = [
+    { coinId: "ethereum", amount: 3.128822813472737, chain: "base", name: "Ethereum", symbol: "ETH", price: 2326.77, imgUrl: "https://static.coinstats.app/coins/1650455629727.png", connectionId: "base-wallet" },
+    { coinId: "degen-base", amount: 3000574.185146692, chain: "base", name: "Degen", symbol: "DEGEN", price: 0.00089, contractAddress: DEGEN, decimals: 18, connectionId: "base-wallet" },
+    { coinId: "dolphin-2", amount: 962.70, chain: "base", name: "Dolphin", symbol: "POD", price: 0.42, contractAddress: "0xed664536023d8e4b1640c394777d34abaff1df8f", decimals: 18 },
+    { coinId: "0x3cc0d3ecc81ba57abf3494abc8d4cb0a43410b07_base", amount: 475372908.28, chain: "base", name: "GMonchain", symbol: "GM", price: 1.47e-7, contractAddress: "0x3cc0d3ecc81ba57abf3494abc8d4cb0a43410b07", decimals: 18 },
+    { coinId: "otra-cosa", amount: 5, chain: "base", name: "Falsa", symbol: "ABC", price: 3, contractAddress: "0x1234567890123456789012345678901234567890", decimals: 18 },
+    { coinId: "binance-coin", amount: 0.5, chain: "binance_smart", name: "BNB", symbol: "BNB", price: 600 },
+    { coinId: "tether", amount: 10, chain: "binance_smart", name: "Tether", symbol: "USDT", price: 1, contractAddress: "0x55d398326f99059ff775485246999027b3197955", decimals: 18 },
+    { coinId: "ethereum", amount: 0.00000005, chain: "linea", name: "Ethereum", symbol: "ETH", price: 2326.77 },
+    { coinId: "nada", amount: 0, chain: "base", name: "Cero", symbol: "CERO", price: 1 }
+  ];
+
+  it("normaliza: red de la app, id por contrato, id de CoinStats solo si el simbolo cuadra", () => {
+    const a = W.normalizeCoinStats(REAL, CG);
+    expect(a).toHaveLength(8);
+    expect(a[0]).toMatchObject({ network: "base", contract: null, coinId: "ethereum", symbol: "ETH", amount: "3.128822813472737", priceUsd: 2326.77 });
+    expect(a[1]).toMatchObject({ network: "base", contract: DEGEN, coinId: "degen-base", decimals: 18 });
+    // Sin contrato en CoinGecko, pero mismo id y mismo simbolo: vale.
+    expect(a[2].coinId).toBe("dolphin-2");
+    // Id inventado de CoinStats para tokens sin listar: sin id.
+    expect(a[3].coinId).toBeNull();
+    // Id que existe en CoinGecko pero de OTRA moneda (simbolo distinto): no cuela.
+    expect(a[4].coinId).toBeNull();
+    // BNB nativo con el id de la app, no el de CoinStats; USDT de BNB por contrato.
+    expect(a[5]).toMatchObject({ network: "bsc", contract: null, coinId: "binancecoin" });
+    expect(a[6]).toMatchObject({ network: "bsc", coinId: "binance-bridged-usdt-bnb-smart-chain" });
+    // Red que la app no lista aparte: se guarda con su nombre; cantidad sin "5e-8".
+    expect(a[7]).toMatchObject({ network: "linea", contract: null, amount: "0.00000005" });
+  });
+
+  it("acepta tambien la respuesta agrupada por red", () => {
+    const a = W.normalizeCoinStats([{ blockchain: "solana", balances: [{ coinId: "solana", amount: 2, symbol: "SOL", name: "Solana", price: 150 }] }], CG);
+    expect(a).toEqual([expect.objectContaining({ network: "solana", coinId: "solana", amount: "2", priceUsd: 150 })]);
+  });
+
+  it("plainNumber nunca devuelve notacion cientifica", () => {
+    expect(W.plainNumber(5e-8)).toBe("0.00000005");
+    expect(W.plainNumber(1.5)).toBe("1.5");
+    expect(W.plainNumber(0)).toBeNull();
+  });
+
+  describe("handler con COINSTATS_API_KEY", () => {
+    let fetchMock;
+    beforeEach(() => {
+      W.reset();
+      fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      process.env.COINSTATS_API_KEY = "cs-clave";
+    });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      delete process.env.COINSTATS_API_KEY;
+    });
+
+    it("EVM: una consulta con connectionId=all y la clave en cabecera, nunca en la URL", async () => {
+      fetchMock.mockImplementation(async (url) => {
+        const u = String(url);
+        if (u.includes("coingecko")) return json([]);
+        return json(REAL.slice(0, 2));
+      });
+      const res = await call(`chain=evm&address=${EVM}`);
+      expect(res.statusCode).toBe(200);
+      expect(res.body.mode).toBe("coinstats");
+      const cs = fetchMock.mock.calls.filter(([u]) => String(u).includes("coinstats"));
+      expect(cs).toHaveLength(1);
+      expect(String(cs[0][0])).toBe(`https://openapiv1.coinstats.app/wallet/balance?address=${EVM}&connectionId=all`);
+      expect(String(cs[0][0])).not.toContain("cs-clave");
+      expect(cs[0][1].headers["X-API-KEY"]).toBe("cs-clave");
+      expect(res.body.assets).toHaveLength(2);
+    });
+
+    it("Solana y Bitcoin usan su connectionId", async () => {
+      fetchMock.mockImplementation(async (url) => (String(url).includes("coingecko") ? json([]) : json([])));
+      await call(`chain=solana&address=${SOL}`);
+      await call("chain=bitcoin&address=bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq");
+      const ids = fetchMock.mock.calls.map(([u]) => String(u)).filter((u) => u.includes("coinstats")).map((u) => new URL(u).searchParams.get("connectionId"));
+      expect(ids).toEqual(["solana", "bitcoin"]);
+    });
+
+    it("si CoinStats falla (clave mala, sin creditos) se lee igual por el camino de siempre", async () => {
+      fetchMock.mockImplementation(async (url) => {
+        const u = String(url);
+        if (u.includes("coinstats")) return json({ statusCode: 401, message: "Unauthorized" }, 401);
+        if (u.startsWith("https://mempool.space/")) return json({ chain_stats: { funded_txo_sum: 100000000, spent_txo_sum: 0 } });
+        return json([]);
+      });
+      const res = await call("chain=bitcoin&address=bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq");
+      expect(res.statusCode).toBe(200);
+      expect(res.body.mode).toBe("public");
+      expect(res.body.assets[0]).toMatchObject({ coinId: "bitcoin", amount: "1" });
+    });
+  });
+});

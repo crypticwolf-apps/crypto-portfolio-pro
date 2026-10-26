@@ -456,20 +456,24 @@ async function casosBilletera(navegador, url, ancho) {
     });
     const r = await leer();
     // ETH (Ethereum + Base en una), USDC y el "SOL" sin listar; el USDC falso
-    // sin precio y el polvo de LINK quedan ocultos.
-    if (r.total !== 5 || r.visibles.length !== 3 || r.marcados !== 3) throw new Error(JSON.stringify(r));
+    // sin precio y el polvo de LINK quedan ocultos. Lo sin listar sale SIN
+    // marcar (suele ser un token regalado para estafar) y con aviso.
+    if (r.total !== 5 || r.visibles.length !== 3 || r.marcados !== 2) throw new Error(JSON.stringify(r));
+    if (!(await page.$('#walletSheet [data-wallet-role="unlistedNote"]'))) throw new Error("falta el aviso de tokens sin listar");
     if (!r.visibles.some((v) => /Ethereum · Base/.test(v))) throw new Error("ETH no se agrupa: " + r.visibles.join(" / "));
     if (r.html) throw new Error("HTML del nombre de un token pintado");
     // Lectura sin cuenta: avisa de que un token pequeno puede no salir.
     if (!(await page.$('#walletSheet [data-wallet-role="publicNote"]'))) throw new Error("falta el aviso del modo sin cuenta");
     await page.click("[data-wallet-toggle-hidden]"); await page.waitForTimeout(200);
     const r2 = await leer();
-    if (r2.visibles.length !== 5 || r2.marcados !== 3) throw new Error("ocultos: " + JSON.stringify(r2));
+    if (r2.visibles.length !== 5 || r2.marcados !== 2) throw new Error("ocultos: " + JSON.stringify(r2));
     const d = await desborde(page); if (d) throw new Error(d);
     await page.click("[data-wallet-toggle-hidden]");
   });
   let ethId = "";
   await paso2("importar al precio de hoy", async () => {
+    // El token sin listar se marca a mano (el usuario lo reconoce).
+    await page.check(`#walletSheet [data-wallet-pick="base:${SOL_FALSO}"]`); await page.waitForTimeout(200);
     await page.click('[data-wallet-cost="today"]');
     await page.click("[data-wallet-import]"); await page.waitForTimeout(900);
     const filas = await filasBilletera(page);

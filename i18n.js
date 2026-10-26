@@ -911,6 +911,7 @@ window.APP_I18N = {
       "wallet.hideHidden": "Ocultar los {n} sin precio o casi sin valor",
       "wallet.alreadyIn": "ya en tu cartera",
       "wallet.unlisted": "sin listar en CoinGecko, precio por contrato",
+      "wallet.unlistedNote": "Los activos sin listar en CoinGecko salen sin marcar: muchos son tokens regalados para estafar. Marca solo los que reconozcas.",
       "wallet.costLabel": "Coste de compra",
       "wallet.costManual": "Lo pongo yo",
       "wallet.costToday": "Precio de hoy",

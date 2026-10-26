@@ -84,7 +84,8 @@ const WALLET_PROXY = typeof location !== "undefined"
 const MAX_WALLETS = 20;
 // Al abrir la app se vuelven a leer las billeteras que lleven mas de esto
 // sin actualizarse (el saldo cambia poco; los precios ya van en vivo aparte).
-const WALLET_STALE_MS = 10 * 60 * 1000;
+// Una hora: cada lectura gasta creditos del proveedor (CoinStats cobra 40).
+const WALLET_STALE_MS = 60 * 60 * 1000;
 const COINGECKO_BASE = COINGECKO_PROXY;
 
 // Free-tier throttle. El API público de CoinGecko admite hoy ~5-15 llamadas

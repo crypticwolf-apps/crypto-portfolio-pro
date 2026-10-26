@@ -13,6 +13,9 @@
 //         Portfolio API, que encuentra todos los tokens. Si Alchemy falla, se
 //         cae al modo sin cuenta. Alchemy admite hasta 5 redes por peticion:
 //         las 7 redes EVM van en dos peticiones en paralelo.
+//   · CON COINSTATS (preferente si existe COINSTATS_API_KEY): su Public API
+//     lee TODOS los tokens de la direccion en todas las redes compatibles
+//     (100+), y tambien Solana y Bitcoin. Si falla, se cae a lo de abajo.
 //   · Bitcoin: mempool.space (sin clave), con blockstream.info de respaldo.
 //   · Cada token se identifica por RED + CONTRATO, nunca por su nombre: un token
 //     basura llamado "USDC" no puede hacerse pasar por el USDC de verdad. El
@@ -32,6 +35,7 @@ const ESPLORA_BASES = ['https://mempool.space/api/', 'https://blockstream.info/a
 const CG_LIST_URL = 'https://api.coingecko.com/api/v3/coins/list?include_platform=true';
 const CG_MARKETS_URL = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&sparkline=false&page=';
 const GECKOTERMINAL_BASE = 'https://api.geckoterminal.com/api/v2/';
+const COINSTATS_BASE = 'https://openapiv1.coinstats.app/';
 
 const ETH = { coinId: 'ethereum', symbol: 'ETH', name: 'Ethereum', decimals: 18 };
 
@@ -377,6 +381,114 @@ async function readAlchemy(address, groups) {
     failedNetworks: failed,
     unlisted: coinMap ? 'checked' : 'unchecked',
     mode: 'alchemy',
+  };
+}
+
+// ── CoinStats (opcional, cobertura completa) ──
+//
+// GET /wallet/balance?address=&connectionId= con la clave en X-API-KEY
+// (40 creditos por consulta). Devuelve una lista plana de activos con la
+// cantidad ya en unidades, precio en USD, contrato y red ("chain").
+
+// connectionId por tipo de direccion: "all" mira todas las redes EVM.
+const COINSTATS_CONNECTION = { evm: 'all', solana: 'solana', bitcoin: 'bitcoin' };
+// "chain" de CoinStats -> id de red de la app (el de GeckoTerminal). Las redes
+// que no estan aqui se guardan con su propio nombre.
+const COINSTATS_CHAINS = {
+  ethereum: 'eth',
+  base: 'base',
+  'arbitrum-one': 'arbitrum',
+  'optimistic-ethereum': 'optimism',
+  'polygon-pos': 'polygon_pos',
+  binance_smart: 'bsc',
+  avalanche: 'avax',
+  solana: 'solana',
+  bitcoin: 'bitcoin',
+};
+// Plataforma de CoinGecko cuando no coincide con el nombre de CoinStats.
+const COINSTATS_PLATFORM = { binance_smart: 'binance-smart-chain' };
+
+/** Numero -> texto decimal sin notacion cientifica ("0.00000005", no "5e-8"). */
+function plainNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n >= 1e-6 && n < 1e21) return String(n);
+  if (n >= 1e21) return BigInt(Math.round(n)).toString();
+  // Muy pequeno: se arma a mano desde la forma exponencial con 15 cifras
+  // significativas, sin arrastrar el error de coma flotante de toFixed.
+  const [mantissa, exponent] = n.toExponential(14).split('e');
+  const digits = mantissa.replace('.', '').replace(/0+$/, '');
+  return `0.${'0'.repeat(-Number(exponent) - 1)}${digits}`;
+}
+
+/** Activos de CoinStats -> formato de la app (cruzando contratos con CoinGecko). */
+function normalizeCoinStats(items, cg) {
+  const flat = (Array.isArray(items) ? items : []).flatMap((item) => (
+    Array.isArray(item?.balances)
+      ? item.balances.map((b) => ({ chain: item.blockchain, ...b }))
+      : [item]
+  ));
+  const assets = [];
+  flat.forEach((item) => {
+    if (!item || typeof item !== 'object') return;
+    const amount = plainNumber(item.amount);
+    const csChain = String(item.chain || item.blockchain || '').trim().toLowerCase();
+    if (!amount || !/^[a-z0-9_.-]{1,40}$/.test(csChain)) return;
+    const network = COINSTATS_CHAINS[csChain] || csChain;
+    const meta = NETWORK_BY_ID[network] || null;
+    const rawContract = item.contractAddress ? String(item.contractAddress).trim() : '';
+    const contract = !rawContract ? null : /^0x[0-9a-fA-F]{40}$/.test(rawContract) ? rawContract.toLowerCase() : rawContract;
+    const platform = meta?.platform || COINSTATS_PLATFORM[csChain] || csChain;
+    const symbol = cleanText(item.symbol || '', 16).toUpperCase();
+
+    let coinId = null;
+    if (!contract && meta) {
+      coinId = meta.native.coinId;
+    } else if (!contract && network === 'bitcoin') {
+      coinId = 'bitcoin';
+    } else if (contract && cg) {
+      coinId = cg.byContract.get(contractKey(platform, contract)) || null;
+    }
+    // El id de CoinStats suele ser el de CoinGecko: se acepta solo si existe
+    // alli Y el simbolo coincide (un id parecido de otra moneda no cuela).
+    if (!coinId && cg && item.coinId && cg.byId.has(item.coinId)
+      && String(cg.byId.get(item.coinId).symbol || '').toUpperCase() === symbol) {
+      coinId = item.coinId;
+    }
+    const decimals = Number.isInteger(item.decimals) ? item.decimals : (meta && !contract ? meta.native.decimals : null);
+    const price = Number(item.price);
+    assets.push({
+      network,
+      contract,
+      symbol,
+      name: cleanText(item.name || item.symbol || '', 48),
+      decimals,
+      amount,
+      priceUsd: Number.isFinite(price) && price > 0 ? price : null,
+      logo: safeLogo(item.imgUrl),
+      coinId,
+    });
+  });
+  return assets;
+}
+
+async function readCoinStats(chain, address) {
+  const key = process.env.COINSTATS_API_KEY;
+  const url = `${COINSTATS_BASE}wallet/balance?address=${encodeURIComponent(address)}&connectionId=${encodeURIComponent(COINSTATS_CONNECTION[chain])}`;
+  const [response, cg] = await Promise.all([
+    fetchWithTimeout(url, { headers: { accept: 'application/json', 'X-API-KEY': key } }),
+    getCoinGeckoData(),
+  ]);
+  if (!response.ok) {
+    throw new UpstreamError(response.status === 429 ? 429 : 502, `CoinStats respondio ${response.status}`);
+  }
+  const json = await response.json();
+  const items = Array.isArray(json) ? json : Array.isArray(json?.result) ? json.result : [];
+  return {
+    assets: normalizeCoinStats(items, cg),
+    failedNetworks: [],
+    unlisted: cg ? 'checked' : 'unchecked',
+    mode: 'coinstats',
   };
 }
 
@@ -793,17 +905,25 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    let read;
-    if (chain === 'bitcoin') {
+    let read = null;
+    if (process.env.COINSTATS_API_KEY) {
+      try {
+        read = await readCoinStats(chain, address);
+      } catch {
+        // CoinStats caido, sin creditos o clave mal: se sigue con lo demas.
+        read = null;
+      }
+    }
+    if (!read && chain === 'bitcoin') {
       read = await readBitcoin(address);
-    } else if (process.env.ALCHEMY_API_KEY) {
+    } else if (!read && process.env.ALCHEMY_API_KEY) {
       try {
         read = await readAlchemy(address, chain === 'solana' ? SOLANA_GROUPS : EVM_GROUPS);
       } catch {
         // Alchemy caido, sin cuota o con la clave mal: se lee igual sin cuenta.
         read = await readPublic(chain, address);
       }
-    } else {
+    } else if (!read) {
       read = await readPublic(chain, address);
     }
     const value = {
@@ -850,6 +970,8 @@ module.exports._internals = {
   satsFromEsplora,
   NETWORKS,
   EVM_GROUPS,
+  normalizeCoinStats,
+  plainNumber,
   encodeAggregate3,
   decodeAggregate3,
   evmCandidates,

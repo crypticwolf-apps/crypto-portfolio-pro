@@ -588,6 +588,9 @@ function priceSourceLabel(row) {
   if (row.priceSource === "coingecko") {
     return "CoinGecko";
   }
+  if (row.priceSource === "coinstats") {
+    return "CoinStats";
+  }
   if (row.priceSource === "alchemy") {
     // Precio que trajo la lectura de la billetera, hasta que llegue el de
     // GeckoTerminal por contrato.

@@ -113,7 +113,19 @@ centro del menú inferior, destacado y sobresaliendo.
 
 ## Pendiente
 
-- **Lector de billeteras SIN cuenta (por defecto):** Alchemy no dejaba crear
+- **CoinStats para el lector de billeteras (lo hace el usuario):** el modo sin
+  cuenta solo mira 9 redes y las 500 monedas principales, y al usuario le
+  faltaban muchos activos. Con `COINSTATS_API_KEY` en Vercel (+ Redeploy) el
+  lector usa CoinStats (`/wallet/balance`, `connectionId=all`, 40 créditos por
+  lectura): todos los tokens en 100+ redes. Formato verificado con su OpenAPI
+  oficial (paquete npm `coinstats-cli`) y con una respuesta real de 215 tokens.
+  La clave se genera en https://openapi.coinstats.app. Las billeteras se
+  releen solas como mucho cada hora (`WALLET_STALE_MS`) para no gastar
+  créditos. Lo que CoinGecko no lista sale sin marcar en la vista previa.
+- **Pendiente de billeteras:** direcciones de otras redes (Tron, TON, XRP,
+  Cardano, Sui…): CoinStats las lee, pero la app aún solo acepta 0x, Solana y
+  Bitcoin; y xpub de Bitcoin (CoinStats lo soporta).
+- **Lector de billeteras SIN cuenta (respaldo):** Alchemy no dejaba crear
   cuenta, así que `api/wallet.js` lee con los nodos públicos de cada red
   (publicnode y oficiales de respaldo): en EVM, nativo + top 500 de CoinGecko
   por Multicall3 (ABI hecha a mano, comprobada byte a byte contra viem); en
