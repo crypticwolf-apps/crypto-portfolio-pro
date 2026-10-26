@@ -133,7 +133,7 @@ async function simularRed(ctx, { proxyCaido = false } = {}) {
     billetera.llamadas.push(`${q.get("chain")}:${q.get("address")}`);
     if (q.get("chain") === "solana") return r.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "missing_key" }) });
     if (q.get("chain") === "bitcoin") return json(r, { chain: "bitcoin", address: q.get("address"), assets: [{ network: "bitcoin", contract: null, symbol: "BTC", name: "Bitcoin", decimals: 8, amount: "0.25", priceUsd: null, logo: null, coinId: "bitcoin" }], failedNetworks: [] });
-    return json(r, { chain: "evm", address: q.get("address"), assets: activosEvm(billetera.version), failedNetworks: [] });
+    return json(r, { chain: "evm", address: q.get("address"), assets: activosEvm(billetera.version), failedNetworks: [], mode: "public" });
   });
   await ctx.route("**api.alternative.me/**", (r) => json(r, { data: [{ value: "55", value_classification: "Greed", timestamp: String(Math.floor(Date.now() / 1000)) }] }));
   for (const lib of CDN) {
@@ -460,6 +460,8 @@ async function casosBilletera(navegador, url, ancho) {
     if (r.total !== 5 || r.visibles.length !== 3 || r.marcados !== 3) throw new Error(JSON.stringify(r));
     if (!r.visibles.some((v) => /Ethereum · Base/.test(v))) throw new Error("ETH no se agrupa: " + r.visibles.join(" / "));
     if (r.html) throw new Error("HTML del nombre de un token pintado");
+    // Lectura sin cuenta: avisa de que un token pequeno puede no salir.
+    if (!(await page.$('#walletSheet [data-wallet-role="publicNote"]'))) throw new Error("falta el aviso del modo sin cuenta");
     await page.click("[data-wallet-toggle-hidden]"); await page.waitForTimeout(200);
     const r2 = await leer();
     if (r2.visibles.length !== 5 || r2.marcados !== 3) throw new Error("ocultos: " + JSON.stringify(r2));

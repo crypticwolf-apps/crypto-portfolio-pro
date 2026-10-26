@@ -113,15 +113,17 @@ centro del menú inferior, destacado y sobresaliendo.
 
 ## Pendiente
 
-- **Activar el lector de Ethereum/Solana (lo hace el usuario):** Alchemy no
-  dejaba crear cuenta. Cuando se pueda: dashboard.alchemy.com → crear app →
-  copiar la API Key → Vercel → Settings → Environment Variables →
-  `ALCHEMY_API_KEY` → **Redeploy** (sin redeploy no se aplica). Hasta entonces
-  Bitcoin funciona y Ethereum/Solana muestran el aviso "falta la clave".
-  Después, **probar con una dirección real**: el formato de Alchemy se sacó de
-  su herramienta oficial (`@alchemy/mcp-server`), no de una respuesta real.
-  Si algo no cuadra, el normalizador es `normalizeAlchemyTokens` en
-  `api/wallet.js` (con pruebas en `tests/wallet-proxy.test.js`).
+- **Lector de billeteras SIN cuenta (por defecto):** Alchemy no dejaba crear
+  cuenta, así que `api/wallet.js` lee con los nodos públicos de cada red
+  (publicnode y oficiales de respaldo): en EVM, nativo + top 500 de CoinGecko
+  por Multicall3 (ABI hecha a mano, comprobada byte a byte contra viem); en
+  Solana, `getTokenAccountsByOwner` (todos los tokens; los no listados se
+  valoran en GeckoTerminal). Falta **probarlo con una dirección real** en la
+  web (desde el entorno de Claude no hay salida a esos nodos). Si un nodo deja
+  de funcionar, la lista está en `PUBLIC_RPCS`.
+- **Alchemy (opcional):** si algún día se pone `ALCHEMY_API_KEY` en Vercel (+
+  Redeploy), se usa para encontrar también tokens pequeños de EVM; si falla,
+  se vuelve solo al modo sin cuenta.
 - **Clave de CoinGecko:** `COINGECKO_API_KEY` en Vercel sigue sin poner
   (funciona sin ella, con menos límite y sin precio histórico por fecha).
 - **Billeteras, fase 2:** xpub de Bitcoin (Ledger/Trezor), escanear QR, coste

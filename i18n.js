@@ -905,6 +905,7 @@ window.APP_I18N = {
       "wallet.err.upstream": "El proveedor de datos no responde ahora. Prueba en un rato.",
       "wallet.partial": "No se pudo leer: {networks}. Lo de esas redes falta; prueba a actualizar luego.",
       "wallet.empty": "No hay activos con saldo en esta direccion.",
+      "wallet.publicNote": "Lectura sin cuenta: se miran la moneda de cada red y las 500 monedas principales. Un token pequeno o muy nuevo puede no salir.",
       "wallet.onlyHidden": "Solo hay activos sin precio o de muy poco valor (ocultos abajo).",
       "wallet.showHidden": "Mostrar {n} ocultos (sin precio o casi sin valor)",
       "wallet.hideHidden": "Ocultar los {n} sin precio o casi sin valor",

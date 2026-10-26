@@ -114,13 +114,6 @@ describe("handler", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("sin clave de Alchemy: 503 claro y sin llamadas", async () => {
-    delete process.env.ALCHEMY_API_KEY;
-    const res = await call(`chain=evm&address=${EVM}`);
-    expect(res.statusCode).toBe(503);
-    expect(res.body.error).toBe("missing_key");
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
 
   it("EVM: dos peticiones (5 + 2 redes), clave en la ruta, paginacion y mapeo", async () => {
     fetchMock.mockImplementation(async (url, opts) => {
@@ -167,12 +160,12 @@ describe("handler", () => {
     expect(res.headers["cache-control"]).toBe("no-store");
   });
 
-  it("si Alchemy cae del todo: 502; si limita: 429", async () => {
+  it("si Alchemy y los nodos publicos caen del todo: 502", async () => {
     fetchMock.mockImplementation(async (url) => (String(url).includes("coingecko") ? json(CG_LIST) : json({}, 500)));
     expect((await call(`chain=evm&address=${EVM}`)).statusCode).toBe(502);
     W.reset();
     fetchMock.mockImplementation(async (url) => (String(url).includes("coingecko") ? json(CG_LIST) : json({}, 429)));
-    expect((await call(`chain=solana&address=${SOL}`)).statusCode).toBe(429);
+    expect((await call(`chain=solana&address=${SOL}`)).statusCode).toBe(502);
   });
 
   it("sin lista de CoinGecko: los tokens llegan igual, sin id", async () => {
@@ -202,5 +195,201 @@ describe("handler", () => {
     await call("chain=bitcoin&address=bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq");
     await call("chain=bitcoin&address=bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq");
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── Modo sin cuenta (nodos publicos) ──
+
+// Codificador de RESULTADOS de aggregate3 escrito aparte del de la app (asi la
+// prueba no se valida a si misma): ((bool success, bytes returnData)[]).
+function encodeResults(results) {
+  const w = (n) => BigInt(n).toString(16).padStart(64, "0");
+  const els = results.map(({ success, data }) => {
+    const hex = data.replace(/^0x/, "");
+    const len = hex.length / 2;
+    return w(success ? 1 : 0) + w(64) + w(len) + hex.padEnd(Math.ceil(len / 32) * 64, "0");
+  });
+  let off = els.length * 32;
+  const heads = els.map((e) => { const h = w(off); off += e.length / 2; return h; });
+  return "0x" + w(32) + w(els.length) + heads.join("") + els.join("");
+}
+const u256 = (n) => "0x" + BigInt(n).toString(16).padStart(64, "0");
+const USDC_ETH = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+
+// Vector de referencia generado con viem 2 (encodeFunctionData de aggregate3):
+// la llamada que la app manda a los nodos tiene que ser identica, byte a byte.
+const VIEM_AGGREGATE3 = "0x82ad56cb0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000100000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000002470a082310000000000000000000000008ba1f109551bd432803012645ac136ddd64dba7200000000000000000000000000000000000000000000000000000000000000000000000000000000dac17f958d2ee523a2206206994597c13d831ec7000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000004313ce56700000000000000000000000000000000000000000000000000000000";
+
+describe("Multicall3 (ABI hecha a mano)", () => {
+  it("codifica exactamente como viem", () => {
+    const calls = [
+      { target: USDC_ETH, data: "0x70a08231" + EVM.slice(2).padStart(64, "0") },
+      { target: "0xdac17f958d2ee523a2206206994597c13d831ec7", data: "0x313ce567" }
+    ];
+    expect(W.encodeAggregate3(calls)).toBe(VIEM_AGGREGATE3);
+  });
+  it("decodifica resultados con exito, fallo y datos largos", () => {
+    const res = W.decodeAggregate3(encodeResults([
+      { success: true, data: u256(42) },
+      { success: false, data: "0x" },
+      { success: true, data: "0x" + "ab".repeat(70) }
+    ]));
+    expect(res).toEqual([
+      { success: true, data: u256(42) },
+      { success: false, data: "0x" },
+      { success: true, data: "0x" + "ab".repeat(70) }
+    ]);
+  });
+  it("una respuesta cortada o vacia no se da por buena", () => {
+    expect(() => W.decodeAggregate3("0x" + "00".repeat(64))).toThrow();
+    const buena = encodeResults([{ success: true, data: u256(1) }, { success: true, data: u256(2) }]);
+    expect(() => W.decodeAggregate3(buena.slice(0, buena.length / 2))).toThrow();
+    expect(() => W.decodeAggregate3("0x")).toThrow();
+  });
+});
+
+describe("candidatos por red", () => {
+  it("top de CoinGecko con contrato en esa red + respaldo minimo, sin repetir", () => {
+    const cg = { byId: W.buildCoinIndex([
+      { id: "usd-coin", symbol: "usdc", name: "USDC", platforms: { ethereum: USDC_ETH.toUpperCase().replace("0X", "0x"), base: USDC_BASE } },
+      { id: "solo-solana", symbol: "x", name: "X", platforms: { solana: USDC_SOL } },
+      { id: "roto", symbol: "r", name: "R", platforms: { ethereum: "no-es-direccion" } }
+    ]) };
+    const top = { ids: ["usd-coin", "solo-solana", "roto"], price: new Map(), image: new Map() };
+    const eth = W.evmCandidates("eth", cg, top);
+    expect(eth[0]).toEqual({ contract: USDC_ETH, coinId: "usd-coin", symbol: "usdc", name: "USDC" });
+    expect(eth.filter((c) => c.contract === USDC_ETH)).toHaveLength(1);
+    expect(eth.some((c) => c.coinId === "tether")).toBe(true);
+    expect(eth.every((c) => /^0x[0-9a-f]{40}$/.test(c.contract))).toBe(true);
+    // Sin CoinGecko: solo el respaldo minimo.
+    expect(W.evmCandidates("base", null, top).map((c) => c.coinId)).toEqual(["usd-coin"]);
+  });
+});
+
+describe("handler sin cuenta", () => {
+  let fetchMock;
+  const MARKETS = [
+    { id: "ethereum", current_price: 2500, image: "https://img/eth.png" },
+    { id: "usd-coin", current_price: 1, image: "https://img/usdc.png" },
+    { id: "binancecoin", current_price: 600 },
+    { id: "solana", current_price: 150 }
+  ];
+  const CG_FULL = [
+    ...CG_LIST,
+    { id: "ethereum", symbol: "eth", name: "Ethereum", platforms: {} },
+    { id: "tether", symbol: "usdt", name: "Tether", platforms: { ethereum: "0xdac17f958d2ee523a2206206994597c13d831ec7" } }
+  ];
+  function rpcBody(opts) { return JSON.parse(opts.body); }
+
+  beforeEach(() => {
+    W.reset();
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    delete process.env.ALCHEMY_API_KEY;
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("EVM: nativo + tokens por Multicall3 en cada red; una red caida no tumba el resto", async () => {
+    fetchMock.mockImplementation(async (url, opts) => {
+      const u = String(url);
+      if (u.startsWith("https://api.coingecko.com/api/v3/coins/list")) return json(CG_FULL);
+      if (u.startsWith("https://api.coingecko.com/api/v3/coins/markets")) return json(u.endsWith("page=1") ? MARKETS : []);
+      if (u.includes("bsc") || u.includes("bnb")) return json({}, 503); // BNB Chain: todos sus nodos caidos
+      const body = rpcBody(opts);
+      if (body.method === "eth_getBalance") {
+        expect(body.params).toEqual([EVM, "latest"]);
+        return json({ jsonrpc: "2.0", id: 1, result: u.includes("ethereum-rpc") ? "0x1bc16d674ec80000" : "0x0" });
+      }
+      if (body.method === "eth_call") {
+        const { to, data } = body.params[0];
+        expect(to).toBe(W.MULTICALL3);
+        expect(data.startsWith("0x82ad56cb")).toBe(true);
+        const n = Number(BigInt("0x" + data.slice(10 + 64, 10 + 128)));
+        const esDecimals = data.includes("313ce567");
+        const results = Array.from({ length: n }, (_, i) => {
+          if (!u.includes("ethereum-rpc")) return { success: true, data: u256(0) };
+          if (esDecimals) return { success: true, data: u256(6) };
+          // En Ethereum solo el primer candidato (USDC) tiene saldo: 250 USDC.
+          return i === 0 ? { success: true, data: u256(250_000_000) } : { success: i % 2 === 0, data: i % 2 === 0 ? u256(0) : "0x" };
+        });
+        return json({ jsonrpc: "2.0", id: 1, result: encodeResults(results) });
+      }
+      return json({}, 404);
+    });
+    const res = await call(`chain=evm&address=${EVM}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.mode).toBe("public");
+    expect(res.body.failedNetworks).toEqual(["bsc"]);
+    expect(res.body.assets).toEqual([
+      expect.objectContaining({ network: "eth", contract: null, coinId: "ethereum", amount: "2", priceUsd: 2500, logo: "https://img/eth.png" }),
+      expect.objectContaining({ network: "eth", contract: USDC_ETH, coinId: "usd-coin", symbol: "USDC", decimals: 6, amount: "250", priceUsd: 1 })
+    ]);
+    // Ninguna llamada a Alchemy sin clave.
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes("alchemy"))).toBe(false);
+  });
+
+  it("si el primer nodo falla se usa el siguiente de la lista", async () => {
+    const vistos = [];
+    fetchMock.mockImplementation(async (url, opts) => {
+      const u = String(url);
+      if (u.includes("coingecko")) return json(u.includes("markets") ? [] : CG_FULL);
+      vistos.push(new URL(u).hostname);
+      if (u.includes("publicnode")) throw new Error("caido");
+      const body = rpcBody(opts);
+      if (body.method === "eth_getBalance") return json({ result: "0x0" });
+      const n = Number(BigInt("0x" + body.params[0].data.slice(10 + 64, 10 + 128)));
+      return json({ result: encodeResults(Array.from({ length: n }, () => ({ success: true, data: u256(0) }))) });
+    });
+    const res = await call(`chain=evm&address=${EVM}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.failedNetworks).toEqual([]);
+    expect(vistos).toContain("ethereum-rpc.publicnode.com");
+    expect(vistos).toContain("eth.llamarpc.com");
+  });
+
+  it("Solana: SOL + tokens SPL sumando cuentas; lo no listado se valora en GeckoTerminal", async () => {
+    const MINT_RARO = "Rar0Mint1111111111111111111111111111111111";
+    fetchMock.mockImplementation(async (url, opts) => {
+      const u = String(url);
+      if (u.startsWith("https://api.coingecko.com/api/v3/coins/list")) return json(CG_FULL);
+      if (u.startsWith("https://api.coingecko.com/api/v3/coins/markets")) return json(u.endsWith("page=1") ? MARKETS : []);
+      if (u.startsWith("https://api.geckoterminal.com/")) {
+        expect(u).toContain(`/networks/solana/tokens/multi/${MINT_RARO}`);
+        return json({ data: [{ attributes: { address: MINT_RARO, symbol: "RARO", name: "Raro", price_usd: "0.02" } }] });
+      }
+      const body = rpcBody(opts);
+      if (body.method === "getBalance") return json({ result: { context: {}, value: 2500000000 } });
+      if (body.method === "getTokenAccountsByOwner") {
+        if (body.params[1].programId.startsWith("Tokenz")) return json({ error: { message: "no soportado" } });
+        const acc = (mint, amount, decimals) => ({ account: { data: { parsed: { info: { mint, tokenAmount: { amount, decimals } } } } } });
+        return json({ result: { value: [acc(USDC_SOL, "1000000", 6), acc(USDC_SOL, "500000", 6), acc(MINT_RARO, "300", 0), acc("Vacio1111111111111111111111111111111111111", "0", 6)] } });
+      }
+      return json({}, 404);
+    });
+    const res = await call(`chain=solana&address=${SOL}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.mode).toBe("public");
+    expect(res.body.assets).toEqual([
+      expect.objectContaining({ network: "solana", contract: null, coinId: "solana", amount: "2.5", priceUsd: 150 }),
+      expect.objectContaining({ network: "solana", contract: USDC_SOL, coinId: "usd-coin", amount: "1.5", priceUsd: 1 }),
+      expect.objectContaining({ network: "solana", contract: MINT_RARO, coinId: null, symbol: "RARO", amount: "300", priceUsd: 0.02 })
+    ]);
+  });
+
+  it("con clave pero Alchemy caido: se lee igual sin cuenta", async () => {
+    process.env.ALCHEMY_API_KEY = "clave";
+    fetchMock.mockImplementation(async (url, opts) => {
+      const u = String(url);
+      if (u.includes("alchemy")) return json({}, 401);
+      if (u.includes("coingecko")) return json(u.includes("markets") ? MARKETS : CG_FULL);
+      const body = rpcBody(opts);
+      if (body.method === "getBalance") return json({ result: { value: 1000000000 } });
+      return json({ result: { value: [] } });
+    });
+    const res = await call(`chain=solana&address=${SOL}`);
+    delete process.env.ALCHEMY_API_KEY;
+    expect(res.statusCode).toBe(200);
+    expect(res.body.mode).toBe("public");
+    expect(res.body.assets[0]).toMatchObject({ coinId: "solana", amount: "1" });
   });
 });

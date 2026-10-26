@@ -288,6 +288,7 @@ function renderWalletSheet() {
     body = `
       <p class="wallet-summary"><strong>${escapeHtml(walletChainLabel(d.chain))}</strong> · <code>${escapeHtml(WalletCore.shortAddress(d.address))}</code></p>
       ${failed ? `<p class="wallet-detect is-warn" role="status">${escapeHtml(t("wallet.partial", { networks: failed }))}</p>` : ""}
+      ${d.source === "public" && d.chain === "evm" ? `<p class="editor-secondary" data-wallet-role="publicNote">${escapeHtml(t("wallet.publicNote"))}</p>` : ""}
       ${d.holdings.length
         ? `<ul class="wallet-assets" role="list" data-show-hidden="${d.showHidden ? "1" : "0"}">
             ${shown.map(walletHoldingHtml).join("")}
@@ -401,6 +402,7 @@ async function loadWalletPreview() {
       })
       .sort((a, b) => (b.value || 0) - (a.value || 0));
     d.address = data.address || d.address;
+    d.source = data.mode || "";
     d.failedNetworks = Array.isArray(data.failedNetworks) ? data.failedNetworks : [];
     d.step = "preview";
   } catch (error) {

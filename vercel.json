@@ -1,16 +1,36 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/wallet.js": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
-    { "source": "/api/cg/:path*", "destination": "/api/cg?cgpath=:path*" }
+    {
+      "source": "/api/cg/:path*",
+      "destination": "/api/cg?cgpath=:path*"
+    }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=()" },
-        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self' https://cryptoatalaya.com https://*.cryptoatalaya.com" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), payment=()"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self' https://cryptoatalaya.com https://*.cryptoatalaya.com"
+        }
       ]
     }
   ]
