@@ -87,12 +87,86 @@ function setWalletKeyIgnored(row, ignored) {
   wallet.ignoredKeys = [...keys].slice(-300);
 }
 
+// ── Clave de CoinStats (opcional, solo en este dispositivo) ──
+
+function getCoinStatsKey() {
+  try {
+    return localStorage.getItem(COINSTATS_KEY_STORAGE) || "";
+  } catch {
+    return "";
+  }
+}
+
+function setCoinStatsKey(value) {
+  try {
+    if (value) {
+      localStorage.setItem(COINSTATS_KEY_STORAGE, value);
+    } else {
+      localStorage.removeItem(COINSTATS_KEY_STORAGE);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function renderCoinStatsKeyStatus() {
+  const status = document.getElementById("coinstatsKeyStatus");
+  const clearBtn = document.getElementById("coinstatsKeyClear");
+  const input = document.getElementById("coinstatsKeyInput");
+  const has = Boolean(getCoinStatsKey());
+  if (status) {
+    status.textContent = t(has ? "walletsPanel.keyOn" : "walletsPanel.keyOff");
+    status.classList.toggle("is-on", has);
+  }
+  if (clearBtn) {
+    clearBtn.hidden = !has;
+  }
+  if (input) {
+    input.placeholder = has ? t("walletsPanel.keySavedPlaceholder") : t("walletsPanel.keyPlaceholder");
+  }
+}
+
+function saveCoinStatsKeyFromInput() {
+  const input = document.getElementById("coinstatsKeyInput");
+  const value = String(input?.value || "").trim();
+  if (!/^[A-Za-z0-9_\-+=/.:]{16,200}$/.test(value)) {
+    showToast(t("walletsPanel.keyInvalidTitle"), t("walletsPanel.keyInvalidText"), "warning");
+    return;
+  }
+  if (!setCoinStatsKey(value)) {
+    showToast(t("walletsPanel.keyInvalidTitle"), t("alerts.saveFailedText"), "negative");
+    return;
+  }
+  if (input) {
+    input.value = "";
+  }
+  renderCoinStatsKeyStatus();
+  showToast(t("walletsPanel.keySavedTitle"), t("walletsPanel.keySavedText"), "positive");
+  // Con la clave puesta se releen las billeteras: lo que antes no salia
+  // aparece como "activos nuevos" para revisarlos.
+  if (state.wallets.length) {
+    syncAllWallets();
+  }
+}
+
+function clearCoinStatsKey() {
+  setCoinStatsKey("");
+  renderCoinStatsKeyStatus();
+  showToast(t("walletsPanel.keyClearedTitle"), t("walletsPanel.keyClearedText"), "neutral");
+}
+
 // ── Lectura (servidor propio) ──
 
 function walletError(code) {
   const error = new Error(code);
   error.code = code;
   return error;
+}
+
+function walletWarningText(code) {
+  const known = ["coinstats_key", "coinstats_limit", "coinstats_down"];
+  return t(`wallet.warn.${known.includes(code) ? code : "coinstats_down"}`);
 }
 
 function walletErrorText(code) {
@@ -109,7 +183,11 @@ async function fetchWalletHoldings(chain, address) {
   const timer = window.setTimeout(() => controller.abort(), 25000);
   let response;
   try {
-    response = await fetch(url, { headers: { accept: "application/json" }, signal: controller.signal });
+    const coinStatsKey = getCoinStatsKey();
+    response = await fetch(url, {
+      headers: { accept: "application/json", ...(coinStatsKey ? { "X-CoinStats-Key": coinStatsKey } : {}) },
+      signal: controller.signal
+    });
   } catch {
     throw walletError("network");
   } finally {
@@ -296,6 +374,7 @@ function renderWalletSheet() {
     body = `
       <p class="wallet-summary"><strong>${escapeHtml(walletChainLabel(d.chain))}</strong> · <code>${escapeHtml(WalletCore.shortAddress(d.address))}</code></p>
       ${failed ? `<p class="wallet-detect is-warn" role="status">${escapeHtml(t("wallet.partial", { networks: failed }))}</p>` : ""}
+      ${d.warning ? `<p class="wallet-detect is-warn" role="status" data-wallet-role="warning">${escapeHtml(walletWarningText(d.warning))}</p>` : ""}
       ${d.source === "public" && d.chain === "evm" ? `<p class="editor-secondary" data-wallet-role="publicNote">${escapeHtml(t("wallet.publicNote"))}</p>` : ""}
       ${d.holdings.length
         ? `<ul class="wallet-assets" role="list" data-show-hidden="${d.showHidden ? "1" : "0"}">
@@ -414,6 +493,7 @@ async function loadWalletPreview() {
       .sort((a, b) => (b.value || 0) - (a.value || 0));
     d.address = data.address || d.address;
     d.source = data.mode || "";
+    d.warning = typeof data.warning === "string" ? data.warning : "";
     d.failedNetworks = Array.isArray(data.failedNetworks) ? data.failedNetworks : [];
     d.step = "preview";
   } catch (error) {
@@ -634,7 +714,10 @@ async function syncWallet(walletId, { manual = false } = {}) {
       syncLivePrices();
     }
     persistState(false);
-    if (manual) {
+    if (data.warning) {
+      // La clave de CoinStats fallo: se leyo igual, pero con menos cobertura.
+      showToast(t("wallet.warnTitle"), walletWarningText(data.warning), "warning");
+    } else if (manual) {
       showToast(
         t("wallet.syncedTitle"),
         changed ? t("wallet.syncedChanged", { n: changed }) : t("wallet.syncedSame"),
@@ -731,6 +814,7 @@ function walletStatusText(wallet, rows) {
 }
 
 function renderWalletsPanel() {
+  renderCoinStatsKeyStatus();
   const box = document.getElementById("walletsList");
   if (!box) {
     return;
@@ -856,4 +940,12 @@ function bindWallets() {
   });
   document.getElementById("addWalletBtn")?.addEventListener("click", () => openWalletSheet());
   document.getElementById("syncWalletsBtn")?.addEventListener("click", () => syncAllWallets());
+  document.getElementById("coinstatsKeySave")?.addEventListener("click", () => saveCoinStatsKeyFromInput());
+  document.getElementById("coinstatsKeyClear")?.addEventListener("click", () => clearCoinStatsKey());
+  document.getElementById("coinstatsKeyInput")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      saveCoinStatsKeyFromInput();
+    }
+  });
 }

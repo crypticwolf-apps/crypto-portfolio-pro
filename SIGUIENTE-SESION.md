@@ -113,7 +113,15 @@ centro del menú inferior, destacado y sobresaliendo.
 
 ## Pendiente
 
-- **CoinStats para el lector de billeteras (lo hace el usuario):** el modo sin
+- **Clave de CoinStats DENTRO de la app:** Vercel le pedía plan Pro para las
+  variables de entorno, así que el usuario pega su clave en Ajustes →
+  Billeteras. Se guarda solo en su dispositivo (`COINSTATS_KEY_STORAGE`, fuera
+  de prefs y datos) y la app la manda en la cabecera `X-CoinStats-Key` a
+  `api/wallet.js`, que la reenvía a CoinStats y no la guarda. Con clave propia
+  la respuesta no se cachea en la CDN. Si CoinStats la rechaza o no hay
+  créditos, se lee sin CoinStats y la app avisa (`warning`). **Nunca meter la
+  clave en el repositorio: es público.**
+- **CoinStats en el servidor (alternativa):** el modo sin
   cuenta solo mira 9 redes y las 500 monedas principales, y al usuario le
   faltaban muchos activos. Con `COINSTATS_API_KEY` en Vercel (+ Redeploy) el
   lector usa CoinStats (`/wallet/balance`, `connectionId=all`, 40 créditos por

@@ -7429,3 +7429,9 @@ a.icon-circle-btn { display: inline-flex; align-items: center; justify-content: 
 /* Cantidad y activo de una posicion de billetera: solo lectura a la vista. */
 #positionEditorPortal input[readonly] { opacity: 0.72; border-style: dashed; cursor: default; }
 .editor-wallet-btn small { font-weight: 500; }
+
+/* Clave de CoinStats en Ajustes -> Billeteras */
+.coinstats-key { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.coinstats-key input { font-family: var(--font-mono); }
+.coinstats-key-status { margin: 0; font-size: 0.72rem; line-height: 1.4; color: var(--muted); }
+.coinstats-key-status.is-on { color: var(--positive); }

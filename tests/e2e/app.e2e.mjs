@@ -111,7 +111,7 @@ function respuestaCoinGecko(ruta) {
 async function simularRed(ctx, { proxyCaido = false } = {}) {
   const json = (r, body) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   const directas = [];
-  const billetera = { version: 1, llamadas: [] };
+  const billetera = { version: 1, llamadas: [], claves: [] };
   await ctx.route("**/api/cg/**", (r) => proxyCaido ? r.abort()
     : json(r, respuestaCoinGecko(new URL(r.request().url()).pathname.replace(/^.*\/api\/cg\//, ""))));
   await ctx.route("**api.coingecko.com/**", (r) => {
@@ -131,6 +131,7 @@ async function simularRed(ctx, { proxyCaido = false } = {}) {
   await ctx.route("**/api/wallet?**", (r) => {
     const q = new URL(r.request().url()).searchParams;
     billetera.llamadas.push(`${q.get("chain")}:${q.get("address")}`);
+    billetera.claves.push(r.request().headers()["x-coinstats-key"] || "");
     if (q.get("chain") === "solana") return r.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "missing_key" }) });
     if (q.get("chain") === "bitcoin") return json(r, { chain: "bitcoin", address: q.get("address"), assets: [{ network: "bitcoin", contract: null, symbol: "BTC", name: "Bitcoin", decimals: 8, amount: "0.25", priceUsd: null, logo: null, coinId: "bitcoin" }], failedNetworks: [] });
     return json(r, { chain: "evm", address: q.get("address"), assets: activosEvm(billetera.version), failedNetworks: [], mode: "public" });
@@ -553,6 +554,29 @@ async function casosBilletera(navegador, url, ancho) {
     const btc = await page.evaluate(() => state.rows.filter((r) => r.symbol === "BTC").map((r) => `${r.walletId ? "billetera" : "manual"}:${r.tokens}`));
     if (btc.sort().join() !== "billetera:0.25,manual:0.05") throw new Error(btc.join(" / "));
   });
+  const CLAVE = "e2e0123456789abcdef0123456789abcdef0";
+  await paso2("clave de CoinStats: solo en este dispositivo, viaja en cada lectura y relee", async () => {
+    await abrirPanel();
+    const estado = () => page.evaluate(() => ({
+      guardada: localStorage.getItem("crypto-dashboard-coinstats-key-v1"),
+      on: document.getElementById("coinstatsKeyStatus").classList.contains("is-on"),
+      quitar: !document.getElementById("coinstatsKeyClear").hidden,
+      campo: document.getElementById("coinstatsKeyInput").value
+    }));
+    if ((await estado()).on) throw new Error("sale activa sin clave");
+    await page.fill("#coinstatsKeyInput", "no es una clave"); await page.click("#coinstatsKeySave"); await page.waitForTimeout(200);
+    if ((await estado()).guardada) throw new Error("guardo una clave invalida");
+    const antes = app.billetera.claves.length;
+    await page.fill("#coinstatsKeyInput", CLAVE); await page.click("#coinstatsKeySave"); await page.waitForTimeout(1800);
+    const e = await estado();
+    if (e.guardada !== CLAVE || !e.on || !e.quitar || e.campo) throw new Error(JSON.stringify(e));
+    // Fuera de las preferencias y de los datos (que se exportan y comparten).
+    const fuga = await page.evaluate((k) => ["crypto-dashboard-prefs-v2", "crypto-dashboard-rows-v3"].some((n) => (localStorage.getItem(n) || "").includes(k)), CLAVE);
+    if (fuga) throw new Error("la clave se colo en las preferencias o en los datos");
+    // Al guardarla se releen las billeteras, y cada lectura la lleva.
+    const nuevas = app.billetera.claves.slice(antes);
+    if (!nuevas.length || !nuevas.every((k) => k === CLAVE)) throw new Error(`lecturas con clave: ${JSON.stringify(nuevas)}`);
+  });
   await paso2("al recargar sigue todo y no se relee de golpe", async () => {
     const antes = app.billetera.llamadas.length;
     await page.reload(); await page.waitForTimeout(3500);
@@ -565,6 +589,11 @@ async function casosBilletera(navegador, url, ancho) {
     await page.click("[data-wallet-delete]"); await page.waitForTimeout(600);
     const r = await page.evaluate(() => ({ billeteras: state.wallets.length, deBilletera: state.rows.filter((x) => x.walletId).length, manuales: state.rows.filter((x) => !x.walletId).length }));
     if (r.billeteras !== 1 || r.deBilletera !== 1 || r.manuales !== 6) throw new Error(JSON.stringify(r));
+  });
+  await paso2("quitar la clave de CoinStats", async () => {
+    await page.click("#coinstatsKeyClear"); await page.waitForTimeout(300);
+    const r = await page.evaluate(() => ({ guardada: localStorage.getItem("crypto-dashboard-coinstats-key-v1"), on: document.getElementById("coinstatsKeyStatus").classList.contains("is-on") }));
+    if (r.guardada || r.on) throw new Error(JSON.stringify(r));
   });
   await paso2("sin HTML inyectado en nombres de billetera ni de tokens", async () => {
     const r = await page.evaluate(() => ({ xss: window.__xss === 1, img: document.querySelectorAll("img[src='x']").length }));

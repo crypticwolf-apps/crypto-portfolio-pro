@@ -472,15 +472,17 @@ function normalizeCoinStats(items, cg) {
   return assets;
 }
 
-async function readCoinStats(chain, address) {
-  const key = process.env.COINSTATS_API_KEY;
+async function readCoinStats(chain, address, key) {
   const url = `${COINSTATS_BASE}wallet/balance?address=${encodeURIComponent(address)}&connectionId=${encodeURIComponent(COINSTATS_CONNECTION[chain])}`;
   const [response, cg] = await Promise.all([
     fetchWithTimeout(url, { headers: { accept: 'application/json', 'X-API-KEY': key } }),
     getCoinGeckoData(),
   ]);
   if (!response.ok) {
-    throw new UpstreamError(response.status === 429 ? 429 : 502, `CoinStats respondio ${response.status}`);
+    // Se conserva 401/403 (clave rechazada) y 429 (sin creditos) para que la
+    // app pueda decir exactamente que pasa.
+    const status = [401, 403, 429].includes(response.status) ? response.status : 502;
+    throw new UpstreamError(status, `CoinStats respondio ${response.status}`);
   }
   const json = await response.json();
   const items = Array.isArray(json) ? json : Array.isArray(json?.result) ? json.result : [];
@@ -865,6 +867,28 @@ async function readBitcoin(address) {
 
 // ── Handler ──
 
+/**
+ * Clave de CoinStats: la que manda la app en la cabecera X-CoinStats-Key (el
+ * usuario la guarda en Ajustes, solo en su dispositivo) o, si no, la del
+ * servidor. Nunca se guarda ni se registra aqui: solo se reenvia a CoinStats.
+ */
+function coinStatsKeyFrom(req) {
+  const raw = req.headers?.['x-coinstats-key'];
+  const fromApp = String(Array.isArray(raw) ? raw[0] : raw || '').trim();
+  if (/^[A-Za-z0-9_\-+=/.:]{16,200}$/.test(fromApp)) {
+    return { key: fromApp, own: true };
+  }
+  return process.env.COINSTATS_API_KEY ? { key: process.env.COINSTATS_API_KEY, own: false } : null;
+}
+
+// Fallo de CoinStats -> aviso para la app (la lectura sigue por otro camino).
+function coinStatsWarning(error) {
+  const status = error?.status;
+  if (status === 401 || status === 403) return 'coinstats_key';
+  if (status === 429) return 'coinstats_limit';
+  return 'coinstats_down';
+}
+
 const results = new Map();
 
 function sendError(res, status, code, message) {
@@ -876,7 +900,7 @@ function sendError(res, status, code, message) {
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CoinStats-Key');
 
   if (req.method === 'OPTIONS') {
     res.statusCode = 204;
@@ -896,21 +920,28 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const cacheKey = `${chain}:${address}`;
+  const coinStats = coinStatsKeyFrom(req);
+  // Con clave propia del usuario la respuesta depende de la cabecera: ni la
+  // CDN ni la memoria se comparten con lecturas sin clave.
+  const sharedCache = !coinStats?.own;
+  const cacheKey = `${coinStats ? 'cs' : 'x'}:${chain}:${address}`;
   const hit = results.get(cacheKey);
   if (hit && Date.now() - hit.at < RESULT_TTL_MS) {
-    res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
+    res.setHeader('Cache-Control', sharedCache ? 'public, s-maxage=30, stale-while-revalidate=60' : 'private, no-store');
     res.json(hit.value);
     return;
   }
 
   try {
     let read = null;
-    if (process.env.COINSTATS_API_KEY) {
+    let warning = null;
+    if (coinStats) {
       try {
-        read = await readCoinStats(chain, address);
-      } catch {
-        // CoinStats caido, sin creditos o clave mal: se sigue con lo demas.
+        read = await readCoinStats(chain, address, coinStats.key);
+      } catch (error) {
+        // CoinStats caido, sin creditos o clave mal: se sigue con lo demas y
+        // la app avisa (si no, una clave mal puesta pasaria desapercibida).
+        warning = coinStatsWarning(error);
         read = null;
       }
     }
@@ -934,12 +965,16 @@ module.exports = async function handler(req, res) {
       failedNetworks: read.failedNetworks,
       unlisted: read.unlisted,
       mode: read.mode,
+      ...(warning ? { warning } : {}),
     };
-    if (results.size > 300) results.delete(results.keys().next().value);
-    results.set(cacheKey, { at: Date.now(), value });
-    // Respuesta parcial (una red cayo): no se cachea en la CDN.
-    res.setHeader('Cache-Control', read.failedNetworks.length
-      ? 'no-store'
+    if (!warning) {
+      if (results.size > 300) results.delete(results.keys().next().value);
+      results.set(cacheKey, { at: Date.now(), value });
+    }
+    // Respuesta parcial (una red cayo), con aviso o con clave propia: no se
+    // cachea en la CDN.
+    res.setHeader('Cache-Control', read.failedNetworks.length || warning || !sharedCache
+      ? 'private, no-store'
       : 'public, s-maxage=30, stale-while-revalidate=60');
     res.json(value);
   } catch (error) {
@@ -972,6 +1007,7 @@ module.exports._internals = {
   EVM_GROUPS,
   normalizeCoinStats,
   plainNumber,
+  coinStatsKeyFrom,
   encodeAggregate3,
   decodeAggregate3,
   evmCandidates,

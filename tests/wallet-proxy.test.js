@@ -157,7 +157,7 @@ describe("handler", () => {
     const res = await call(`chain=evm&address=${EVM}`);
     expect(res.statusCode).toBe(200);
     expect(res.body.failedNetworks).toEqual(["bsc", "avax"]);
-    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(res.headers["cache-control"]).toBe("private, no-store");
   });
 
   it("si Alchemy y los nodos publicos caen del todo: 502", async () => {
@@ -500,5 +500,78 @@ describe("CoinStats", () => {
       expect(res.body.mode).toBe("public");
       expect(res.body.assets[0]).toMatchObject({ coinId: "bitcoin", amount: "1" });
     });
+  });
+});
+
+describe("clave de CoinStats puesta por el usuario en la app", () => {
+  let fetchMock;
+  const KEY = "e2e0123456789abcdef0123456789abcdef0";
+  const callWith = async (query, headers) => {
+    const res = fakeRes();
+    await handler({ method: "GET", url: `/api/wallet?${query}`, headers }, res);
+    return res;
+  };
+  beforeEach(() => {
+    W.reset();
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    delete process.env.COINSTATS_API_KEY;
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("solo acepta claves con forma de clave (sin espacios ni rarezas)", () => {
+    expect(W.coinStatsKeyFrom({ headers: { "x-coinstats-key": KEY } })).toEqual({ key: KEY, own: true });
+    expect(W.coinStatsKeyFrom({ headers: { "x-coinstats-key": "corta" } })).toBeNull();
+    expect(W.coinStatsKeyFrom({ headers: { "x-coinstats-key": "con espacios dentro de la clave" } })).toBeNull();
+    expect(W.coinStatsKeyFrom({ headers: {} })).toBeNull();
+  });
+
+  it("usa la clave de la cabecera, la reenvia solo a CoinStats y no deja cachear la respuesta", async () => {
+    fetchMock.mockImplementation(async (url) => (String(url).includes("coingecko") ? json([]) : json([
+      { coinId: "ethereum", amount: 1, chain: "ethereum", symbol: "ETH", name: "Ethereum", price: 2000 }
+    ])));
+    const res = await callWith(`chain=evm&address=${EVM}`, { "x-coinstats-key": KEY });
+    expect(res.statusCode).toBe(200);
+    expect(res.body.mode).toBe("coinstats");
+    expect(res.headers["cache-control"]).toBe("private, no-store");
+    const conClave = fetchMock.mock.calls.filter(([, o]) => JSON.stringify(o?.headers || {}).includes(KEY));
+    expect(conClave).toHaveLength(1);
+    expect(String(conClave[0][0]).startsWith("https://openapiv1.coinstats.app/")).toBe(true);
+    // Una lectura SIN clave no recibe lo cacheado con clave (ni al reves).
+    fetchMock.mockImplementation(async (url, opts) => {
+      if (String(url).includes("coingecko")) return json([]);
+      if (String(url).startsWith("https://mempool.space/")) return json({ chain_stats: { funded_txo_sum: 0, spent_txo_sum: 0 } });
+      const body = JSON.parse(opts.body);
+      if (body.method === "eth_getBalance") return json({ result: "0x0" });
+      const n = Number(BigInt("0x" + body.params[0].data.slice(10 + 64, 10 + 128)));
+      return json({ result: encodeResults(Array.from({ length: n }, () => ({ success: true, data: u256(0) }))) });
+    });
+    const sinClave = await callWith(`chain=evm&address=${EVM}`, {});
+    expect(sinClave.body.mode).toBe("public");
+  });
+
+  it("clave rechazada: se lee igual sin CoinStats y la respuesta lo avisa", async () => {
+    fetchMock.mockImplementation(async (url) => {
+      const u = String(url);
+      if (u.includes("coinstats")) return json({ statusCode: 401 }, 401);
+      if (u.includes("coingecko")) return json([]);
+      return json({ chain_stats: { funded_txo_sum: 50000000, spent_txo_sum: 0 } });
+    });
+    const res = await callWith("chain=bitcoin&address=bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", { "x-coinstats-key": KEY });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ mode: "public", warning: "coinstats_key" });
+    expect(res.body.assets[0]).toMatchObject({ coinId: "bitcoin", amount: "0.5" });
+    expect(res.headers["cache-control"]).toBe("private, no-store");
+  });
+
+  it("sin creditos (429): aviso coinstats_limit", async () => {
+    fetchMock.mockImplementation(async (url) => {
+      const u = String(url);
+      if (u.includes("coinstats")) return json({}, 429);
+      if (u.includes("coingecko")) return json([]);
+      return json({ chain_stats: {} });
+    });
+    const res = await callWith("chain=bitcoin&address=bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", { "x-coinstats-key": KEY });
+    expect(res.body.warning).toBe("coinstats_limit");
   });
 });

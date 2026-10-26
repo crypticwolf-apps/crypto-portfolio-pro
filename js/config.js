@@ -82,6 +82,10 @@ const WALLET_PROXY = typeof location !== "undefined"
   ? "/api/wallet"
   : "https://crypto-portfolio-pro-omega.vercel.app/api/wallet";
 const MAX_WALLETS = 20;
+// Clave de CoinStats del usuario (opcional). Va en su PROPIA clave de
+// localStorage, fuera de las preferencias: asi no viaja en ninguna
+// exportacion ni copia. Solo se manda al lector de billeteras de la app.
+const COINSTATS_KEY_STORAGE = "crypto-dashboard-coinstats-key-v1";
 // Al abrir la app se vuelven a leer las billeteras que lleven mas de esto
 // sin actualizarse (el saldo cambia poco; los precios ya van en vivo aparte).
 // Una hora: cada lectura gasta creditos del proveedor (CoinStats cobra 40).
