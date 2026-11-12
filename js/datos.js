@@ -44,18 +44,14 @@ function loadState() {
     }
   });
   state.history = Array.isArray(history?.points) ? compactHistoryPoints(history.points) : [];
-  const storedTheme = prefs && (prefs.theme === "light" || prefs.theme === "dark") ? prefs.theme : null;
   state.prefs = {
     ...DEFAULT_PREFS,
     ...(prefs && typeof prefs === "object" ? prefs : {})
   };
-  // Primer arranque sin elección previa: se adopta la preferencia del sistema
-  // (coincide con el script anti-parpadeo del <head>). La elección del usuario,
+  // Primer arranque sin eleccion previa: tema automatico (sigue al sistema,
+  // igual que el script anti-parpadeo del <head>). La eleccion del usuario,
   // una vez guardada, siempre prevalece.
-  if (!storedTheme) {
-    state.prefs.theme = (typeof window !== "undefined" && window.matchMedia
-      && window.matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
-  }
+  normalizeAppearancePrefs(state.prefs, Boolean(prefs && typeof prefs === "object" && prefs.theme));
   if (!TRANSLATIONS[state.prefs.language]) {
     state.prefs.language = DEFAULT_PREFS.language;
   }
@@ -67,7 +63,8 @@ function loadState() {
       ? 300
       : DEFAULT_PREFS.autoRefreshSec;
   }
-  state.prefs.hideBalance = Boolean(state.prefs.hideBalance);
+  // "Ocultar saldos al abrir": cada arranque empieza en modo privado.
+  state.prefs.hideBalance = Boolean(state.prefs.hideBalance) || state.prefs.hideOnOpen;
   // El panel de filtros se retiró de Posiciones: los filtros guardados de
   // versiones anteriores se descartan para que nunca oculten posiciones sin
   // que exista una forma de restablecerlos. La búsqueda rápida sigue activa.
@@ -888,6 +885,44 @@ function persistState(manual) {
   } catch (error) {
     showToast(t("status.apiError"), t("alerts.saveFailedText"), "negative");
   }
+}
+
+// Deja las preferencias de Apariencia en valores validos (un valor guardado
+// por una version futura o editado a mano cae al predeterminado).
+function normalizeAppearancePrefs(prefs, hasStoredTheme = true) {
+  const pick = (value, options) => (options.includes(value) ? value : options[0]);
+  prefs.theme = hasStoredTheme ? pick(prefs.theme, APARIENCIA.temas) : "auto";
+  prefs.oled = prefs.oled === true;
+  prefs.accent = pick(prefs.accent, APARIENCIA.acentos);
+  prefs.textSize = pick(prefs.textSize, APARIENCIA.textos);
+  prefs.spacing = pick(prefs.spacing, APARIENCIA.espacios);
+  prefs.listMetric = pick(prefs.listMetric, APARIENCIA.metricas);
+  prefs.homeRange = pick(prefs.homeRange, APARIENCIA.rangos);
+  prefs.decimals = prefs.decimals !== false;
+  prefs.hideOnOpen = prefs.hideOnOpen === true;
+  prefs.groupSmall = prefs.groupSmall !== false;
+  prefs.homeBlocks = normalizeHomeBlocks(prefs.homeBlocks);
+  return prefs;
+}
+
+// Orden y visibilidad de los bloques de Inicio: [{ id, on }]. Los bloques
+// desconocidos se descartan y los que falten se anaden al final, visibles.
+function normalizeHomeBlocks(list) {
+  const seen = new Set();
+  const out = [];
+  (Array.isArray(list) ? list : []).forEach((item) => {
+    const id = item && typeof item === "object" ? item.id : null;
+    if (APARIENCIA.bloques.includes(id) && !seen.has(id)) {
+      seen.add(id);
+      out.push({ id, on: item.on !== false });
+    }
+  });
+  APARIENCIA.bloques.forEach((id) => {
+    if (!seen.has(id)) {
+      out.push({ id, on: true });
+    }
+  });
+  return out;
 }
 
 function savePreferences() {

@@ -1,6 +1,7 @@
 // =============================================================================
-// cartera.js - Pestana Portafolio: tabla y tarjetas moviles, filtros, resumen,
-// valor total, reparto, barra fija, modo privacidad y borrado con deshacer.
+// cartera.js - Pestana Portafolio: tabla de escritorio, orden, barra fija,
+// modo privacidad, estado y borrado con deshacer. Lo que se ve en Inicio
+// (saldo, grafico, resumen, lista, reparto, mercado) esta en inicio.js.
 // =============================================================================
 
 function getPortfolioName() {
@@ -22,6 +23,7 @@ function renderPortfolioIdentity() {
   if (dom.portfolioNameInput && document.activeElement !== dom.portfolioNameInput) {
     dom.portfolioNameInput.value = portfolioName;
   }
+  renderHomeGreeting();
 }
 
 function savePortfolioName(nextValue) {
@@ -52,6 +54,8 @@ function applyBalanceVisibility() {
 
 function renderAll() {
   renderPortfolioIdentity();
+  // Textos de Apariencia que dependen de la moneda (vista previa, umbral).
+  renderAppearanceControls();
   renderTableHead();
   renderTableBody();
   renderDashboardOnly();
@@ -163,111 +167,14 @@ function renderTableBody() {
         <button class="primary-btn" type="button" data-action="empty-add">${escapeHtml(t("buttons.newPosition"))}</button>
       </div>`;
     dom.tableBody.innerHTML = `<tr><td colspan="${TABLE_COLUMNS.length}">${emptyHtml}</td></tr>`;
-    const mobileBox = document.getElementById("portfolioMobileList");
-    if (mobileBox) mobileBox.innerHTML = emptyHtml;
+    renderPortfolioMobile([]);
     applyPositionFilter();
     return;
   }
 
   dom.tableBody.innerHTML = rows.map((row) => renderRow(row, totalValue)).join("");
-  renderPortfolioMobile(rows, totalValue);
+  renderPortfolioMobile(rows);
   applyPositionFilter();
-}
-
-// ── Vista móvil del portafolio: cada activo es una tarjeta expandible ──
-// Usa exactamente las mismas métricas que la tabla de escritorio.
-function renderPortfolioMobile(rows, totalValue = 0) {
-  const box = document.getElementById("portfolioMobileList");
-  if (!box) {
-    return;
-  }
-  box.innerHTML = rows.map((row) => portfolioMobileCardHtml(row, totalValue)).join("");
-}
-
-function portfolioMobileCardHtml(row, totalValue = 0) {
-  const metrics = computeRowMetrics(row);
-  const rowTone = metrics.pnlUsd > 0 ? "row-profit" : metrics.pnlUsd < 0 ? "row-loss" : "";
-  const weight = totalValue > 0 && metrics.currentValue > 0
-    ? (metrics.currentValue / totalValue) * 100
-    : null;
-  const change = row.priceChange24h;
-  const changeText = Number.isFinite(change) ? formatSignedPercent(change) : "--";
-  const priceText = metrics.currentPrice > 0
-    ? formatCurrency(metrics.currentPrice, getPriceDigits(metrics.currentPrice))
-    : "--";
-  const expanded = state.expandedCards.has(row.id);
-  const bodyId = `amc-body-${row.id}`;
-
-  // Objetivos TP + distancia al siguiente.
-  const tps = [metrics.tp1, metrics.tp2, metrics.tp3]
-    .map((value, i) => ({ label: `TP${i + 1}`, value }))
-    .filter((tp) => tp.value > 0);
-  const tpChips = tps.length
-    ? tps.map((tp) => {
-        const reached = metrics.currentPrice > 0 && metrics.currentPrice >= tp.value;
-        return `<span class="amc-tp ${reached ? "reached" : ""}">${tp.label} ${formatCurrency(tp.value, getPriceDigits(tp.value))}</span>`;
-      }).join("")
-    : `<span class="amc-tp empty">${escapeHtml(t("row.noTarget"))}</span>`;
-  const nextTp = metrics.currentPrice > 0 ? tps.find((tp) => metrics.currentPrice < tp.value) : null;
-  const nextTpText = nextTp
-    ? `${nextTp.label} · +${((nextTp.value / metrics.currentPrice - 1) * 100).toFixed(1)}%`
-    : (tps.length ? t("row.targetReachedShort") : "--");
-
-  const tokensText = metrics.tokens > 0 ? formatNumber(metrics.tokens, metrics.tokens >= 1 ? 4 : 8) : "--";
-
-  return `
-    <div class="asset-mobile-card ${rowTone} ${row.favorite ? "is-fav" : ""} ${expanded ? "is-expanded" : ""}" role="listitem" data-card-row="${row.id}">
-      <button class="amc-head" type="button" data-card-toggle="${row.id}" aria-expanded="${expanded ? "true" : "false"}" aria-controls="${bodyId}">
-        <span class="amc-avatar asset-avatar">${renderAssetAvatar(row)}</span>
-        <span class="amc-id">
-          <strong class="amc-name">${escapeHtml(assetDisplayName(row))}</strong>
-          <small class="amc-sym">${escapeHtml(row.symbol || t("row.noAsset"))}${walletBadgeHtml(row)}</small>
-        </span>
-        <span class="amc-value">
-          <strong class="money" data-role="rowValue">${maskedCurrency(metrics.currentValue)}</strong>
-          <span class="amc-pnl ${toneClass(metrics.pnlUsd)}"><span data-role="rowPnlAbs">${maskedSignedCurrency(metrics.pnlUsd)}</span> · <span data-role="rowPnlPct">${formatPercent(metrics.pnlPct)}</span></span>
-        </span>
-        <svg class="amc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <div class="amc-subline">
-        <span class="amc-price money" data-role="rowPrice">${priceText}</span>
-        <span class="amc-24h ${toneClass(change || 0)}" data-role="rowChange">${changeText}<small> 24h</small></span>
-      </div>
-      <div class="amc-body" id="${bodyId}">
-        <div class="amc-body-inner">
-          <dl class="amc-grid">
-            <div><dt>${escapeHtml(t("table.columns.invested"))}</dt><dd>${maskedCurrency(metrics.investment)}</dd></div>
-            <div><dt>${escapeHtml(t("editor.tokens"))}</dt><dd>${tokensText}</dd></div>
-            <div><dt>${escapeHtml(t("reb.weight"))}</dt><dd>${weight != null ? weight.toFixed(1) + "%" : "--"}</dd></div>
-            <div><dt>${escapeHtml(t("amc.nextTp"))}</dt><dd>${escapeHtml(nextTpText)}</dd></div>
-          </dl>
-          <div class="amc-tps">${tpChips}</div>
-          <div class="amc-actions">
-            ${isWalletRow(row)
-              ? `<button class="primary-btn amc-btn amc-wide" type="button" data-card-action="walletSync" data-row-id="${row.id}">${escapeHtml(t("wallet.syncOne"))}</button>`
-              : `<button class="primary-btn amc-btn" type="button" data-card-action="buy" data-row-id="${row.id}">${escapeHtml(t("quick.buy"))}</button>
-            <button class="primary-btn amc-btn amc-sell" type="button" data-card-action="sell" data-row-id="${row.id}">${escapeHtml(t("quick.sell"))}</button>`}
-            <button class="ghost-btn amc-btn" type="button" data-card-action="edit" data-row-id="${row.id}">${escapeHtml(t("buttons.edit"))}</button>
-            <button class="ghost-btn amc-btn amc-delete" type="button" data-card-action="delete" data-row-id="${row.id}">${escapeHtml(t("menu.delete"))}</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// Actualiza una sola tarjeta móvil (refresco de precios) conservando su estado.
-function updateMobileCard(rowId) {
-  const box = document.getElementById("portfolioMobileList");
-  if (!box) return;
-  const card = box.querySelector(`[data-card-row="${rowId}"]`);
-  const row = getRowById(rowId);
-  if (!card || !row) return;
-  const totalValue = state.rows.reduce((sum, item) => {
-    const value = computeRowMetrics(item).currentValue;
-    return sum + (value > 0 ? value : 0);
-  }, 0);
-  card.outerHTML = portfolioMobileCardHtml(row, totalValue);
 }
 
 // Filtro combinado: búsqueda + categoría + rentabilidad + peso/cap mínimos +
@@ -536,178 +443,6 @@ function getPortfolio24hChange(snapshot) {
   return base > 0 ? { pct: (delta / base) * 100, delta } : null;
 }
 
-function summaryIconSvg(name) {
-  const icons = {
-    invested: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M15 9.2c-.6-.8-1.7-1.2-3-1.2-1.8 0-3 .8-3 2s1.2 1.7 3 2 3 .8 3 2-1.2 2-3 2c-1.3 0-2.4-.4-3-1.2"/></svg>',
-    change: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 6-8"/><path d="M15 6h3v3"/></svg>',
-    assets: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>',
-    target: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.5" fill="currentColor"/></svg>'
-  };
-  return icons[name] || "";
-}
-
-function renderSummary(snapshot, insights = getPortfolioInsights(snapshot)) {
-  renderMainValueCard(snapshot);
-
-  const change = getPortfolio24hChange(snapshot);
-  const dayItems = get24hInsightItems(snapshot);
-  const bestDay = [...dayItems].sort((a, b) => b.change24h - a.change24h)[0] || null;
-  const worstDay = [...dayItems].sort((a, b) => a.change24h - b.change24h)[0] || null;
-
-  const cards = [
-    {
-      icon: summaryIconSvg("invested"),
-      label: t("summary.investedShort"),
-      value: maskedCurrency(snapshot.totals.investment),
-      tone: ""
-    },
-    {
-      icon: summaryIconSvg("change"),
-      label: t("summary.change24h"),
-      value: change ? formatSignedPercent(change.pct) : "--",
-      tone: change ? toneClass(change.pct) : ""
-    },
-    {
-      icon: summaryIconSvg("change"),
-      label: t("summary.bestDay"),
-      value: bestDay ? `${assetDisplayName(bestDay.row)} ${formatSignedPercent(bestDay.change24h)}` : "--",
-      tone: bestDay ? "positive" : ""
-    },
-    {
-      icon: summaryIconSvg("change"),
-      label: t("summary.worstDay"),
-      value: worstDay ? `${assetDisplayName(worstDay.row)} ${formatSignedPercent(worstDay.change24h)}` : "--",
-      tone: worstDay ? "negative" : ""
-    },
-  ];
-
-  dom.summaryGrid.innerHTML = cards
-    .map(
-      (card) => `
-        <article class="summary-card mini ${card.tone}">
-          <span class="summary-icon" aria-hidden="true">${card.icon}</span>
-          <strong>${escapeHtml(card.value)}</strong>
-          <p>${escapeHtml(card.label)}</p>
-        </article>
-      `
-    )
-    .join("");
-
-  renderAllocationCard(snapshot);
-}
-
-// Reparto del capital entre BTC / ETH / stables / altcoins (barra apilada).
-function getAllocationBreakdown(snapshot) {
-  const totals = { btc: 0, eth: 0, stable: 0, alt: 0 };
-  let sum = 0;
-  snapshot.items.forEach(({ row, metrics }) => {
-    if (metrics.currentValue > 0) {
-      totals[getAssetCategory(row)] += metrics.currentValue;
-      sum += metrics.currentValue;
-    }
-  });
-  if (!(sum > 0)) {
-    return null;
-  }
-  return {
-    btc: (totals.btc / sum) * 100,
-    eth: (totals.eth / sum) * 100,
-    stable: (totals.stable / sum) * 100,
-    alt: (totals.alt / sum) * 100
-  };
-}
-
-function renderAllocationCard(snapshot) {
-  const card = document.getElementById("allocationCard");
-  if (!card) {
-    return;
-  }
-
-  const alloc = getAllocationBreakdown(snapshot);
-  if (!alloc) {
-    card.hidden = true;
-    return;
-  }
-
-  const segments = [
-    { key: "btc", label: "BTC", color: "#f6b34c" },
-    { key: "eth", label: "ETH", color: "#7da4ff" },
-    { key: "stable", label: t("alloc.stables"), color: "#6d9ec4" },
-    { key: "alt", label: t("alloc.alts"), color: "#3effa8" }
-  ].filter((segment) => alloc[segment.key] > 0.05);
-
-  card.hidden = false;
-  card.innerHTML = `
-    <span class="alloc-title">${escapeHtml(t("alloc.title"))}</span>
-    <div class="alloc-bar" aria-hidden="true">
-      ${segments.map((segment) => `<span style="width:${alloc[segment.key].toFixed(2)}%;background:${segment.color}"></span>`).join("")}
-    </div>
-    <div class="alloc-legend">
-      ${segments.map((segment) => `
-        <span class="alloc-chip">
-          <i style="background:${segment.color}"></i>
-          ${escapeHtml(segment.label)} <strong>${alloc[segment.key].toFixed(1)}%</strong>
-        </span>
-      `).join("")}
-    </div>
-  `;
-}
-
-function renderMainValueCard(snapshot) {
-  if (!dom.mainValue) {
-    return;
-  }
-
-  const totalPnl = snapshot.totals.currentValue - snapshot.totals.investment;
-  const totalPnlPct = snapshot.totals.investment
-    ? (totalPnl / snapshot.totals.investment) * 100
-    : 0;
-
-  dom.mainValue.textContent = maskedCurrency(snapshot.totals.currentValue);
-  if (dom.mainPnlAbs) {
-    dom.mainPnlAbs.textContent = maskedSignedCurrency(totalPnl);
-    dom.mainPnlAbs.className = toneClass(totalPnl);
-  }
-  if (dom.mainPnlPct) {
-    dom.mainPnlPct.hidden = false;
-    dom.mainPnlPct.textContent = formatPercent(totalPnlPct);
-    dom.mainPnlPct.className = `delta-chip ${totalPnl > 0 ? "good" : totalPnl < 0 ? "error" : "warn"}`;
-  }
-  if (dom.mainUpdated) {
-    dom.mainUpdated.textContent = mainUpdatedLabel();
-  }
-
-  renderMainSparkline();
-}
-
-// Línea fina de 7 días bajo el valor total: solo con historial real (≥2 puntos).
-function renderMainSparkline() {
-  if (!dom.mainSparkline || !dom.mainSparklinePath) {
-    return;
-  }
-
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const points = state.history.filter(
-    (point) => point.currency === state.prefs.currency && new Date(point.at).getTime() >= cutoff
-  );
-
-  if (points.length < 2) {
-    dom.mainSparkline.hidden = true;
-    return;
-  }
-
-  const sampled = downsampleHistoryPoints(points, 60);
-  const values = sampled.map((point) => Number(point.total || 0));
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const coords = values.map((value, index) =>
-    `${((index / (values.length - 1)) * 100).toFixed(2)},${(26 - ((value - min) / span) * 23).toFixed(2)}`
-  );
-  dom.mainSparklinePath.setAttribute("points", coords.join(" "));
-  dom.mainSparkline.hidden = false;
-}
-
 function renderStickyBar(snapshot) {
   if (!dom.stickyBar) {
     return;
@@ -725,9 +460,8 @@ function renderStickyBar(snapshot) {
     dom.stickyBarValue.textContent = maskedCurrency(snapshot.totals.currentValue);
   }
   if (dom.stickyBarPnl) {
-    dom.stickyBarPnl.textContent = state.prefs.hideBalance
-      ? formatPercent(totalPnlPct)
-      : `${formatSignedCurrency(totalPnl)} (${formatPercent(totalPnlPct)})`;
+    // Solo el porcentaje: la barra es estrecha y el importe ya esta arriba.
+    dom.stickyBarPnl.textContent = formatPercent(totalPnlPct);
     dom.stickyBarPnl.className = `sticky-bar-pnl ${toneClass(totalPnl)}`;
   }
 }
@@ -1095,50 +829,6 @@ function handleTableKeyDown(event) {
   }
 }
 
-// ── Interacciones de la lista móvil de activos ──
-function bindPortfolioMobile() {
-  const box = document.getElementById("portfolioMobileList");
-  if (!box) {
-    return;
-  }
-  box.addEventListener("click", (event) => {
-    const emptyAdd = event.target.closest('[data-action="empty-add"]');
-    if (emptyAdd) {
-      handleAddRow();
-      return;
-    }
-    const toggle = event.target.closest("[data-card-toggle]");
-    if (toggle) {
-      toggleMobileCard(toggle.dataset.cardToggle, toggle);
-      return;
-    }
-    const actionBtn = event.target.closest("[data-card-action]");
-    if (actionBtn) {
-      const rowId = actionBtn.dataset.rowId;
-      switch (actionBtn.dataset.cardAction) {
-        case "buy": openTradeSheet("buy", rowId); break;
-        case "sell": openTradeSheet("sell", rowId); break;
-        case "edit": openPositionEditor(rowId); break;
-        case "delete": deletePositionWithUndo(rowId); break;
-        case "walletSync": syncWallet(getRowById(rowId)?.walletId, { manual: true }); break;
-        default: break;
-      }
-    }
-  });
-}
-
-function toggleMobileCard(rowId, toggleBtn) {
-  const card = document.querySelector(`.asset-mobile-card[data-card-row="${rowId}"]`);
-  if (!card) return;
-  const expanded = card.classList.toggle("is-expanded");
-  if (expanded) {
-    state.expandedCards.add(rowId);
-  } else {
-    state.expandedCards.delete(rowId);
-  }
-  toggleBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
-}
-
 // Eliminar posición con confirmación + opción de deshacer.
 function deletePositionWithUndo(rowId) {
   const row = getRowById(rowId);
@@ -1152,7 +842,6 @@ function deletePositionWithUndo(rowId) {
   // Borrar una posicion de billetera = no la quiero en la cartera: la
   // siguiente lectura no la vuelve a proponer (deshacer lo revierte).
   setWalletKeyIgnored(row, true);
-  state.expandedCards.delete(rowId);
   clearTimersForRow(rowId);
   if (state.detailRowId === rowId) {
     closeAssetDetail();

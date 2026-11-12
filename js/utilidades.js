@@ -297,14 +297,44 @@ function parseDecimal(value) {
   return numeric;
 }
 
-function formatCurrency(value, digits = 2) {
+// Ajuste "Mostrar decimales" apagado: los importes de 10 o mas van sin
+// centimos. Los precios con mas cifras (getPriceDigits) no se tocan.
+function currencyFractionDigits(value, digits) {
+  if (digits === 2 && state.prefs.decimals === false && Math.abs(value || 0) >= 10) {
+    return 0;
+  }
+  return digits;
+}
+
+function currencyFormatter(digits) {
   const meta = CURRENCY_META[state.prefs.currency] || CURRENCY_META.usd;
   return new Intl.NumberFormat(getUiLocale() || meta.locale, {
     style: "currency",
     currency: meta.code,
     minimumFractionDigits: digits,
     maximumFractionDigits: digits
-  }).format(value || 0);
+  });
+}
+
+function formatCurrency(value, digits = 2) {
+  return currencyFormatter(currencyFractionDigits(value, digits)).format(value || 0);
+}
+
+// Importe partido en dos para el saldo grande: la parte principal (signo y
+// entero, con el simbolo si va delante) y el resto (decimales y simbolo si
+// va detras), que se pinta mas pequeno. Une las dos y sale formatCurrency.
+function moneyParts(value, digits = 2) {
+  const parts = currencyFormatter(currencyFractionDigits(value, digits)).formatToParts(value || 0);
+  let last = -1;
+  parts.forEach((part, index) => {
+    if (part.type === "integer" || part.type === "group") {
+      last = index;
+    }
+  });
+  return {
+    main: parts.slice(0, last + 1).map((part) => part.value).join(""),
+    rest: parts.slice(last + 1).map((part) => part.value).join("")
+  };
 }
 
 function formatCompactCurrency(value) {

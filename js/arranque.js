@@ -8,9 +8,10 @@ function init() {
   loadState();
   loadNewsCache();
   translateStaticContent();
-  applyTheme();
-  applyDensity();
+  applyAppearance();
   bindEvents();
+  bindHome();
+  bindAppearance();
   bindWallets();
   bindEnvironmentEvents();
   applyBalanceVisibility();
@@ -284,9 +285,6 @@ function bindEvents() {
   dom.importBtn.addEventListener("click", () => dom.importFileInput.click());
   dom.importFileInput.addEventListener("change", handleImportCsv);
   dom.toggleChartsBtn.addEventListener("click", toggleCharts);
-  document.querySelectorAll("[data-theme-set]").forEach((btn) => {
-    btn.addEventListener("click", () => setTheme(btn.dataset.themeSet));
-  });
   bindAnalyticsSummary();
   bindNews();
   dom.portfolioNameInput.addEventListener("input", (event) => {
@@ -312,7 +310,6 @@ function bindEvents() {
   dom.tableHead.addEventListener("click", handleHeaderClick);
   dom.tableBody.addEventListener("keydown", handleTableKeyDown);
   dom.tableBody.addEventListener("click", handleTableClick);
-  bindPortfolioMobile();
   bindPositionEditor();
   bindFab();
   bindAssetDetail();
@@ -418,7 +415,7 @@ function bindEvents() {
       state.prefs.hideBalance = !state.prefs.hideBalance;
       savePreferences();
       applyBalanceVisibility();
-      renderDashboardOnly();
+      renderAll();
     });
   }
 
@@ -441,54 +438,52 @@ function bindEvents() {
   });
 }
 
-// Tema con tres opciones excluyentes: claro, oscuro y OLED (oscuro + negro).
+// Tema: claro, oscuro o automatico (sigue al sistema). El negro puro (OLED)
+// es un interruptor aparte que solo pinta sobre el oscuro. "oled" se acepta
+// como modo por compatibilidad con la version anterior.
 function setTheme(mode) {
   if (mode === "oled") {
     state.prefs.theme = "dark";
     state.prefs.oled = true;
   } else {
-    state.prefs.theme = mode === "light" ? "light" : "dark";
-    state.prefs.oled = false;
+    state.prefs.theme = APARIENCIA.temas.includes(mode) ? mode : "dark";
   }
   applyTheme();
   savePreferences();
   renderDashboardOnly();
 }
 
-function applyTheme() {
-  document.documentElement.dataset.theme = state.prefs.theme;
-
-  // Mantiene el color del marco del navegador/PWA alineado con el tema activo.
-  const themeColor = THEME_COLORS[state.prefs.theme] || THEME_COLORS.dark;
-  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
-    meta.setAttribute("content", themeColor);
-  });
-  // OLED es una capa sobre el modo oscuro; se reevalúa tras cambiar de tema.
-  applyOled();
-  const active = state.prefs.oled && state.prefs.theme === "dark" ? "oled" : state.prefs.theme;
-  document.querySelectorAll("[data-theme-set]").forEach((btn) => {
-    const on = btn.dataset.themeSet === active;
-    btn.classList.toggle("is-active", on);
-    btn.setAttribute("aria-pressed", on ? "true" : "false");
-  });
+function systemPrefersLight() {
+  return typeof window !== "undefined" && Boolean(window.matchMedia)
+    && window.matchMedia("(prefers-color-scheme: light)").matches;
 }
 
-// Tema OLED: capa negra profunda sobre el modo oscuro (independiente del
-// toggle claro/oscuro). Solo tiene efecto visual cuando el tema es "dark".
-function applyOled() {
-  const active = Boolean(state.prefs.oled);
-  document.documentElement.dataset.oled = active ? "on" : "";
-  // En OLED sobre oscuro, el marco del navegador/PWA va a negro puro.
-  if (active && state.prefs.theme === "dark") {
-    document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
-      meta.setAttribute("content", "#000000");
-    });
+// Tema que se ve de verdad: resuelve "auto" con el del sistema.
+function resolvedTheme() {
+  if (state.prefs.theme === "auto") {
+    return systemPrefersLight() ? "light" : "dark";
+  }
+  return state.prefs.theme === "light" ? "light" : "dark";
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = resolvedTheme();
+  applyOled();
+  if (typeof renderAppearanceControls === "function") {
+    renderAppearanceControls();
   }
 }
 
-// La vista compacta es ahora la norma: se aplica siempre y no hay ajuste.
-function applyDensity() {
-  document.documentElement.dataset.density = "compact";
+// Negro puro: capa sobre el oscuro. Tambien fija el color del marco del
+// navegador/PWA (barra de estado) para que case con el fondo.
+function applyOled() {
+  const theme = resolvedTheme();
+  const oled = Boolean(state.prefs.oled) && theme === "dark";
+  document.documentElement.dataset.oled = oled ? "on" : "";
+  const color = oled ? THEME_COLORS.oled : (THEME_COLORS[theme] || THEME_COLORS.dark);
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    meta.setAttribute("content", color);
+  });
 }
 
 function bindEnvironmentEvents() {

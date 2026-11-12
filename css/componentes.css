@@ -1,0 +1,291 @@
+/* =============================================================================
+   componentes.css - Piezas comunes del rediseno: boton redondo, chip de
+   cambio, selector segmentado, interruptor, tarjeta, cabecera de bloque,
+   barra inferior y barra fija superior.
+   Todas bajo :root[data-ui] (ver tokens.css).
+   ============================================================================= */
+
+/* ── Boton redondo de icono ── */
+:root[data-ui] .boton-icono {
+  width: var(--toque);
+  height: var(--toque);
+  min-height: 0;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--c-s1);
+  color: var(--c-t1);
+  box-shadow: var(--c-sombra);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.12s ease, background-color 0.2s ease;
+}
+:root[data-ui] .boton-icono svg { width: 20px; height: 20px; }
+:root[data-ui] .boton-icono:active { transform: scale(0.94); }
+:root[data-ui] .boton-icono:focus-visible,
+:root[data-ui] .barra-btn:focus-visible,
+:root[data-ui] .segmentado > button:focus-visible,
+:root[data-ui] .interruptor:focus-visible {
+  outline: 2px solid var(--c-ac);
+  outline-offset: 2px;
+}
+
+/* ── Chip de cambio (+3.940 € · +56 %) ── */
+:root[data-ui] .chip-cambio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  background: var(--c-s2);
+  color: var(--c-t2);
+  white-space: nowrap;
+}
+:root[data-ui] .chip-cambio svg { width: 12px; height: 12px; flex: 0 0 auto; }
+:root[data-ui] .chip-cambio.positive { background: var(--c-pos-suave); color: var(--c-pos); }
+:root[data-ui] .chip-cambio.negative { background: var(--c-neg-suave); color: var(--c-neg); }
+:root[data-ui] .chip-cambio.negative svg { transform: rotate(90deg); }
+:root[data-ui] .chip-cambio.neutral svg { display: none; }
+
+/* ── Selector segmentado (1D 1S 1M... / Claro Oscuro Auto) ── */
+:root[data-ui] .segmentado {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-md);
+  background: var(--c-s1);
+  box-shadow: var(--c-sombra);
+}
+:root[data-ui] .segmentado.en-tarjeta { background: var(--c-s2); box-shadow: none; }
+:root[data-ui] .segmentado > button {
+  min-height: 36px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--c-t2);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+:root[data-ui] .segmentado > button[aria-pressed="true"] {
+  background: var(--c-s2);
+  color: var(--c-t1);
+  font-weight: 600;
+}
+:root[data-ui] .segmentado.en-tarjeta > button[aria-pressed="true"] {
+  background: var(--c-s1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* ── Interruptor ── */
+:root[data-ui] .interruptor {
+  position: relative;
+  width: 50px;
+  height: 30px;
+  min-height: 0;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 15px;
+  background: var(--c-apagado);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+:root[data-ui] .interruptor::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease;
+}
+:root[data-ui] .interruptor[aria-checked="true"] { background: var(--c-ac); }
+:root[data-ui] .interruptor[aria-checked="true"]::after { transform: translateX(20px); }
+:root[data-ui] .interruptor:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Tarjeta ── */
+:root[data-ui] .tarjeta {
+  background: var(--c-s1);
+  border-radius: var(--r-lg);
+  box-shadow: var(--c-sombra);
+  padding: var(--tarjeta-pad);
+}
+
+/* ── Cabecera de bloque (titulo + accion) ── */
+:root[data-ui] .cabecera-bloque {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 4px 10px;
+}
+:root[data-ui] .titulo-bloque {
+  margin: 0;
+  font-size: 1.1875rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--c-t1);
+}
+:root[data-ui] .titulo-tarjeta {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--c-t1);
+}
+
+/* Boton tipo pildora (p. ej. "Por valor"); con <select> nativo dentro. */
+:root[data-ui] .boton-pildora {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--c-s1);
+  color: var(--c-t2);
+  box-shadow: var(--c-sombra);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+:root[data-ui] .boton-pildora svg { width: 14px; height: 14px; flex: 0 0 auto; }
+:root[data-ui] .boton-pildora select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 0;
+  height: 34px;
+  max-width: 160px;
+  padding: 0 18px 0 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--c-t1);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+:root[data-ui] .boton-pildora select:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 4px; border-radius: 4px; }
+:root[data-ui] .boton-pildora .flecha-select {
+  position: absolute;
+  right: 12px;
+  pointer-events: none;
+  color: var(--c-t2);
+}
+
+/* ── Barra inferior ── */
+:root[data-ui] .barra-inferior {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  border: 0;
+  border-top: 1px solid var(--c-line);
+  border-radius: 0;
+  background: var(--c-nav);
+  -webkit-backdrop-filter: saturate(160%) blur(20px);
+  backdrop-filter: saturate(160%) blur(20px);
+  box-shadow: none;
+  transform: none;
+}
+:root[data-ui] .barra-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 52px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--c-t3);
+  font: inherit;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+:root[data-ui] .barra-btn svg { width: 24px; height: 24px; }
+:root[data-ui] .barra-btn span {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+:root[data-ui] .barra-btn.is-active { color: var(--c-ac); }
+:root[data-ui] .barra-btn.is-active span { font-weight: 600; }
+@media (min-width: 700px) {
+  :root[data-ui] .barra-inferior {
+    left: 50%;
+    right: auto;
+    width: 560px;
+    bottom: 16px;
+    transform: translateX(-50%);
+    padding: 6px 8px;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-xl);
+    box-shadow: var(--c-sombra-alta);
+  }
+}
+
+/* ── Barra fija superior (aparece al bajar en Inicio) ── */
+:root[data-ui] .sticky-bar {
+  top: 0;
+  left: 50%;
+  right: auto;
+  width: min(640px, 100%);
+  transform: translate(-50%, -110%);
+  box-sizing: border-box;
+  padding: max(10px, env(safe-area-inset-top)) 20px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--c-line);
+  border-radius: 0;
+  background: var(--c-nav);
+  -webkit-backdrop-filter: saturate(160%) blur(20px);
+  backdrop-filter: saturate(160%) blur(20px);
+  box-shadow: none;
+  justify-content: flex-start;
+  gap: 10px;
+  font-family: var(--fuente);
+}
+:root[data-ui] .sticky-bar.is-visible { transform: translate(-50%, 0); }
+:root[data-ui] .sticky-bar .sticky-bar-title {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--c-t1);
+}
+:root[data-ui] .sticky-bar .sticky-bar-value { flex: 0 0 auto; font-size: 0.9375rem; font-weight: 600; color: var(--c-t1); }
+:root[data-ui] .sticky-bar .sticky-bar-pnl { flex: 0 0 auto; font-weight: 600; white-space: nowrap; }
+:root[data-ui] .sticky-bar .sticky-bar-sep,
+:root[data-ui] .sticky-bar .sticky-bar-right { display: none; }

@@ -320,7 +320,38 @@ const DEFAULT_PREFS = {
   hideBalance: false,
   activeTab: "home",
   filters: null,
-  plan: null
+  plan: null,
+  // Apariencia (rediseno). theme admite "auto": sigue al sistema.
+  accent: "esmeralda",
+  textSize: "m",
+  spacing: "comoda",
+  decimals: true,
+  hideOnOpen: false,
+  groupSmall: true,
+  listMetric: "24h",
+  homeRange: "1m",
+  homeBlocks: null
+};
+
+// Opciones de Apariencia. El primer valor de cada lista es el predeterminado.
+const APARIENCIA = {
+  temas: ["dark", "light", "auto"],
+  acentos: ["esmeralda", "zafiro", "violeta", "oro", "coral", "grafito"],
+  textos: ["m", "s", "l"],
+  espacios: ["comoda", "compacta"],
+  metricas: ["24h", "pnl", "precio"],
+  rangos: ["1m", "1d", "1s", "3m", "1a", "todo"],
+  // Bloques de Inicio en su orden de fabrica.
+  bloques: ["grafico", "acciones", "resumen", "activos", "reparto", "mercado"]
+};
+// Ventana de cada rango del grafico de Inicio (ms). "todo" no tiene limite.
+const RANGOS_INICIO = {
+  "1d": 24 * 60 * 60 * 1000,
+  "1s": 7 * 24 * 60 * 60 * 1000,
+  "1m": 30 * 24 * 60 * 60 * 1000,
+  "3m": 91 * 24 * 60 * 60 * 1000,
+  "1a": 365 * 24 * 60 * 60 * 1000,
+  todo: Infinity
 };
 
 // Trío inversión/tokens/entrada: con dos datos se deriva el tercero.
@@ -337,7 +368,7 @@ const SORT_OPTIONS = [
   { key: "investment", labelKey: "sort.invested" },
   { key: "asset", labelKey: "sort.name" }
 ];
-const THEME_COLORS = { dark: "#050d14", light: "#f0f4f8" };
+const THEME_COLORS = { dark: "#0A0B0D", light: "#F2F3F5", oled: "#000000" };
 
 // Portafolio de demostración genérico (la app es pública): cifras redondas
 // y activos conocidos. Los coinId van sembrados para que el primer arranque
@@ -544,13 +575,17 @@ const dom = {
   mobileSortSelect: document.getElementById("mobileSortSelect"),
   mobileSortDirBtn: document.getElementById("mobileSortDirBtn"),
   mainValue: document.getElementById("mainValue"),
-  mainPnlAbs: document.getElementById("mainPnlAbs"),
-  mainPnlPct: document.getElementById("mainPnlPct"),
+  saldoCambio: document.getElementById("saldoCambio"),
+  saldoCambioValor: document.getElementById("saldoCambioValor"),
+  saldoCambioEtiqueta: document.getElementById("saldoCambioEtiqueta"),
+  graficoSaldo: document.getElementById("graficoSaldo"),
+  rangoSaldo: document.getElementById("rangoSaldo"),
+  inicioBloques: document.getElementById("inicioBloques"),
+  inicioSaludo: document.getElementById("inicioSaludo"),
+  inicioAvatar: document.getElementById("inicioAvatar"),
   mainUpdated: document.getElementById("mainUpdated"),
   liveDot: document.getElementById("liveDot"),
   livePricesSelect: document.getElementById("livePricesSelect"),
-  mainSparkline: document.getElementById("mainSparkline"),
-  mainSparklinePath: document.getElementById("mainSparklinePath"),
   homeStatusLine: document.getElementById("homeStatusLine"),
   homeRefreshBtn: document.getElementById("homeRefreshBtn"),
   toggleBalanceBtn: document.getElementById("toggleBalanceBtn"),

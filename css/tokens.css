@@ -1,0 +1,199 @@
+/* =============================================================================
+   tokens.css - Sistema visual de la app (rediseno 2026).
+   -----------------------------------------------------------------------------
+   Todo lo nuevo cuelga de :root[data-ui] (atributo fijo en <html>), asi gana
+   siempre a la hoja antigua (styles.css) sin !important: sus reglas mas
+   fuertes son del tipo :root[data-theme="light"] select (0,2,1).
+
+   Atributos en <html> (los pone el script del <head> y applyAppearance()):
+     data-theme   dark | light     (el efectivo; "automatico" lo resuelve JS)
+     data-oled    on | ""          (negro puro sobre el oscuro)
+     data-accent  esmeralda | zafiro | violeta | oro | coral | grafito
+     data-texto   s | m | l        (tamano del texto)
+     data-espacio comoda | compacta
+   Contraste comprobado: todo texto >= 4.5:1 sobre su superficie.
+   ============================================================================= */
+
+:root[data-ui] {
+  --fuente: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --r-xl: 24px;
+  --r-lg: 22px;
+  --r-md: 14px;
+  --r-sm: 10px;
+  --r-pill: 999px;
+  --tarjeta-pad: 18px;
+  --fila-pad: 13px;
+  --bloque-gap: 16px;
+  --toque: 44px;
+  --barra-alto: 64px;
+  font-size: 16px;
+}
+:root[data-ui][data-texto="s"] { font-size: 15px; }
+:root[data-ui][data-texto="l"] { font-size: 17.5px; }
+:root[data-ui][data-espacio="compacta"] {
+  --tarjeta-pad: 12px;
+  --fila-pad: 9px;
+  --bloque-gap: 10px;
+}
+
+/* ── Oscuro ── */
+:root[data-ui][data-theme="dark"] {
+  color-scheme: dark;
+  --c-bg: #0A0B0D;
+  --c-s1: #15161A;
+  --c-s2: #1D1F24;
+  --c-s3: #282B31;
+  --c-line: rgba(255, 255, 255, 0.07);
+  --c-line-2: rgba(255, 255, 255, 0.13);
+  --c-t1: #F4F5F7;
+  --c-t2: #A6ABB3;
+  --c-t3: #868B94;
+  --c-pos: #3DDC97;
+  --c-neg: #FF6B70;
+  --c-warn: #F5B94A;
+  --c-pos-suave: rgba(61, 220, 151, 0.13);
+  --c-neg-suave: rgba(255, 107, 112, 0.12);
+  --c-warn-suave: rgba(245, 185, 74, 0.13);
+  --c-nav: rgba(10, 11, 13, 0.9);
+  --c-sombra: none;
+  --c-sombra-alta: 0 18px 50px rgba(0, 0, 0, 0.55);
+  --c-velo: rgba(0, 0, 0, 0.62);
+  --c-apagado: #3A3D44;
+}
+/* ── Negro puro (OLED) ── */
+:root[data-ui][data-theme="dark"][data-oled="on"] {
+  --c-bg: #000000;
+  --c-s1: #0E0F11;
+  --c-s2: #18191C;
+  --c-s3: #222429;
+  --c-nav: rgba(0, 0, 0, 0.9);
+}
+/* ── Claro ── */
+:root[data-ui][data-theme="light"] {
+  color-scheme: light;
+  --c-bg: #F2F3F5;
+  --c-s1: #FFFFFF;
+  --c-s2: #EEF0F3;
+  --c-s3: #E2E5E9;
+  --c-line: rgba(12, 14, 18, 0.08);
+  --c-line-2: rgba(12, 14, 18, 0.15);
+  --c-t1: #0C0E12;
+  --c-t2: #4A4F57;
+  --c-t3: #666B74;
+  --c-pos: #0B7650;
+  --c-neg: #C22E33;
+  --c-warn: #8A5D00;
+  --c-pos-suave: rgba(11, 118, 80, 0.10);
+  --c-neg-suave: rgba(194, 46, 51, 0.09);
+  --c-warn-suave: rgba(138, 93, 0, 0.10);
+  --c-nav: rgba(242, 243, 245, 0.92);
+  --c-sombra: 0 1px 2px rgba(12, 14, 18, 0.04), 0 10px 30px rgba(12, 14, 18, 0.06);
+  --c-sombra-alta: 0 18px 50px rgba(12, 14, 18, 0.18);
+  --c-velo: rgba(12, 14, 18, 0.42);
+  --c-apagado: #C9CDD3;
+}
+
+/* ── Color de acento (el primero de cada par: oscuro; el segundo: claro) ── */
+:root[data-ui][data-theme="dark"][data-accent="esmeralda"] { --c-ac: #34D399; --c-ac-suave: rgba(52, 211, 153, 0.16); --c-sobre-ac: #0A0B0D; }
+:root[data-ui][data-theme="light"][data-accent="esmeralda"] { --c-ac: #087A54; --c-ac-suave: rgba(8, 122, 84, 0.10); --c-sobre-ac: #FFFFFF; }
+:root[data-ui][data-theme="dark"][data-accent="zafiro"] { --c-ac: #6EA8FE; --c-ac-suave: rgba(110, 168, 254, 0.16); --c-sobre-ac: #0A0B0D; }
+:root[data-ui][data-theme="light"][data-accent="zafiro"] { --c-ac: #2160E0; --c-ac-suave: rgba(33, 96, 224, 0.10); --c-sobre-ac: #FFFFFF; }
+:root[data-ui][data-theme="dark"][data-accent="violeta"] { --c-ac: #A78BFA; --c-ac-suave: rgba(167, 139, 250, 0.16); --c-sobre-ac: #0A0B0D; }
+:root[data-ui][data-theme="light"][data-accent="violeta"] { --c-ac: #6544F0; --c-ac-suave: rgba(101, 68, 240, 0.10); --c-sobre-ac: #FFFFFF; }
+:root[data-ui][data-theme="dark"][data-accent="oro"] { --c-ac: #E3C27A; --c-ac-suave: rgba(227, 194, 122, 0.16); --c-sobre-ac: #0A0B0D; }
+:root[data-ui][data-theme="light"][data-accent="oro"] { --c-ac: #8E6A12; --c-ac-suave: rgba(142, 106, 18, 0.10); --c-sobre-ac: #FFFFFF; }
+:root[data-ui][data-theme="dark"][data-accent="coral"] { --c-ac: #FF8A70; --c-ac-suave: rgba(255, 138, 112, 0.16); --c-sobre-ac: #0A0B0D; }
+:root[data-ui][data-theme="light"][data-accent="coral"] { --c-ac: #C9452C; --c-ac-suave: rgba(201, 69, 44, 0.10); --c-sobre-ac: #FFFFFF; }
+:root[data-ui][data-theme="dark"][data-accent="grafito"] { --c-ac: #E8E9EC; --c-ac-suave: rgba(232, 233, 236, 0.13); --c-sobre-ac: #0A0B0D; }
+:root[data-ui][data-theme="light"][data-accent="grafito"] { --c-ac: #16181C; --c-ac-suave: rgba(22, 24, 28, 0.08); --c-sobre-ac: #FFFFFF; }
+
+/* ── Puente con la hoja antigua ──
+   Las pantallas que aun no se han rehecho (Noticias, Plan, Analitica,
+   hojas y detalle) leen estas variables: asi ya salen con los colores y la
+   letra nuevos. Se borra cuando desaparezca styles.css (fase 3). */
+:root[data-ui][data-theme] {
+  --bg: var(--c-bg);
+  --bg-2: var(--c-bg);
+  --bg-3: var(--c-s1);
+  --panel: var(--c-s1);
+  --panel-strong: var(--c-s1);
+  --panel-soft: var(--c-s2);
+  --panel-hover: var(--c-s2);
+  --line: var(--c-line);
+  --line-strong: var(--c-line-2);
+  --line-accent: var(--c-ac-suave);
+  --text: var(--c-t1);
+  --text-2: var(--c-t2);
+  --muted: var(--c-t3);
+  --muted-2: var(--c-t3);
+  --accent: var(--c-ac);
+  --accent-dim: var(--c-ac-suave);
+  --accent-2: var(--c-ac);
+  --accent-2-dim: var(--c-ac-suave);
+  --danger: var(--c-neg);
+  --warning: var(--c-warn);
+  --positive: var(--c-pos);
+  --negative: var(--c-neg);
+  --neutral: var(--c-t2);
+  --positive-bg: var(--c-pos-suave);
+  --negative-bg: var(--c-neg-suave);
+  --warning-bg: var(--c-warn-suave);
+  --glow-accent: none;
+  --glow-blue: none;
+  --shadow: var(--c-sombra);
+  --shadow-sm: var(--c-sombra);
+  --shadow-md: var(--c-sombra);
+  --shadow-lg: var(--c-sombra-alta);
+  --font-display: var(--fuente);
+  --font-body: var(--fuente);
+  --font-mono: var(--fuente);
+  --glass-bg: var(--c-s1);
+  --glass-bg-strong: var(--c-s1);
+  --glass-inner: linear-gradient(transparent, transparent);
+  --glass-card: linear-gradient(var(--c-s1), var(--c-s1));
+  --glass-border: var(--c-line);
+  --glass-highlight: transparent;
+  --glass-shadow: var(--c-sombra);
+  --field-bg: var(--c-s2);
+  --surface-glass: var(--c-s1);
+}
+
+/* ── Base ── */
+:root[data-ui][data-theme] body {
+  background: var(--c-bg);
+  background-image: none;
+  color: var(--c-t1);
+  font-family: var(--fuente);
+  font-feature-settings: "tnum" 1, "cv11" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+/* Fuera la cuadricula y las lineas de terminal de la version anterior. */
+:root[data-ui][data-theme] body::before,
+:root[data-ui][data-theme] body::after {
+  content: none;
+  display: none;
+}
+:root[data-ui][data-theme] .bg-layer { display: none; }
+
+:root[data-ui] .app-shell {
+  max-width: 640px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(var(--barra-alto) + 32px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  gap: 0;
+}
+
+/* Utilidad: oculto a la vista pero leible por lectores de pantalla. */
+:root[data-ui] .solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui] * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

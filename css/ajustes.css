@@ -1,0 +1,300 @@
+/* =============================================================================
+   ajustes.css - Pestana Ajustes: cabecera, bloques plegables (estilo nuevo) y
+   el panel de Apariencia (vista previa, tema, acento, texto, densidad,
+   cifras y bloques de la pantalla de inicio).
+   ============================================================================= */
+
+/* ── Cabecera de pestana (Ajustes y, de momento, las demas) ── */
+:root[data-ui] .home-header {
+  padding: 8px 4px 6px;
+  margin: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+:root[data-ui] .home-header .portfolio-name-display {
+  font-family: var(--fuente);
+  font-size: 1.625rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  text-transform: none;
+  color: var(--c-t1);
+}
+:root[data-ui] .home-header .portfolio-name-display::before { content: none; }
+:root[data-ui] .home-header .home-status {
+  font-family: var(--fuente);
+  font-size: 0.8125rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--c-t2);
+}
+
+/* ── Pestana Ajustes: separacion entre bloques ── */
+:root[data-ui] body[data-active-tab] .tab-section[data-tab="more"] { gap: 12px; }
+
+/* ── Bloque plegable (details) ── */
+:root[data-ui] .more-fold {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: var(--c-s1);
+  box-shadow: var(--c-sombra);
+  overflow: hidden;
+}
+:root[data-ui] .more-fold::before,
+:root[data-ui] .more-fold::after { content: none; display: none; }
+:root[data-ui] .more-fold > .more-fold-sum {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 12px 18px;
+  list-style: none;
+  cursor: pointer;
+}
+:root[data-ui] .more-fold > .more-fold-sum::-webkit-details-marker { display: none; }
+:root[data-ui] .more-fold > .more-fold-sum:focus-visible { outline: 2px solid var(--c-ac); outline-offset: -2px; border-radius: var(--r-lg); }
+:root[data-ui] .more-fold-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+:root[data-ui] .more-fold-txt small {
+  font-family: var(--fuente);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--c-t2);
+}
+:root[data-ui] .more-fold-txt strong {
+  font-family: var(--fuente);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--c-t1);
+}
+:root[data-ui] .more-fold-chev {
+  flex: 0 0 auto;
+  color: var(--c-t3);
+  font-size: 0.875rem;
+  transition: transform 0.2s ease;
+}
+:root[data-ui] .more-fold[open] > .more-fold-sum .more-fold-chev { transform: rotate(180deg); }
+:root[data-ui] .more-fold-body {
+  padding: 0 18px 18px;
+  border-top: 1px solid var(--c-line);
+  padding-top: 14px;
+}
+
+/* ── Apariencia ── */
+:root[data-ui] .apariencia {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+:root[data-ui] .apariencia-titulo {
+  margin: 20px 2px 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--c-t2);
+}
+:root[data-ui] .apariencia-titulo:first-child { margin-top: 0; }
+:root[data-ui] .apariencia-grupo {
+  border-radius: var(--r-md);
+  background: var(--c-bg);
+  padding: 4px 14px;
+}
+
+/* Vista previa */
+:root[data-ui] .vista-previa {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--r-md);
+  background: var(--c-bg);
+  border: 1px solid var(--c-line);
+}
+:root[data-ui] .vista-previa-etiqueta { font-size: 0.8125rem; color: var(--c-t2); }
+:root[data-ui] .vista-previa-valor {
+  font-size: 2.25rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--c-t1);
+}
+:root[data-ui] .vista-previa-valor .saldo-resto { font-size: 0.6em; font-weight: 500; color: var(--c-t2); }
+:root[data-ui] .vista-previa-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+:root[data-ui] .vista-previa-boton {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 20px;
+  background: var(--c-ac);
+  color: var(--c-sobre-ac);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+:root[data-ui] .vista-previa svg { display: block; width: 100%; height: 44px; }
+
+/* Fila con texto + control (interruptor) */
+:root[data-ui] .ajuste-fila {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+:root[data-ui] .ajuste-fila + .ajuste-fila,
+:root[data-ui] .segmentado + .ajuste-fila,
+:root[data-ui] .ajuste-fila + .ajuste-etiqueta { border-top: 1px solid var(--c-line); }
+:root[data-ui] .ajuste-texto {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+:root[data-ui] .ajuste-texto strong { font-size: 0.9375rem; font-weight: 500; color: var(--c-t1); }
+:root[data-ui] .ajuste-texto small { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .ajuste-etiqueta {
+  display: block;
+  padding: 12px 0 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--c-t1);
+}
+:root[data-ui] .apariencia-grupo > .segmentado { margin: 8px 0 12px; }
+
+/* Tamano del texto: las tres "A" crecen */
+:root[data-ui] .segmentado.tamanos > button[data-texto-set="s"] { font-size: 0.8125rem; }
+:root[data-ui] .segmentado.tamanos > button[data-texto-set="m"] { font-size: 1rem; }
+:root[data-ui] .segmentado.tamanos > button[data-texto-set="l"] { font-size: 1.25rem; }
+
+/* Colores de acento */
+:root[data-ui] .acentos {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  padding: 14px 6px;
+  border-radius: var(--r-md);
+  background: var(--c-bg);
+}
+/* En movil los nombres no caben en seis columnas: dos filas de tres. */
+@media (max-width: 440px) {
+  :root[data-ui] .acentos { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 16px; }
+}
+:root[data-ui] .acento-opcion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-t2);
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+:root[data-ui] .acento-muestra {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-sobre-ac);
+}
+:root[data-ui] .acento-muestra svg { width: 18px; height: 18px; visibility: hidden; }
+:root[data-ui] .acento-opcion[aria-pressed="true"] { color: var(--c-t1); font-weight: 600; }
+:root[data-ui] .acento-opcion[aria-pressed="true"] .acento-muestra { box-shadow: 0 0 0 3px var(--c-bg), 0 0 0 5px var(--muestra); }
+:root[data-ui] .acento-opcion[aria-pressed="true"] .acento-muestra svg { visibility: visible; }
+:root[data-ui] .acento-opcion:focus-visible { outline: none; }
+:root[data-ui] .acento-opcion:focus-visible .acento-muestra { outline: 2px solid var(--c-t1); outline-offset: 5px; }
+:root[data-ui] .acento-muestra { background: var(--muestra); }
+:root[data-ui][data-theme="dark"] .acento-muestra.esmeralda { --muestra: #34D399; }
+:root[data-ui][data-theme="light"] .acento-muestra.esmeralda { --muestra: #087A54; }
+:root[data-ui][data-theme="dark"] .acento-muestra.zafiro { --muestra: #6EA8FE; }
+:root[data-ui][data-theme="light"] .acento-muestra.zafiro { --muestra: #2160E0; }
+:root[data-ui][data-theme="dark"] .acento-muestra.violeta { --muestra: #A78BFA; }
+:root[data-ui][data-theme="light"] .acento-muestra.violeta { --muestra: #6544F0; }
+:root[data-ui][data-theme="dark"] .acento-muestra.oro { --muestra: #E3C27A; }
+:root[data-ui][data-theme="light"] .acento-muestra.oro { --muestra: #8E6A12; }
+:root[data-ui][data-theme="dark"] .acento-muestra.coral { --muestra: #FF8A70; }
+:root[data-ui][data-theme="light"] .acento-muestra.coral { --muestra: #C9452C; }
+:root[data-ui][data-theme="dark"] .acento-muestra.grafito { --muestra: #E8E9EC; }
+:root[data-ui][data-theme="light"] .acento-muestra.grafito { --muestra: #16181C; }
+:root[data-ui][data-theme="dark"] .acento-muestra { color: #0A0B0D; }
+:root[data-ui][data-theme="light"] .acento-muestra { color: #FFFFFF; }
+
+/* Bloques de la pantalla de inicio (orden + visibilidad) */
+:root[data-ui] .bloques-inicio { list-style: none; margin: 0; padding: 0 14px; border-radius: var(--r-md); background: var(--c-bg); }
+:root[data-ui] .bloque-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  background: var(--c-bg);
+  touch-action: pan-y;
+}
+:root[data-ui] .bloque-item + .bloque-item { border-top: 1px solid var(--c-line); }
+:root[data-ui] .bloque-item.arrastrando {
+  position: relative;
+  z-index: 2;
+  border-radius: var(--r-sm);
+  box-shadow: var(--c-sombra-alta);
+  background: var(--c-s1);
+  padding-left: 8px;
+  padding-right: 8px;
+  margin: 0 -8px;
+}
+:root[data-ui] .bloque-asa {
+  width: 36px;
+  height: 40px;
+  min-height: 0;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--c-t3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+}
+:root[data-ui] .bloque-asa svg { width: 20px; height: 20px; }
+:root[data-ui] .bloque-asa:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 0; }
+:root[data-ui] .bloque-nombre {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--c-t1);
+}
+:root[data-ui] .bloque-item.apagado .bloque-nombre { color: var(--c-t3); }
+:root[data-ui] .apariencia-nota { margin: 8px 2px 0; font-size: 0.75rem; color: var(--c-t2); }
+
+/* Campos del bloque Preferencias con la letra nueva */
+:root[data-ui] .tab-section[data-tab="more"] .inline-field > span,
+:root[data-ui] .tab-section[data-tab="more"] .status-label,
+:root[data-ui] .tab-section[data-tab="more"] .eyebrow {
+  font-family: var(--fuente);
+  letter-spacing: 0;
+  text-transform: none;
+}

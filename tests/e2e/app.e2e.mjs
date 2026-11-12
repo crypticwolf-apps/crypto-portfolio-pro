@@ -256,8 +256,8 @@ async function recorridoCompleto(navegador, url, ancho) {
   const { page } = app;
 
   await paso(g, "arranque con cartera realista", app, async () => {
-    const n = await page.evaluate(() => document.querySelectorAll(".asset-mobile-card").length);
-    if (n < 6) throw new Error(`se esperaban 6 tarjetas de activo y hay ${n}`);
+    const n = await page.evaluate(() => document.querySelectorAll("#portfolioMobileList .fila-activo").length);
+    if (n < 6) throw new Error(`se esperaban 6 filas de activo y hay ${n}`);
   });
   for (const tab of ["home", "news", "plan", "analytics", "more"]) {
     await paso(g, `pestana ${tab}: visible y sin desborde`, app, async () => {
@@ -287,7 +287,7 @@ async function recorridoCompleto(navegador, url, ancho) {
     await page.selectOption("[data-trade-field='rowId']", "__all__"); await cerrarHoja(page); await page.waitForTimeout(300);
   });
   await paso(g, "detalle de activo con todas sus pestanas", app, async () => {
-    await page.evaluate(() => document.querySelector("tr[data-row-id]")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await page.click("#portfolioMobileList .fila-activo-boton[data-asset-open]");
     await page.waitForTimeout(600);
     const tabs = await page.evaluate(() => [...document.querySelectorAll("[data-detail-tab]")].map((x) => x.dataset.detailTab));
     if (!tabs.length) throw new Error("el detalle no se abrio");
@@ -299,10 +299,55 @@ async function recorridoCompleto(navegador, url, ancho) {
     for (const o of ops) { await page.selectOption("#mobileSortSelect", o); await page.waitForTimeout(120); }
   });
   await paso(g, "modo privacidad", app, async () => { await page.click("#toggleBalanceBtn"); await page.waitForTimeout(250); await page.click("#toggleBalanceBtn"); });
-  await paso(g, "temas claro, OLED y oscuro", app, async () => {
+  await paso(g, "apariencia: claro, automatico (sigue al sistema), negro puro y oscuro", app, async () => {
     await page.click('[data-tab-target="more"]'); await page.waitForTimeout(300);
-    await page.evaluate(() => { document.querySelector(".more-settings-panel").open = true; });
-    for (const t of ["light", "oled", "dark"]) { await page.click(`[data-theme-set="${t}"]`); await page.waitForTimeout(200); }
+    const tema = () => page.evaluate(() => [document.documentElement.dataset.theme, document.documentElement.dataset.oled, document.querySelector('meta[name="theme-color"]').content]);
+    await page.click('[data-tema-set="light"]'); let r = await tema();
+    if (r[0] !== "light" || r[2] !== "#F2F3F5") throw new Error("claro: " + r.join());
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.click('[data-tema-set="auto"]'); r = await tema();
+    if (r[0] !== "dark") throw new Error("automatico con sistema oscuro: " + r.join());
+    await page.emulateMedia({ colorScheme: "light" }); await page.waitForTimeout(200); r = await tema();
+    if (r[0] !== "light") throw new Error("automatico no sigue al sistema: " + r.join());
+    await page.emulateMedia({ colorScheme: null });
+    await page.click('[data-tema-set="dark"]'); await page.click('[data-ajuste="oled"]'); r = await tema();
+    if (r[0] !== "dark" || r[1] !== "on" || r[2] !== "#000000") throw new Error("negro puro: " + r.join());
+    await page.click('[data-ajuste="oled"]'); r = await tema();
+    if (r[1] !== "" || r[2] !== "#0A0B0D") throw new Error("oscuro: " + r.join());
+  });
+  await paso(g, "apariencia: acento, texto grande y densidad sin desborde", app, async () => {
+    await page.click('[data-acento-set="violeta"]'); await page.click('[data-texto-set="l"]'); await page.click('[data-espacio-set="compacta"]');
+    const r = await page.evaluate(() => ({ acento: getComputedStyle(document.documentElement).getPropertyValue("--c-ac").trim(), letra: getComputedStyle(document.documentElement).fontSize, espacio: document.documentElement.dataset.espacio }));
+    if (r.acento.toUpperCase() !== "#A78BFA" || r.letra !== "17.5px" || r.espacio !== "compacta") throw new Error(JSON.stringify(r));
+    for (const tab of ["more", "home"]) {
+      await page.click(`[data-tab-target="${tab}"]`); await page.waitForTimeout(400);
+      const d = await desborde(page); if (d) throw new Error(`${tab} con texto grande: ${d}`);
+    }
+    await page.click('[data-tab-target="more"]'); await page.waitForTimeout(300);
+    await page.click('[data-acento-set="esmeralda"]'); await page.click('[data-texto-set="m"]'); await page.click('[data-espacio-set="comoda"]');
+    const guardado = await page.evaluate(() => JSON.parse(localStorage.getItem("crypto-dashboard-prefs-v2")));
+    if (guardado.accent !== "esmeralda" || guardado.textSize !== "m" || guardado.spacing !== "comoda") throw new Error("no se guardo: " + JSON.stringify(guardado));
+  });
+  await paso(g, "apariencia: ocultar y reordenar bloques de inicio", app, async () => {
+    await page.click('[data-bloque-switch="mercado"]');
+    const oculto = await page.evaluate(() => getComputedStyle(document.querySelector('#inicioBloques [data-bloque="mercado"]')).display);
+    if (oculto !== "none") throw new Error("mercado sigue visible");
+    await page.click('[data-bloque-switch="mercado"]');
+    await page.focus('#bloquesInicio [data-bloque-id="activos"] [data-asa]');
+    await page.keyboard.press("ArrowUp"); await page.keyboard.press("ArrowUp");
+    const orden = await page.evaluate(() => [...document.querySelectorAll("#inicioBloques > [data-bloque]")].map((b) => b.dataset.bloque).join());
+    if (orden !== "grafico,activos,acciones,resumen,reparto,mercado") throw new Error("orden: " + orden);
+    await page.keyboard.press("ArrowDown"); await page.keyboard.press("ArrowDown");
+  });
+  await paso(g, "apariencia: sin decimales y precio como dato de la lista", app, async () => {
+    await page.click('[data-ajuste="decimals"]'); await page.waitForTimeout(200);
+    const sin = await page.evaluate(() => document.getElementById("mainValue").textContent);
+    if (/,\d\d/.test(sin)) throw new Error("con decimales: " + sin);
+    await page.click('[data-ajuste="decimals"]');
+    await page.click('[data-metrica-set="precio"]'); await page.waitForTimeout(200);
+    const dato = await page.evaluate(() => document.querySelector('#portfolioMobileList [data-role="rowMetric"]').textContent);
+    if (!/\$/.test(dato)) throw new Error("dato de la lista: " + dato);
+    await page.click('[data-metrica-set="24h"]');
   });
   await paso(g, "plegables de Ajustes abiertos sin desborde", app, async () => {
     await page.evaluate(() => document.querySelectorAll('.tab-section[data-tab="more"] details').forEach((d) => { d.open = true; }));
@@ -372,8 +417,24 @@ async function casosSueltos(navegador, url) {
   // Primera vez: sin nada guardado, con la cartera de demostracion.
   const virgen = await abrirApp(navegador, url, { sembrar: false });
   await paso(g, "primera apertura sin datos guardados", virgen, async (page) => {
-    const n = await page.evaluate(() => document.querySelectorAll(".asset-mobile-card").length);
+    const n = await page.evaluate(() => document.querySelectorAll("#portfolioMobileList .fila-activo").length);
     if (!n) throw new Error("no se pinto ninguna posicion");
+  });
+  await paso(g, "saldos pequenos agrupados al final y desplegables", virgen, async (page) => {
+    await page.evaluate(() => {
+      ["a", "b"].forEach((k) => state.rows.push(createRow({ id: "peq-" + k, crypto: "polvo" + k, symbol: "P" + k.toUpperCase(), tokens: "1", investment: "0.5", currentPrice: 0.2 })));
+      renderAll();
+    });
+    const r = await page.evaluate(() => ({ grupo: !!document.querySelector(".grupo-pequenos"), oculto: document.getElementById("grupoPequenosLista")?.hidden, filas: document.querySelectorAll("#grupoPequenosLista .fila-activo").length }));
+    if (!r.grupo || !r.oculto || r.filas !== 2) throw new Error(JSON.stringify(r));
+    await page.click("[data-grupo-toggle]");
+    if (await page.evaluate(() => document.getElementById("grupoPequenosLista").hidden)) throw new Error("no se despliega");
+  });
+  await paso(g, "ocultar saldos al abrir: la app arranca en privado", virgen, async (page) => {
+    await page.evaluate(() => { state.prefs.hideOnOpen = true; state.prefs.hideBalance = false; savePreferences(); });
+    await page.reload(); await page.waitForTimeout(2500);
+    const v = await page.evaluate(() => document.getElementById("mainValue").textContent);
+    if (!/•/.test(v) || /\d/.test(v)) throw new Error("saldo visible: " + v);
   });
   await virgen.ctx.close();
   // Proxy propio caido: debe reintentar contra CoinGecko directo y pintar precio.
@@ -382,8 +443,8 @@ async function casosSueltos(navegador, url) {
     // Binance da precio a casi todo, asi que lo que se comprueba es que el
     // mercado se pidio de verdad a CoinGecko directo al fallar el proxy.
     if (!caido.directas.includes("coins/markets")) throw new Error(`sin peticion directa a coins/markets (directas: ${caido.directas.join(", ") || "ninguna"})`);
-    const precio = await page.evaluate(() => document.querySelector('.asset-mobile-card [data-role="rowPrice"]')?.textContent || "");
-    if (!/\d/.test(precio)) throw new Error(`sin precio: "${precio}"`);
+    const valor = await page.evaluate(() => document.querySelector('#portfolioMobileList [data-role="rowValue"]')?.textContent || "");
+    if (!/[1-9]/.test(valor)) throw new Error(`sin precio: "${valor}"`);
   });
   await caido.ctx.close();
 }
@@ -482,7 +543,7 @@ async function casosBilletera(navegador, url, ancho) {
     const eth = filas.find((f) => f.key === "cg:ethereum");
     ethId = eth?.id || "";
     if (Number(eth?.tokens) !== 2 || Math.abs(Number(eth?.investment) - 5000) > 1) throw new Error(`ETH: ${eth?.tokens} tokens, coste ${eth?.investment}`);
-    const chips = await page.evaluate(() => [...document.querySelectorAll(".asset-mobile-card .wallet-chip")].map((c) => c.textContent.trim()));
+    const chips = await page.evaluate(() => [...document.querySelectorAll("#portfolioMobileList .wallet-chip")].map((c) => c.textContent.trim()));
     if (chips.length !== 3 || !chips.every((c) => c.startsWith("Ledger"))) throw new Error("etiquetas: " + chips.join(" / "));
   });
   await paso2("token sin listar: precio por contrato, nunca por simbolo", async () => {
@@ -493,16 +554,18 @@ async function casosBilletera(navegador, url, ancho) {
   });
   await paso2("posicion de billetera: sin comprar ni vender y cantidad bloqueada", async () => {
     await page.click('[data-tab-target="home"]'); await page.waitForTimeout(300);
-    const card = `.asset-mobile-card[data-card-row="${ethId}"]`;
-    await page.click(`${card} [data-card-toggle]`); await page.waitForTimeout(300);
-    const acciones = await page.evaluate((sel) => [...document.querySelectorAll(sel + " [data-card-action]")].map((b) => b.dataset.cardAction), card);
+    const fila = `#portfolioMobileList [data-asset-open="${ethId}"]`;
+    await page.click(fila); await page.waitForTimeout(500);
+    const acciones = await page.evaluate(() => [...document.querySelectorAll("#assetDetailScreen [data-detail-action]")].map((b) => b.dataset.detailAction));
     if (acciones.includes("buy") || acciones.includes("sell") || !acciones.includes("walletSync")) throw new Error("acciones: " + acciones.join(","));
+    await page.click("[data-detail-close]"); await page.waitForTimeout(400);
     await page.click('[data-quick="buy"]'); await page.waitForTimeout(400);
     const opciones = await page.evaluate(() => [...document.querySelectorAll("#tradeSheet [data-trade-field='rowId'] option")].map((o) => o.value));
     const deBilletera = (await filasBilletera(page)).map((f) => f.id);
     if (opciones.some((v) => deBilletera.includes(v))) throw new Error("la compra ofrece posiciones de billetera");
     await cerrarHoja(page); await page.waitForTimeout(300);
-    await page.click(`${card} [data-card-action="edit"]`); await page.waitForTimeout(500);
+    await page.click(fila); await page.waitForTimeout(500);
+    await page.click('#assetDetailScreen [data-detail-action="edit"]'); await page.waitForTimeout(500);
     const bloqueo = await page.evaluate(() => ({
       tokens: document.querySelector('#positionEditorPortal [data-editor-field="tokens"]').readOnly,
       crypto: document.querySelector('#positionEditorPortal [data-editor-field="crypto"]').readOnly
@@ -512,6 +575,8 @@ async function casosBilletera(navegador, url, ancho) {
     const eth = (await filasBilletera(page)).find((f) => f.id === ethId);
     if (eth.tokens !== "2" || eth.investment !== "4000") throw new Error(`tras editar el coste: ${eth.tokens} / ${eth.investment}`);
     await page.click("#positionEditorPortal [data-editor-close]"); await page.waitForTimeout(400);
+    // Se edito desde el detalle: al cerrar el editor se vuelve a el.
+    await page.click("[data-detail-close]"); await page.waitForTimeout(400);
   });
   await paso2("actualizar: si bajan los tokens, el coste baja en proporcion", async () => {
     app.billetera.version = 2; // vendio 0,75 ETH y recibio 1000 ADA
@@ -580,7 +645,7 @@ async function casosBilletera(navegador, url, ancho) {
   await paso2("al recargar sigue todo y no se relee de golpe", async () => {
     const antes = app.billetera.llamadas.length;
     await page.reload(); await page.waitForTimeout(3500);
-    const r = await page.evaluate(() => ({ billeteras: state.wallets.length, chips: document.querySelectorAll(".asset-mobile-card .wallet-chip").length }));
+    const r = await page.evaluate(() => ({ billeteras: state.wallets.length, chips: document.querySelectorAll("#portfolioMobileList .wallet-chip").length }));
     if (r.billeteras !== 2 || r.chips !== 5) throw new Error(JSON.stringify(r));
     if (app.billetera.llamadas.length !== antes) throw new Error("se releyo sin haber pasado el tiempo");
   });
@@ -608,7 +673,8 @@ else anotar("versiones", "librerias del CDN alineadas con package.json", null);
 
 const servidor = await arrancarServidor();
 const url = `http://127.0.0.1:${servidor.address().port}/index.html`;
-const navegador = await chromium.launch();
+// CHROMIUM_PATH: para usar un Chromium ya instalado en vez del de playwright.
+const navegador = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 try {
   await casosSueltos(navegador, url);
   for (const ancho of [375, 320]) await recorridoCompleto(navegador, url, ancho);

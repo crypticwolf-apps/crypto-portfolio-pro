@@ -10,14 +10,15 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 
 - **Carpeta:** `D:\Mega\Proyectos\Proyecto mixto\Portafolio Crypto`
 - **Qué es:** PWA de cartera de criptomonedas en JavaScript vanilla, **sin build**.
-  Ficheros: `index.html`, la app en **`js/`** (18 scripts por tema: `config.js`
-  primero, `arranque.js` el último), `styles.css`, `i18n.js`, `finance.js`
+  Ficheros: `index.html`, la app en **`js/`** (21 scripts por tema: `config.js`
+  primero, `arranque.js` el último), `styles.css` (hoja antigua) y **`css/`**
+  (el rediseño: `tokens.css`, `componentes.css`, `inicio.css`, `ajustes.css`), `i18n.js`, `finance.js`
   (cálculos puros + tests con Vitest), `wallet-core.js` (lógica pura de
   billeteras + tests), `sw.js`, `api/cg.js` (proxy de CoinGecko; clave en
   `COINGECKO_API_KEY`) y `api/wallet.js` (lector de billeteras; clave en
   `ALCHEMY_API_KEY`). Las claves solo en variables de entorno de Vercel.
 - **Scripts clásicos, no módulos ES:** la APK abre la app desde `file://` y ahí
-  `import`/`export` no cargan. Los 18 ficheros comparten el ámbito global y se
+  `import`/`export` no cargan. Los 21 ficheros comparten el ámbito global y se
   ejecutan en el orden de `index.html`. Reglas en la cabecera de `js/config.js`;
   un fichero nuevo va en `index.html` (antes de `arranque.js`) y en `APP_SHELL`
   de `sw.js`.
@@ -30,7 +31,7 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 
 1. **Tres copias:** la raíz es la fuente. Tras cada cambio hay que copiar los
    ficheros tocados a `crypto-portfolio-pwa\` y `android-build\www\` (la
-   carpeta `js\` entera; el antiguo `app.js` ya no se usa).
+   carpetas `js\` y `css\` enteras; el antiguo `app.js` ya no se usa).
 2. **Subir al terminar cada bloque:** `git add` → `commit` → `git fetch` +
    `git rebase origin/main` → `push`. Nunca `--force`.
 3. **Verificar el despliegue:** Vercel publica su resultado en el commit de

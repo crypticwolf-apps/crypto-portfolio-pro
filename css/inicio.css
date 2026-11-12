@@ -1,0 +1,464 @@
+/* =============================================================================
+   inicio.css - Pantalla de Inicio (Portafolio): cabecera, saldo, grafico,
+   acciones rapidas, resumen, lista de activos, reparto y mercado.
+   ============================================================================= */
+
+:root[data-ui] body[data-active-tab] .tab-section.inicio { gap: 0; }
+
+/* ── Cabecera ── */
+:root[data-ui] .inicio-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px 4px;
+}
+:root[data-ui] .inicio-avatar {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--c-ac-suave);
+  color: var(--c-ac);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+:root[data-ui] .inicio-titulos {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+:root[data-ui] .inicio-saludo {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--c-t2);
+}
+:root[data-ui] .inicio-nombre {
+  margin: 0;
+  font-family: var(--fuente);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--c-t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root[data-ui] .inicio-nombre::before { content: none; }
+:root[data-ui] #toggleBalanceBtn .eye-closed { display: none; }
+:root[data-ui] #toggleBalanceBtn.is-hidden-balance .eye-open { display: none; }
+:root[data-ui] #toggleBalanceBtn.is-hidden-balance .eye-closed { display: block; }
+
+/* ── Saldo ── */
+:root[data-ui] .saldo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 4px 6px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+:root[data-ui] .saldo-etiqueta {
+  font-size: 0.8125rem;
+  color: var(--c-t2);
+}
+:root[data-ui] .saldo-valor {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 0;
+  font-family: var(--fuente);
+  font-size: 2.875rem;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  color: var(--c-t1);
+}
+:root[data-ui] .saldo-valor .saldo-resto {
+  font-size: 0.565em;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--c-t2);
+}
+:root[data-ui] .saldo-cambio {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+:root[data-ui] .saldo-cambio-texto {
+  font-size: 0.8125rem;
+  color: var(--c-t2);
+}
+
+/* ── Bloques reordenables ── */
+:root[data-ui] .inicio-bloques {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bloque-gap);
+  padding-top: 8px;
+}
+:root[data-ui] .bloque[hidden],
+:root[data-ui] .bloque[data-apagado] { display: none; }
+
+/* ── Grafico del saldo ── */
+:root[data-ui] .grafico-saldo {
+  position: relative;
+  height: 150px;
+  margin: 0 -4px;
+}
+:root[data-ui] .grafico-saldo svg {
+  display: block;
+  width: 100%;
+  height: 150px;
+  overflow: visible;
+}
+:root[data-ui] .grafico-linea {
+  stroke: var(--c-ac);
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+:root[data-ui] .grafico-punto { fill: var(--c-ac); stroke: var(--c-bg); stroke-width: 2.5; }
+:root[data-ui] .grafico-stop-alto { stop-color: var(--c-ac); stop-opacity: 0.22; }
+:root[data-ui] .grafico-stop-bajo { stop-color: var(--c-ac); stop-opacity: 0; }
+:root[data-ui][data-theme="light"] .grafico-stop-alto { stop-opacity: 0.16; }
+:root[data-ui] .grafico-vacio {
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 24px;
+  font-size: 0.8125rem;
+  color: var(--c-t2);
+  border: 1px dashed var(--c-line-2);
+  border-radius: var(--r-lg);
+}
+:root[data-ui] .bloque-grafico .segmentado { margin-top: 12px; }
+:root[data-ui] .grafico-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  font-size: 0.75rem;
+  color: var(--c-t2);
+}
+:root[data-ui] .grafico-meta .live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-pos);
+  box-shadow: none;
+}
+
+/* ── Acciones rapidas ── */
+:root[data-ui] .acciones-rapidas {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 6px 0 2px;
+}
+:root[data-ui] .accion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-t2);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+:root[data-ui] .accion-icono {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--c-s1);
+  color: var(--c-t1);
+  box-shadow: var(--c-sombra);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.12s ease;
+}
+:root[data-ui] .accion-icono svg { width: 22px; height: 22px; }
+:root[data-ui] .accion-icono.es-primaria { background: var(--c-ac); color: var(--c-sobre-ac); }
+:root[data-ui] .accion:active .accion-icono { transform: scale(0.94); }
+:root[data-ui] .accion:focus-visible { outline: none; }
+:root[data-ui] .accion:focus-visible .accion-icono { outline: 2px solid var(--c-ac); outline-offset: 3px; }
+
+/* ── Resumen (Hoy, Invertido, Mejor y Peor 24 h) ── */
+:root[data-ui] .resumen {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 12px;
+}
+:root[data-ui] .resumen-celda {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+:root[data-ui] .resumen-celda:nth-child(even) {
+  padding-left: 12px;
+  border-left: 1px solid var(--c-line);
+}
+:root[data-ui] .resumen-etiqueta { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .resumen-valor {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--c-t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root[data-ui] .resumen-valor.positive { color: var(--c-pos); }
+@media (max-width: 360px) {
+  :root[data-ui] .resumen-valor { font-size: 0.9375rem; }
+  :root[data-ui] .saldo-valor { font-size: 2.5rem; }
+  :root[data-ui] .mercado-valor { font-size: 0.9375rem; }
+}
+:root[data-ui] .resumen-valor.negative { color: var(--c-neg); }
+:root[data-ui] .resumen-sub {
+  font-size: 0.75rem;
+  color: var(--c-t2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Lista de activos ── */
+:root[data-ui] .cabecera-bloque .titulo-bloque { white-space: nowrap; }
+:root[data-ui] .orden { display: flex; align-items: center; gap: 6px; min-width: 0; }
+:root[data-ui] .orden .boton-pildora { min-width: 0; }
+:root[data-ui] .orden .boton-pildora select { max-width: min(160px, 36vw); }
+:root[data-ui] .orden .boton-icono { width: 34px; height: 34px; font-size: 1rem; font-weight: 600; }
+:root[data-ui] .lista-activos {
+  padding: 0;
+  overflow: hidden;
+}
+:root[data-ui] .fila-activo + .fila-activo,
+:root[data-ui] .fila-activo + .grupo-pequenos,
+:root[data-ui] .grupo-pequenos .fila-activo { border-top: 1px solid var(--c-line); }
+:root[data-ui] .fila-activo-boton {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 0;
+  padding: var(--fila-pad) 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--c-t1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+:root[data-ui] .fila-activo-boton:active { background: var(--c-s2); }
+:root[data-ui] .fila-activo-boton:focus-visible { outline: 2px solid var(--c-ac); outline-offset: -2px; }
+:root[data-ui] .logo-activo {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--logo, var(--c-s3));
+  color: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+:root[data-ui] .logo-activo img { width: 100%; height: 100%; object-fit: cover; }
+:root[data-ui] .logo-activo.logo-grupo { background: var(--c-s2); color: var(--c-t2); }
+:root[data-ui] .logo-activo.logo-grupo svg { width: 20px; height: 20px; }
+:root[data-ui] .fila-activo-id {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+:root[data-ui] .fila-activo-nombre {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root[data-ui] .fila-activo-nombre .favorito { color: var(--c-ac); margin-left: 4px; font-size: 0.75rem; }
+:root[data-ui] .fila-activo-sub {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-size: 0.8125rem;
+  color: var(--c-t2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root[data-ui] .fila-activo-sub .wallet-chip { flex: 0 1 auto; min-width: 0; }
+:root[data-ui] .fila-activo-cifras {
+  flex: 0 0 auto;
+  max-width: 48%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+:root[data-ui] .fila-activo-valor {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+:root[data-ui] .fila-activo-cambio {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--c-t2);
+  white-space: nowrap;
+}
+:root[data-ui] .fila-activo-cambio.positive { color: var(--c-pos); }
+:root[data-ui] .fila-activo-cambio.negative { color: var(--c-neg); }
+/* Destello del precio en vivo sobre el valor de la fila. */
+:root[data-ui] .fila-activo-valor.price-flash-up { animation: filaSube 0.9s ease; }
+:root[data-ui] .fila-activo-valor.price-flash-down { animation: filaBaja 0.9s ease; }
+@keyframes filaSube { 0% { color: var(--c-pos); } 100% { color: inherit; } }
+@keyframes filaBaja { 0% { color: var(--c-neg); } 100% { color: inherit; } }
+
+:root[data-ui] .lista-vacia {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 20px;
+  text-align: center;
+}
+:root[data-ui] .lista-vacia strong { font-size: 1rem; font-weight: 600; }
+:root[data-ui] .lista-vacia p { margin: 0; font-size: 0.875rem; color: var(--c-t2); }
+:root[data-ui] .boton-primario {
+  min-height: 48px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--c-ac);
+  color: var(--c-sobre-ac);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Reparto ── */
+:root[data-ui] .reparto { display: flex; flex-direction: column; gap: 14px; }
+:root[data-ui] .reparto-barra {
+  display: flex;
+  gap: 3px;
+  height: 10px;
+}
+:root[data-ui] .reparto-barra span { border-radius: 5px; min-width: 4px; }
+:root[data-ui] .reparto-leyenda {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+:root[data-ui] .reparto-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.8125rem;
+}
+:root[data-ui] .reparto-item i { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; }
+:root[data-ui] .reparto-item span { flex: 1 1 auto; min-width: 0; color: var(--c-t2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-ui] .reparto-item strong { font-weight: 600; color: var(--c-t1); }
+
+/* ── Mercado ── */
+:root[data-ui] .mercado {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 12px;
+}
+:root[data-ui] .mercado-celda {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+:root[data-ui] .mercado-celda:nth-child(even) {
+  padding-left: 12px;
+  border-left: 1px solid var(--c-line);
+}
+:root[data-ui] .mercado-etiqueta { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .mercado-valor {
+  font-size: 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root[data-ui] .mercado-sub { font-size: 0.75rem; font-weight: 500; color: var(--c-t2); }
+:root[data-ui] .mercado-sub.positive { color: var(--c-pos); }
+:root[data-ui] .mercado-sub.negative { color: var(--c-neg); }
+:root[data-ui] .mercado-barra {
+  position: relative;
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 3px;
+  background: var(--c-s2);
+  overflow: visible;
+}
+:root[data-ui] .mercado-barra > span {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--c-ac);
+}
+:root[data-ui] .mercado-barra.miedo {
+  background: linear-gradient(90deg, #E5484D, #F5B94A 50%, #3DB87A);
+}
+:root[data-ui] .mercado-barra.miedo > i {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--c-s1);
+  border: 2px solid var(--c-t1);
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+}
+:root[data-ui] .mercado-cargando {
+  height: 14px;
+  border-radius: 7px;
+  background: var(--c-s2);
+}
+
+/* Tabla de escritorio: solo en pantallas anchas, donde ocupa el ancho de la
+   ventana (la app va centrada a 640 px) y sustituye a la lista. En movil y
+   tableta manda la lista nueva. */
+:root[data-ui] body[data-active-tab] .tab-section.seccion-escritorio { display: none; }
+@media (min-width: 1100px) {
+  :root[data-ui] body[data-active-tab="home"] .tab-section.seccion-escritorio {
+    display: flex;
+    width: min(1180px, calc(100vw - 48px));
+    margin: var(--bloque-gap) 0 0 calc((100% - min(1180px, calc(100vw - 48px))) / 2);
+  }
+  :root[data-ui] .bloque[data-bloque="activos"] { display: none; }
+}

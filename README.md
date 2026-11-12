@@ -10,13 +10,13 @@ Aplicación web (PWA instalable) para gestionar inversiones en criptomonedas: ta
 - Resumen e insights: PnL agregado, top/peores activos (actual y 24h), activo más volátil.
 - Barra fija al hacer scroll con valor total, PnL y estado de API/guardado.
 - Gráficos (Chart.js, carga diferida): dona de distribución y línea de evolución con rangos 1h–total.
-- Moneda base USD/EUR con conversión del portafolio, 3 idiomas (es/en/fr), tema claro/oscuro.
+- Moneda base USD/EUR con conversión del portafolio, 3 idiomas (es/en/fr), tema claro, oscuro o automatico, negro puro, 6 colores de acento, tamano de texto, densidad y pantalla de inicio personalizable.
 - Importación/exportación CSV y PDF con resumen, KPIs y gráfico de distribución.
 - Guardado automático en `localStorage`; funciona offline como PWA (service worker con cache del app shell).
 
 ## Estructura
 
-- Carpeta raíz y `crypto-portfolio-pwa/`: la app (copias sincronizadas). `index.html`, `js/` (la app en 18 scripts por tema, cargados en orden), `i18n.js`, `finance.js`, `styles.css`, `sw.js`, `manifest.webmanifest`, iconos.
+- Carpeta raíz y `crypto-portfolio-pwa/`: la app (copias sincronizadas). `index.html`, `js/` (la app en 21 scripts por tema, cargados en orden), `css/` (sistema visual nuevo), `i18n.js`, `finance.js`, `styles.css`, `sw.js`, `manifest.webmanifest`, iconos.
 - `wallet-core.js` y `api/wallet.js`: lector de billeteras (lógica pura en el navegador y servidor en Vercel). Con `COINSTATS_API_KEY` (recomendada) lee todos los tokens en 100+ redes; sin ella, usa Alchemy si hay `ALCHEMY_API_KEY`, y si no, los nodos públicos de cada red y mempool.space (solo moneda nativa y las ~500 principales en EVM).
 - `tests/`: pruebas de extremo a extremo en navegador (`npm run test:e2e`) y unitarias con Vitest (`finance.test.js`, `tests/*.test.js`). Se ejecutan solas en cada push (GitHub Actions).
 - `android-build/`: proyecto Capacitor para generar el APK (la web vive en `android-build/www`). Ver `crypto-portfolio-pwa/COMO-GENERAR-APK.md`.

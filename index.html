@@ -1,30 +1,37 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-ui="2">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#050d14" />
+    <meta name="theme-color" content="#0A0B0D" />
 
-    <!-- Tema aplicado antes de pintar: evita el parpadeo claro/oscuro.
-         Prioriza la eleccion guardada; si no existe, usa la del sistema. -->
+    <!-- Apariencia aplicada antes de pintar (sin parpadeo): tema efectivo
+         (claro, oscuro o automatico segun el sistema), negro puro, color de
+         acento, tamano del texto y espaciado. Misma logica que applyTheme(). -->
     <script>
       (function () {
+        var root = document.documentElement;
         try {
-          var stored = JSON.parse(localStorage.getItem("crypto-dashboard-prefs-v2") || "{}");
-          var theme = stored && (stored.theme === "light" || stored.theme === "dark") ? stored.theme : null;
+          var p = JSON.parse(localStorage.getItem("crypto-dashboard-prefs-v2") || "{}") || {};
+          var theme = p.theme === "light" || p.theme === "dark" ? p.theme : null;
           if (!theme) {
             theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
           }
-          document.documentElement.dataset.theme = theme;
-          var oled = stored && stored.oled === true;
-          document.documentElement.dataset.oled = oled ? "on" : "";
-          document.documentElement.dataset.density = "compact";
+          var oled = p.oled === true && theme === "dark";
+          var acentos = ["esmeralda", "zafiro", "violeta", "oro", "coral", "grafito"];
+          root.dataset.theme = theme;
+          root.dataset.oled = oled ? "on" : "";
+          root.dataset.accent = acentos.indexOf(p.accent) >= 0 ? p.accent : "esmeralda";
+          root.dataset.texto = p.textSize === "s" || p.textSize === "l" ? p.textSize : "m";
+          root.dataset.espacio = p.spacing === "compacta" ? "compacta" : "comoda";
+          root.dataset.density = "compact";
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) {
-            meta.setAttribute("content", oled && theme === "dark" ? "#000000" : (theme === "light" ? "#f0f4f8" : "#050d14"));
+            meta.setAttribute("content", oled ? "#000000" : (theme === "light" ? "#F2F3F5" : "#0A0B0D"));
           }
         } catch (e) {
-          document.documentElement.dataset.theme = "dark";
+          root.dataset.theme = "dark";
+          root.dataset.accent = "esmeralda";
         }
       })();
     </script>
@@ -51,17 +58,22 @@
     <link
       rel="preload"
       as="style"
-      href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       onload="this.onload=null;this.rel='stylesheet'"
     />
     <noscript>
       <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       />
     </noscript>
 
     <link rel="stylesheet" href="./styles.css" />
+    <!-- Rediseno: sistema visual nuevo por encima de la hoja antigua. -->
+    <link rel="stylesheet" href="./css/tokens.css" />
+    <link rel="stylesheet" href="./css/componentes.css" />
+    <link rel="stylesheet" href="./css/inicio.css" />
+    <link rel="stylesheet" href="./css/ajustes.css" />
     <link rel="manifest" href="./manifest.webmanifest" />
 
     <script src="./i18n.js" defer></script>
@@ -88,6 +100,8 @@
     <script src="./js/graficos.js" defer></script>
     <script src="./js/exportar.js" defer></script>
     <script src="./js/billeteras.js" defer></script>
+    <script src="./js/inicio.js" defer></script>
+    <script src="./js/apariencia.js" defer></script>
     <script src="./js/arranque.js" defer></script>
 
     <script>
@@ -104,24 +118,24 @@
          background-attachment: fixed, que en iOS no cubre la banda del area
          segura y dejaba una franja de otro color bajo el dock. -->
     <div class="bg-layer" aria-hidden="true"></div>
-    <nav id="tabBar" class="tab-bar" aria-label="Navegacion principal" data-i18n-aria-label="nav.ariaLabel">
-      <button class="tab-btn" type="button" data-tab-target="news" aria-current="false">
+    <nav id="tabBar" class="barra-inferior" aria-label="Navegacion principal" data-i18n-aria-label="nav.ariaLabel">
+      <button class="barra-btn" type="button" data-tab-target="news" aria-current="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h13v14H5a1 1 0 0 1-1-1z"/><path d="M17 8h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1"/><path d="M7 9h7M7 12h7M7 15h4"/></svg>
         <span data-i18n="nav.news">Noticias</span>
       </button>
-      <button class="tab-btn" type="button" data-tab-target="plan" aria-current="false">
+      <button class="barra-btn" type="button" data-tab-target="plan" aria-current="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M5 8l7-4 7 4"/><path d="M5 8l-2 5a3 3 0 0 0 6 0z"/><path d="M19 8l-2 5a3 3 0 0 0 6 0z"/></svg>
         <span data-i18n="nav.plan">Plan</span>
       </button>
-      <button class="tab-btn tab-btn-primary is-active" type="button" data-tab-target="home" aria-current="page">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18"/><path d="M15 14.5h3"/></svg>
+      <button class="barra-btn is-active" type="button" data-tab-target="home" aria-current="page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3"/><path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2"/><path d="M21 12h-5a2 2 0 0 0 0 4h5z"/></svg>
         <span data-i18n="nav.home">Portafolio</span>
       </button>
-      <button class="tab-btn" type="button" data-tab-target="analytics" aria-current="false">
+      <button class="barra-btn" type="button" data-tab-target="analytics" aria-current="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>
         <span data-i18n="nav.analytics">Analitica</span>
       </button>
-      <button class="tab-btn" type="button" data-tab-target="more" aria-current="false">
+      <button class="barra-btn" type="button" data-tab-target="more" aria-current="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.1 13.6a7.6 7.6 0 0 0 0-3.2L21 9l-1.9-3.3-2.2.9a7.5 7.5 0 0 0-2.8-1.6l-.4-2.5h-3.4l-.4 2.5a7.5 7.5 0 0 0-2.8 1.6l-2.2-.9L3 9l1.9 1.4a7.6 7.6 0 0 0 0 3.2L3 15l1.9 3.3 2.2-.9a7.5 7.5 0 0 0 2.8 1.6l.4 2.5h3.4l.4-2.5a7.5 7.5 0 0 0 2.8-1.6l2.2.9L21 15z"/></svg>
         <span data-i18n="nav.settings">Ajustes</span>
       </button>
@@ -192,68 +206,97 @@
       </div>
 
       <!-- ═══ PESTAÑA INICIO ═══ -->
-      <section class="tab-section" data-tab="home">
-        <header class="home-header">
-          <div class="home-header-main">
-            <p id="portfolioNameDisplay" class="portfolio-name-display">Mi Portafolio</p>
-            <p class="home-status" id="homeStatusLine">--</p>
+      <section class="tab-section inicio" data-tab="home">
+        <header class="inicio-cabecera">
+          <span class="inicio-avatar" id="inicioAvatar" aria-hidden="true">MP</span>
+          <div class="inicio-titulos">
+            <p class="inicio-saludo" id="inicioSaludo">&nbsp;</p>
+            <h1 id="portfolioNameDisplay" class="inicio-nombre">Mi Portafolio</h1>
+            <p class="solo-lector" id="homeStatusLine">--</p>
           </div>
-          <div class="home-header-actions">
-            <button id="toggleBalanceBtn" class="icon-circle-btn" type="button" aria-label="Ocultar saldo" data-i18n-aria-label="home.hideBalance">
-              <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.1 6.1A17 17 0 0 0 2 12s3.5 7 10 7a10.4 10.4 0 0 0 5.9-1.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
-            </button>
-            <button id="homeRefreshBtn" class="icon-circle-btn" type="button" aria-label="Actualizar precios" data-i18n-aria-label="home.refresh">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
-            </button>
-          </div>
+          <button id="toggleBalanceBtn" class="boton-icono" type="button" aria-label="Ocultar saldo" data-i18n-aria-label="home.hideBalance">
+            <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.1 6.1A17 17 0 0 0 2 12s3.5 7 10 7a10.4 10.4 0 0 0 5.9-1.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+          </button>
+          <button id="homeRefreshBtn" class="boton-icono" type="button" aria-label="Actualizar precios" data-i18n-aria-label="home.refresh">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
+          </button>
         </header>
 
-        <section class="main-value-card" id="mainValueCard" aria-label="Valor total de la cartera" data-i18n-aria-label="home.totalValueAria">
-          <span class="mvc-label" data-i18n="home.totalValue">Valor total</span>
-          <strong class="mvc-value" id="mainValue">--</strong>
-          <div class="mvc-pnl">
-            <span id="mainPnlAbs" class="neutral">--</span>
-            <span id="mainPnlPct" class="delta-chip" hidden>--</span>
+        <section class="saldo" id="mainValueCard" aria-label="Valor total de la cartera" data-i18n-aria-label="home.totalValueAria">
+          <span class="saldo-etiqueta" data-i18n="inicio.saldoTotal">Saldo total</span>
+          <strong class="saldo-valor" id="mainValue">--</strong>
+          <div class="saldo-cambio">
+            <span class="chip-cambio neutral" id="saldoCambio">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
+              <span id="saldoCambioValor">--</span>
+            </span>
+            <span class="saldo-cambio-texto" id="saldoCambioEtiqueta"></span>
           </div>
-          <svg id="mainSparkline" class="mvc-sparkline" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true" hidden>
-            <polyline id="mainSparklinePath" fill="none" stroke-width="1.5" points=""></polyline>
-          </svg>
-          <span class="mvc-meta"><span class="live-dot" id="liveDot" hidden aria-hidden="true"></span><span id="mainUpdated">--</span></span>
         </section>
 
-        <section class="quick-actions" aria-label="Acciones rapidas">
-          <button class="quick-action" type="button" id="quickAddBtn">
-            <span class="qa-icon accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.1 13.6a7.6 7.6 0 0 0 0-3.2L21 9l-1.9-3.3-2.2.9a7.5 7.5 0 0 0-2.8-1.6l-.4-2.5h-3.4l-.4 2.5a7.5 7.5 0 0 0-2.8 1.6l-2.2-.9L3 9l1.9 1.4a7.6 7.6 0 0 0 0 3.2L3 15l1.9 3.3 2.2-.9a7.5 7.5 0 0 0 2.8 1.6l.4 2.5h3.4l.4-2.5a7.5 7.5 0 0 0 2.8-1.6l2.2.9L21 15z"/></svg></span>
-            <span data-i18n="quick.settings">Ajustes</span>
-          </button>
-          <button class="quick-action" type="button" data-quick="buy">
-            <span class="qa-icon positive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
-            <span data-i18n="quick.buy">Comprar</span>
-          </button>
-          <button class="quick-action" type="button" data-quick="sell">
-            <span class="qa-icon negative"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg></span>
-            <span data-i18n="quick.sell">Vender</span>
-          </button>
-          <button class="quick-action" type="button" data-quick="new">
-            <span class="qa-icon accent2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
-            <span data-i18n="quick.asset">Activo</span>
-          </button>
-        </section>
+        <div class="inicio-bloques" id="inicioBloques">
+          <section class="bloque bloque-grafico" data-bloque="grafico" aria-label="Evolucion del saldo" data-i18n-aria-label="inicio.graficoAria">
+            <div class="grafico-saldo" id="graficoSaldo"></div>
+            <div class="segmentado" id="rangoSaldo" role="group" aria-label="Periodo del grafico" data-i18n-aria-label="inicio.rangoAria">
+              <button type="button" data-rango="1d" aria-pressed="false" data-i18n="inicio.rango1d">1D</button>
+              <button type="button" data-rango="1s" aria-pressed="false" data-i18n="inicio.rango1s">1S</button>
+              <button type="button" data-rango="1m" aria-pressed="true" data-i18n="inicio.rango1m">1M</button>
+              <button type="button" data-rango="3m" aria-pressed="false" data-i18n="inicio.rango3m">3M</button>
+              <button type="button" data-rango="1a" aria-pressed="false" data-i18n="inicio.rango1a">1A</button>
+              <button type="button" data-rango="todo" aria-pressed="false" data-i18n="inicio.rangoTodo">Todo</button>
+            </div>
+            <p class="grafico-meta"><span class="live-dot" id="liveDot" hidden aria-hidden="true"></span><span id="mainUpdated">--</span></p>
+          </section>
 
-        <section class="summary-grid" id="summaryGrid" aria-label="Resumen del portafolio" data-i18n-aria-label="summary.ariaLabel"></section>
+          <section class="bloque acciones-rapidas" data-bloque="acciones" aria-label="Acciones rapidas" data-i18n-aria-label="inicio.accionesAria">
+            <button class="accion" type="button" id="quickAddBtn">
+              <span class="accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.1 13.6a7.6 7.6 0 0 0 0-3.2L21 9l-1.9-3.3-2.2.9a7.5 7.5 0 0 0-2.8-1.6l-.4-2.5h-3.4l-.4 2.5a7.5 7.5 0 0 0-2.8 1.6l-2.2-.9L3 9l1.9 1.4a7.6 7.6 0 0 0 0 3.2L3 15l1.9 3.3 2.2-.9a7.5 7.5 0 0 0 2.8 1.6l.4 2.5h3.4l.4-2.5a7.5 7.5 0 0 0 2.8-1.6l2.2.9L21 15z"/></svg></span>
+              <span data-i18n="quick.settings">Ajustes</span>
+            </button>
+            <button class="accion" type="button" data-quick="buy">
+              <span class="accion-icono es-primaria"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
+              <span data-i18n="quick.buy">Comprar</span>
+            </button>
+            <button class="accion" type="button" data-quick="sell">
+              <span class="accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M19 12l-7 7-7-7"/></svg></span>
+              <span data-i18n="quick.sell">Vender</span>
+            </button>
+            <button class="accion" type="button" data-quick="new">
+              <span class="accion-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+              <span data-i18n="quick.asset">Activo</span>
+            </button>
+          </section>
 
-        <section class="alloc-card" id="allocationCard" hidden></section>
+          <section class="bloque tarjeta resumen" data-bloque="resumen" id="summaryGrid" aria-label="Resumen del portafolio" data-i18n-aria-label="summary.ariaLabel"></section>
 
-        <section class="market-section">
-          <div class="home-section-head">
-            <h2 class="home-section-title" data-i18n="market.title">Mercado</h2>
-            <span id="marketTrendChip" class="trend-chip" hidden></span>
-          </div>
-          <div id="marketGrid" class="market-grid"></div>
-        </section>
+          <section class="bloque" data-bloque="activos">
+            <div class="cabecera-bloque">
+              <h2 class="titulo-bloque" data-i18n="inicio.tusActivos">Tus activos</h2>
+              <div class="orden" id="mobileSort">
+                <label class="boton-pildora" for="mobileSortSelect">
+                  <span class="solo-lector" data-i18n="table.sortBy">Ordenar por</span>
+                  <select id="mobileSortSelect"></select>
+                  <svg class="flecha-select" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </label>
+                <button id="mobileSortDirBtn" class="boton-icono" type="button" aria-label="Cambiar direccion de orden" data-i18n-aria-label="table.sortDirAria">&darr;</button>
+              </div>
+            </div>
+            <div id="portfolioMobileList" class="tarjeta lista-activos" role="list"></div>
+          </section>
 
+          <section class="bloque tarjeta reparto" data-bloque="reparto" id="allocationCard" hidden></section>
+
+          <section class="bloque" data-bloque="mercado">
+            <div class="cabecera-bloque">
+              <h2 class="titulo-bloque" data-i18n="market.title">Mercado</h2>
+              <span id="marketTrendChip" class="chip-cambio" hidden></span>
+            </div>
+            <div id="marketGrid" class="tarjeta mercado"></div>
+          </section>
+        </div>
       </section>
+
 
       <!-- ═══ PESTAÑA ANALITICA ═══ -->
       <section class="tab-section" data-tab="analytics">
@@ -323,8 +366,8 @@
       </div>
       </section>
 
-      <!-- ═══ POSICIONES (dentro de Portafolio) ═══ -->
-      <section class="tab-section" data-tab="home">
+      <!-- ═══ POSICIONES: tabla de escritorio (solo en pantallas anchas) ═══ -->
+      <section class="tab-section seccion-escritorio" data-tab="home">
 
       <section class="panel controls-panel desktop-only-toolbar">
         <div class="toolbar" id="actionsToolbar">
@@ -339,21 +382,6 @@
       <section class="panel table-panel table-panel-full">
         <div class="panel-heading compact-heading">
           <h2 class="home-section-title" data-i18n="table.eyebrow">Posiciones</h2>
-          <div class="cartera-toolbar">
-            <div class="mobile-sort" id="mobileSort">
-              <label class="mobile-sort-field" for="mobileSortSelect">
-                <span data-i18n="table.sortBy">Ordenar por</span>
-                <select id="mobileSortSelect"></select>
-              </label>
-              <button
-                id="mobileSortDirBtn"
-                class="ghost-btn mobile-sort-dir"
-                type="button"
-                aria-label="Cambiar direccion de orden"
-                data-i18n-aria-label="table.sortDirAria"
-              >&darr;</button>
-            </div>
-          </div>
         </div>
 
         <!-- Escritorio: tabla tradicional -->
@@ -365,8 +393,6 @@
           </table>
         </div>
 
-        <!-- Movil: lista de tarjetas de activo (misma fuente de datos) -->
-        <div id="portfolioMobileList" class="portfolio-mobile-list" role="list"></div>
       </section>
 
       </section>
@@ -407,8 +433,13 @@
         <div id="planContent"></div>
       </section>
 
-      <!-- ═══ PESTAÑA MAS ═══ -->
+      <!-- ═══ PESTAÑA AJUSTES ═══ -->
       <section class="tab-section" data-tab="more">
+        <header class="home-header">
+          <div class="home-header-main">
+            <p class="portfolio-name-display" data-i18n="nav.settings">Ajustes</p>
+          </div>
+        </header>
 
       <section class="panel install-card" id="installCard" hidden>
         <div class="install-card-icon" aria-hidden="true">
@@ -420,7 +451,83 @@
         </div>
       </section>
 
-            <details class="panel more-settings-panel more-fold" open>
+      <details class="panel more-fold apariencia-panel" id="aparienciaPanel" open>
+        <summary class="more-fold-sum"><span class="more-fold-txt"><small data-i18n="apariencia.eyebrow">Personaliza</small><strong data-i18n="apariencia.title">Apariencia</strong></span><span class="more-fold-chev" aria-hidden="true">▾</span></summary>
+        <div class="more-fold-body apariencia">
+          <div class="vista-previa" aria-hidden="true">
+            <span class="vista-previa-etiqueta" data-i18n="apariencia.vistaPrevia">Vista previa · Saldo total</span>
+            <strong class="vista-previa-valor" id="vistaPreviaValor">--</strong>
+            <div class="vista-previa-fila">
+              <span class="chip-cambio positive" id="vistaPreviaCambio">--</span>
+              <span class="vista-previa-boton" data-i18n="quick.buy">Comprar</span>
+            </div>
+            <svg viewBox="0 0 326 44" preserveAspectRatio="none"><path d="M2 38 L30 32 L58 35 L86 26 L114 29 L142 20 L170 23 L198 14 L226 17 L254 9 L282 11 L310 4 L324 6" fill="none" style="stroke: var(--c-ac)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>
+          </div>
+
+          <h3 class="apariencia-titulo" data-i18n="apariencia.tema">Tema</h3>
+          <div class="apariencia-grupo">
+            <div class="segmentado en-tarjeta" role="group" aria-label="Tema" data-i18n-aria-label="theme.pickerAria">
+              <button type="button" data-tema-set="light" aria-pressed="false" data-i18n="apariencia.claro">Claro</button>
+              <button type="button" data-tema-set="dark" aria-pressed="false" data-i18n="apariencia.oscuro">Oscuro</button>
+              <button type="button" data-tema-set="auto" aria-pressed="false" data-i18n="apariencia.auto">Automatico</button>
+            </div>
+            <div class="ajuste-fila">
+              <span class="ajuste-texto"><strong id="oledLabel" data-i18n="apariencia.oled">Negro puro (OLED)</strong><small data-i18n="apariencia.oledHint">Fondo negro total en modo oscuro. Ahorra bateria.</small></span>
+              <button class="interruptor" type="button" role="switch" aria-checked="false" aria-labelledby="oledLabel" data-ajuste="oled"></button>
+            </div>
+          </div>
+
+          <h3 class="apariencia-titulo" data-i18n="apariencia.acento">Color de acento</h3>
+          <div class="acentos" role="group" aria-label="Color de acento" data-i18n-aria-label="apariencia.acento" id="acentos"></div>
+
+          <h3 class="apariencia-titulo" data-i18n="apariencia.textoDensidad">Texto y densidad</h3>
+          <div class="apariencia-grupo">
+            <span class="ajuste-etiqueta" id="tamanoLabel" data-i18n="apariencia.tamano">Tamano del texto</span>
+            <div class="segmentado en-tarjeta tamanos" role="group" aria-labelledby="tamanoLabel">
+              <button type="button" data-texto-set="s" aria-pressed="false" aria-label="Texto pequeno" data-i18n-aria-label="apariencia.textoS">A</button>
+              <button type="button" data-texto-set="m" aria-pressed="false" aria-label="Texto normal" data-i18n-aria-label="apariencia.textoM">A</button>
+              <button type="button" data-texto-set="l" aria-pressed="false" aria-label="Texto grande" data-i18n-aria-label="apariencia.textoL">A</button>
+            </div>
+            <span class="ajuste-etiqueta" id="espacioLabel" data-i18n="apariencia.densidad">Densidad</span>
+            <div class="segmentado en-tarjeta" role="group" aria-labelledby="espacioLabel">
+              <button type="button" data-espacio-set="comoda" aria-pressed="false" data-i18n="apariencia.comoda">Comoda</button>
+              <button type="button" data-espacio-set="compacta" aria-pressed="false" data-i18n="apariencia.compacta">Compacta</button>
+            </div>
+          </div>
+
+          <h3 class="apariencia-titulo" data-i18n="apariencia.cifras">Cifras y privacidad</h3>
+          <div class="apariencia-grupo">
+            <div class="ajuste-fila">
+              <span class="ajuste-texto"><strong id="decimalesLabel" data-i18n="apariencia.decimales">Mostrar decimales</strong><small data-i18n="apariencia.decimalesHint">Importes con centimos en toda la app.</small></span>
+              <button class="interruptor" type="button" role="switch" aria-checked="true" aria-labelledby="decimalesLabel" data-ajuste="decimals"></button>
+            </div>
+            <div class="ajuste-fila">
+              <span class="ajuste-texto"><strong id="ocultarLabel" data-i18n="apariencia.ocultar">Ocultar saldos al abrir</strong><small data-i18n="apariencia.ocultarHint">Empieza en modo privado; se muestran con el ojo.</small></span>
+              <button class="interruptor" type="button" role="switch" aria-checked="false" aria-labelledby="ocultarLabel" data-ajuste="hideOnOpen"></button>
+            </div>
+            <div class="ajuste-fila">
+              <span class="ajuste-texto"><strong id="agruparLabel" data-i18n="apariencia.agrupar">Agrupar saldos pequenos</strong><small id="agruparHint">Los activos de menos de 1 van juntos al final.</small></span>
+              <button class="interruptor" type="button" role="switch" aria-checked="true" aria-labelledby="agruparLabel" data-ajuste="groupSmall"></button>
+            </div>
+          </div>
+
+          <h3 class="apariencia-titulo" data-i18n="apariencia.lista">Lista de activos</h3>
+          <div class="apariencia-grupo">
+            <span class="ajuste-etiqueta" id="metricaLabel" data-i18n="apariencia.metrica">Dato bajo el valor</span>
+            <div class="segmentado en-tarjeta" role="group" aria-labelledby="metricaLabel">
+              <button type="button" data-metrica-set="24h" aria-pressed="false" data-i18n="apariencia.metrica24h">24 h</button>
+              <button type="button" data-metrica-set="pnl" aria-pressed="false" data-i18n="apariencia.metricaPnl">Ganancia</button>
+              <button type="button" data-metrica-set="precio" aria-pressed="false" data-i18n="apariencia.metricaPrecio">Precio</button>
+            </div>
+          </div>
+
+          <h3 class="apariencia-titulo" data-i18n="apariencia.inicio">Pantalla de inicio</h3>
+          <ul class="bloques-inicio" id="bloquesInicio"></ul>
+          <p class="apariencia-nota" data-i18n="apariencia.inicioNota">Arrastra el asa para cambiar el orden. Con el teclado: flechas arriba y abajo.</p>
+        </div>
+      </details>
+
+      <details class="panel more-settings-panel more-fold">
         <summary class="more-fold-sum"><span class="more-fold-txt"><small data-i18n="more.settingsEyebrow">Ajustes</small><strong data-i18n="more.settingsTitle">Preferencias</strong></span><span class="more-fold-chev" aria-hidden="true">▾</span></summary>
         <div class="more-fold-body">
 <div class="top-actions">
@@ -462,11 +569,6 @@
             </select>
           </label>
 
-          <div class="theme-picker" role="group" aria-label="Tema" data-i18n-aria-label="theme.pickerAria">
-            <button class="theme-opt" type="button" data-theme-set="light" aria-pressed="false" data-i18n="theme.light">Modo claro</button>
-            <button class="theme-opt" type="button" data-theme-set="dark" aria-pressed="false" data-i18n="theme.dark">Modo oscuro</button>
-            <button class="theme-opt" type="button" data-theme-set="oled" aria-pressed="false" data-i18n="theme.oled">Modo OLED</button>
-          </div>
         </div>
 
         <div class="autorefresh-row">

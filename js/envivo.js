@@ -486,19 +486,20 @@ function flushLivePrices() {
 // Aviso discreto en Inicio: sustituye el "actualizado hace X" mientras el
 // feed esta sirviendo, para que se vea de donde sale el precio.
 // Actualiza solo las celdas que cambian con un tick y marca la direccion
-// para el destello. Trabaja sobre la fila de la tabla y sobre la tarjeta
-// movil sin reconstruir ninguna de las dos.
+// para el destello. Trabaja sobre la fila de la tabla y sobre la fila de la
+// lista de Inicio sin reconstruir ninguna de las dos.
 function updateRowPriceCells(rowId, direction) {
   const row = getRowById(rowId);
   if (!row) {
     return;
   }
   const metrics = computeRowMetrics(row);
+  // Lista de Inicio: valor y dato de la derecha, con destello en el valor.
+  const inList = updateAssetRowLive(rowId, direction);
   const containers = [
-    dom.tableBody?.querySelector(`tr[data-row-id="${rowId}"]`),
-    document.querySelector(`[data-card-row="${rowId}"]`)
+    dom.tableBody?.querySelector(`tr[data-row-id="${rowId}"]`)
   ].filter(Boolean);
-  if (!containers.length) {
+  if (!containers.length && !inList) {
     scheduleDashboardRefresh();
     return;
   }
@@ -522,7 +523,7 @@ function updateRowPriceCells(rowId, direction) {
     set("rowChange", (node) => {
       const suffix = node.querySelector("small") ? "<small> 24h</small>" : "";
       node.innerHTML = `${changeValue === null ? "--" : formatSignedPercent(changeValue)}${suffix}`;
-      node.className = `${container.matches("tr") ? "numeric" : "amc-24h"} ${toneClass(changeValue || 0)}`;
+      node.className = `numeric ${toneClass(changeValue || 0)}`;
     });
     set("rowValue", (node) => { node.textContent = maskedCurrency(metrics.currentValue); });
     set("rowPnlAbs", (node) => {
