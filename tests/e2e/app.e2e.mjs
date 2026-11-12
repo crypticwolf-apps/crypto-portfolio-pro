@@ -286,12 +286,26 @@ async function recorridoCompleto(navegador, url, ancho) {
     for (const k of ["tp1", "tp2", "tp3", "price"]) await page.click(`[data-alert-kind="${k}"]`);
     await page.selectOption("[data-trade-field='rowId']", "__all__"); await cerrarHoja(page); await page.waitForTimeout(300);
   });
-  await paso(g, "detalle de activo con todas sus pestanas", app, async () => {
+  await paso(g, "ficha de activo: secciones, rangos del grafico y sin desborde", app, async () => {
     await page.click("#portfolioMobileList .fila-activo-boton[data-asset-open]");
     await page.waitForTimeout(600);
-    const tabs = await page.evaluate(() => [...document.querySelectorAll("[data-detail-tab]")].map((x) => x.dataset.detailTab));
-    if (!tabs.length) throw new Error("el detalle no se abrio");
-    for (const t of tabs) { await page.click(`[data-detail-tab="${t}"]`); await page.waitForTimeout(250); }
+    const r = await page.evaluate(() => ({
+      bloques: document.querySelectorAll("#assetDetailScreen .ficha-bloque").length,
+      precio: document.querySelector('#assetDetailScreen [data-detail-role="price"]')?.textContent || "",
+      rangos: [...document.querySelectorAll("#assetDetailScreen [data-detail-range]")].map((b) => b.dataset.detailRange),
+      botones: [...document.querySelectorAll("#assetDetailScreen .ficha-pie [data-detail-action]")].map((b) => b.dataset.detailAction).join()
+    }));
+    if (r.bloques !== 5 || !/\d/.test(r.precio) || r.rangos.length !== 6 || r.botones !== "sell,buy") throw new Error(JSON.stringify(r));
+    for (const k of r.rangos) {
+      await page.click(`[data-detail-range="${k}"]`); await page.waitForTimeout(150);
+      const pulsado = await page.evaluate((x) => document.querySelector(`[data-detail-range="${x}"]`).getAttribute("aria-pressed"), k);
+      if (pulsado !== "true") throw new Error("rango sin marcar: " + k);
+    }
+    const d = await desborde(page); if (d) throw new Error(d);
+    await page.click('#assetDetailScreen [data-detail-action="favorite"]'); await page.waitForTimeout(200);
+    const fav = await page.evaluate(() => document.querySelector('#assetDetailScreen [data-detail-action="favorite"]').getAttribute("aria-pressed"));
+    await page.click('#assetDetailScreen [data-detail-action="favorite"]');
+    if (fav !== "false") throw new Error("favorito no cambia: " + fav);
     await page.click("[data-detail-close]");
   });
   await paso(g, "todas las ordenaciones", app, async () => {

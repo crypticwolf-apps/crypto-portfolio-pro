@@ -1,0 +1,523 @@
+/* =============================================================================
+   hojas.css - Controles comunes (botones, campos, selectores, chips) y todo
+   lo que se superpone: hojas de compra, venta, alerta y billetera, editor de
+   posicion, menu del engranaje, menu de fila y avisos.
+   Prefijo :root[data-ui][data-theme] para ganar a las reglas antiguas por
+   tema (p. ej. :root[data-theme="light"] .ghost-btn) sin !important.
+   ============================================================================= */
+
+/* ── Botones ── */
+:root[data-ui][data-theme] .primary-btn,
+:root[data-ui][data-theme] .ghost-btn,
+:root[data-ui][data-theme] .danger-btn,
+:root[data-ui][data-theme] .boton-secundario {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--r-md);
+  box-shadow: none;
+  font-family: var(--fuente);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+  transition: transform 0.12s ease, background-color 0.2s ease, opacity 0.2s ease;
+}
+:root[data-ui][data-theme] .primary-btn,
+:root[data-ui][data-theme] .primary-btn:hover {
+  background: var(--c-ac);
+  color: var(--c-sobre-ac);
+  box-shadow: none;
+  transform: none;
+}
+:root[data-ui][data-theme] .ghost-btn,
+:root[data-ui][data-theme] .boton-secundario {
+  background: var(--c-s2);
+  color: var(--c-t1);
+}
+:root[data-ui][data-theme] .ghost-btn:hover,
+:root[data-ui][data-theme] .boton-secundario:hover { background: var(--c-s3); transform: none; }
+:root[data-ui][data-theme] .danger-btn,
+:root[data-ui][data-theme] .danger-btn:hover {
+  background: var(--c-neg-suave);
+  color: var(--c-neg);
+  transform: none;
+}
+:root[data-ui][data-theme] .primary-btn:active,
+:root[data-ui][data-theme] .ghost-btn:active,
+:root[data-ui][data-theme] .danger-btn:active,
+:root[data-ui][data-theme] .boton-secundario:active { transform: scale(0.98); }
+:root[data-ui][data-theme] .primary-btn:disabled,
+:root[data-ui][data-theme] .ghost-btn:disabled,
+:root[data-ui][data-theme] .danger-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+:root[data-ui][data-theme] .primary-btn:focus-visible,
+:root[data-ui][data-theme] .ghost-btn:focus-visible,
+:root[data-ui][data-theme] .danger-btn:focus-visible,
+:root[data-ui][data-theme] .boton-secundario:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 2px; }
+:root[data-ui][data-theme] .boton-secundario { align-self: flex-start; }
+
+/* Boton redondo antiguo (cabeceras de Noticias y Plan, cierre de hojas):
+   igual que .boton-icono. */
+:root[data-ui][data-theme] .icon-circle-btn {
+  width: var(--toque);
+  height: var(--toque);
+  border: 0;
+  background: var(--c-s1);
+  color: var(--c-t1);
+  box-shadow: var(--c-sombra);
+}
+:root[data-ui][data-theme] .icon-circle-btn svg { width: 20px; height: 20px; }
+:root[data-ui][data-theme] .icon-circle-btn:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 2px; }
+
+/* ── Campos ── */
+:root[data-ui][data-theme] select,
+:root[data-ui][data-theme] #currencySelect,
+:root[data-ui][data-theme] #autoRefreshSelect {
+  min-height: 46px;
+  padding: 0 40px 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background-color: var(--c-s2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23868B94' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: calc(100% - 14px) center;
+  background-size: 12px 8px;
+  background-repeat: no-repeat;
+  box-shadow: none;
+  color: var(--c-t1);
+  font-family: var(--fuente);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+:root[data-ui][data-theme] select:hover,
+:root[data-ui][data-theme] select:focus,
+:root[data-ui][data-theme] #currencySelect:focus,
+:root[data-ui][data-theme] #autoRefreshSelect:focus {
+  color: var(--c-t1);
+  background-color: var(--c-s2);
+  border-color: transparent;
+}
+:root[data-ui][data-theme] select:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 1px; }
+:root[data-ui][data-theme] select option,
+:root[data-ui][data-theme] select optgroup { background: var(--c-s1); color: var(--c-t1); }
+/* El selector de orden de Inicio va dentro de una pildora: sin caja propia. */
+:root[data-ui][data-theme] .boton-pildora select {
+  min-height: 0;
+  height: 34px;
+  padding: 0 18px 0 0;
+  background: transparent;
+  font-size: 0.8125rem;
+}
+
+:root[data-ui][data-theme] .editor-field input,
+:root[data-ui][data-theme] .editor-field textarea,
+:root[data-ui][data-theme] .inline-input {
+  width: 100%;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: var(--c-s2);
+  box-shadow: none;
+  color: var(--c-t1);
+  font-family: var(--fuente);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+:root[data-ui][data-theme] .editor-field textarea { padding: 12px 14px; line-height: 1.45; }
+:root[data-ui][data-theme] .editor-field input::placeholder,
+:root[data-ui][data-theme] .editor-field textarea::placeholder,
+:root[data-ui][data-theme] .inline-input::placeholder { color: var(--c-t3); }
+:root[data-ui][data-theme] .editor-field input:focus,
+:root[data-ui][data-theme] .editor-field textarea:focus,
+:root[data-ui][data-theme] .inline-input:focus {
+  outline: none;
+  border-color: var(--c-ac);
+  background: var(--c-s1);
+  box-shadow: 0 0 0 3px var(--c-ac-suave);
+}
+:root[data-ui][data-theme] .editor-field input[readonly] {
+  opacity: 1;
+  border: 1px dashed var(--c-line-2);
+  background: transparent;
+  color: var(--c-t2);
+}
+:root[data-ui][data-theme] .editor-field > span,
+:root[data-ui][data-theme] .inline-field > span {
+  display: block;
+  margin: 0 0 6px 2px;
+  font-family: var(--fuente);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--c-t2);
+}
+:root[data-ui][data-theme] .editor-field { gap: 0; }
+:root[data-ui][data-theme] .inline-field {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/* Chips de eleccion (TP1/TP2/TP3/Precio, coste de billetera, % de venta) */
+:root[data-ui][data-theme] .alert-kind,
+:root[data-ui][data-theme] .trade-quick,
+:root[data-ui][data-theme] .alert-tp-suggest { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+:root[data-ui][data-theme] .alert-tp-suggest[hidden] { display: none; }
+:root[data-ui][data-theme] .alert-tp-suggest .chip-preset { flex: 0 0 auto; width: auto; }
+:root[data-ui][data-theme] .alert-suggest-label { width: 100%; }
+:root[data-ui][data-theme] .alert-kind-chip,
+:root[data-ui][data-theme] .chip-preset {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--c-s2);
+  color: var(--c-t2);
+  font-family: var(--fuente);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+:root[data-ui][data-theme] .alert-kind-chip.is-active,
+:root[data-ui][data-theme] .alert-kind-chip[aria-checked="true"] {
+  background: var(--c-ac-suave);
+  color: var(--c-ac);
+}
+:root[data-ui][data-theme] .alert-kind-chip:focus-visible,
+:root[data-ui][data-theme] .chip-preset:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 2px; }
+:root[data-ui][data-theme] .alert-suggest-label { font-size: 0.75rem; color: var(--c-t2); }
+
+/* ── Hojas (compra, venta, alerta, billetera) y editor ── */
+:root[data-ui][data-theme] .editor-backdrop,
+:root[data-ui][data-theme] .fab-sheet-backdrop {
+  background: var(--c-velo);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+:root[data-ui][data-theme] .editor-panel {
+  width: min(560px, calc(100% - 32px));
+  border: 0;
+  border-radius: var(--r-xl);
+  background: var(--c-s1);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--c-sombra-alta);
+  color: var(--c-t1);
+  font-family: var(--fuente);
+}
+@media (max-width: 768px) {
+  /* Movil: hoja que sube desde abajo, a todo el ancho. */
+  :root[data-ui][data-theme] .editor-panel {
+    width: 100%;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+  }
+}
+:root[data-ui][data-theme] .editor-head {
+  padding: 16px 20px 8px;
+  border-bottom: 0;
+}
+:root[data-ui][data-theme] .editor-title-row h2 {
+  margin: 0;
+  font-family: var(--fuente);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  color: var(--c-t1);
+}
+:root[data-ui][data-theme] .editor-head .icon-circle-btn {
+  width: 36px;
+  height: 36px;
+  background: var(--c-s2);
+  box-shadow: none;
+  color: var(--c-t2);
+}
+:root[data-ui][data-theme] .editor-head .icon-circle-btn svg { width: 18px; height: 18px; }
+:root[data-ui][data-theme] .editor-grip { background: var(--c-line-2); }
+:root[data-ui][data-theme] .editor-body {
+  padding: 8px 20px 18px;
+  gap: 16px;
+}
+:root[data-ui][data-theme] .editor-grid-2,
+:root[data-ui][data-theme] .editor-tp-grid { gap: 12px; align-items: end; }
+:root[data-ui][data-theme] .editor-readonly {
+  justify-content: flex-end;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+:root[data-ui][data-theme] .editor-readonly strong {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 2px;
+  font-family: var(--fuente);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--c-t1);
+}
+:root[data-ui][data-theme] .editor-hint,
+:root[data-ui][data-theme] .editor-secondary {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--c-t2);
+}
+:root[data-ui][data-theme] .editor-hint { margin: 6px 2px 0; }
+:root[data-ui][data-theme] .trade-calc strong {
+  font-family: var(--fuente);
+  font-weight: 600;
+  color: var(--c-t1);
+}
+:root[data-ui][data-theme] .trade-calc strong.positive { color: var(--c-pos); }
+:root[data-ui][data-theme] .trade-calc strong.negative { color: var(--c-neg); }
+:root[data-ui][data-theme] .editor-foot {
+  gap: 10px;
+  padding: 12px 20px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--c-line);
+}
+:root[data-ui][data-theme] .editor-foot .primary-btn,
+:root[data-ui][data-theme] .editor-foot .ghost-btn { min-height: 52px; border-radius: 16px; font-size: 1rem; }
+:root[data-ui][data-theme] .editor-foot .ghost-btn { padding: 0 20px; }
+
+/* Sugerencias del buscador de monedas */
+:root[data-ui][data-theme] .editor-suggestions {
+  margin-top: 6px;
+  padding: 6px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  background: var(--c-s1);
+  box-shadow: var(--c-sombra-alta);
+}
+:root[data-ui][data-theme] .editor-suggestion {
+  min-height: 48px;
+  border-radius: var(--r-sm);
+  color: var(--c-t1);
+  font-family: var(--fuente);
+}
+:root[data-ui][data-theme] .editor-suggestion:hover,
+:root[data-ui][data-theme] .editor-suggestion:focus-visible { background: var(--c-s2); outline: none; }
+:root[data-ui][data-theme] .editor-suggestion img { width: 28px; height: 28px; }
+:root[data-ui][data-theme] .editor-suggestion strong { font-size: 0.9375rem; font-weight: 600; }
+:root[data-ui][data-theme] .editor-suggestion small,
+:root[data-ui][data-theme] .editor-suggestion-rank { font-family: var(--fuente); font-size: 0.75rem; color: var(--c-t2); }
+
+/* Boton "Importar desde una billetera" del editor */
+:root[data-ui][data-theme] .editor-wallet-btn {
+  min-height: 60px;
+  padding: 10px 14px;
+  border: 1px dashed var(--c-line-2);
+  border-radius: var(--r-md);
+  background: transparent;
+  gap: 12px;
+}
+:root[data-ui][data-theme] .editor-wallet-btn svg { color: var(--c-ac); }
+:root[data-ui][data-theme] .editor-wallet-btn strong { font-size: 0.9375rem; font-weight: 600; }
+:root[data-ui][data-theme] .editor-wallet-btn small { font-size: 0.75rem; color: var(--c-t2); }
+
+/* ── Hoja de billetera ── */
+:root[data-ui][data-theme] .wallet-safety {
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--c-warn-suave);
+  color: var(--c-t1);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+:root[data-ui][data-theme] .wallet-detect { font-size: 0.8125rem; line-height: 1.45; color: var(--c-t2); }
+:root[data-ui][data-theme] .wallet-detect.is-ok { color: var(--c-pos); }
+:root[data-ui][data-theme] .wallet-detect.is-warn { color: var(--c-warn); }
+:root[data-ui][data-theme] .wallet-detect.is-danger {
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--c-neg-suave);
+  color: var(--c-neg);
+}
+:root[data-ui][data-theme] .wallet-panel textarea[data-wallet-field="address"] {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+}
+:root[data-ui][data-theme] .wallet-summary { font-size: 0.9375rem; }
+:root[data-ui][data-theme] .wallet-summary code { font-size: 0.8125rem; color: var(--c-t2); }
+:root[data-ui][data-theme] .wallet-assets {
+  gap: 0;
+  border-radius: var(--r-md);
+  background: var(--c-bg);
+  overflow: hidden;
+}
+:root[data-ui][data-theme] .wallet-asset + .wallet-asset { border-top: 1px solid var(--c-line); }
+:root[data-ui][data-theme] .wallet-asset-row {
+  gap: 12px;
+  min-height: 60px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+:root[data-ui][data-theme] .wallet-asset-row input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--c-ac); }
+:root[data-ui][data-theme] .wallet-asset-avatar { width: 32px; height: 32px; }
+:root[data-ui][data-theme] .wallet-asset-id strong,
+:root[data-ui][data-theme] .wallet-asset-val strong { font-size: 0.9375rem; font-weight: 600; }
+:root[data-ui][data-theme] .wallet-asset-id small,
+:root[data-ui][data-theme] .wallet-asset-val small { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui][data-theme] .wallet-toggle-hidden { color: var(--c-ac); font-size: 0.875rem; }
+:root[data-ui][data-theme] .wallet-total { align-items: baseline; font-size: 0.875rem; color: var(--c-t2); }
+:root[data-ui][data-theme] .wallet-total strong { font-size: 1.0625rem; font-weight: 600; color: var(--c-t1); }
+:root[data-ui][data-theme] .wallet-cost { gap: 8px; }
+:root[data-ui][data-theme] .wallet-cost > span { font-size: 0.8125rem; color: var(--c-t2); }
+:root[data-ui][data-theme] .wallet-cost small { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui][data-theme] .wallet-loading { font-size: 0.9375rem; color: var(--c-t2); }
+:root[data-ui][data-theme] .wallet-spinner { border-color: var(--c-line-2); border-top-color: var(--c-ac); }
+:root[data-ui][data-theme] .wallet-chip {
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  background: var(--c-ac-suave);
+  color: var(--c-ac);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+/* ── Menu del engranaje (contenido igual que antes) ── */
+:root[data-ui][data-theme] .fab-sheet-panel {
+  gap: 2px;
+  padding: 8px 12px calc(14px + env(safe-area-inset-bottom));
+  border: 0;
+  background: var(--c-s1);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--c-sombra-alta);
+  font-family: var(--fuente);
+}
+:root[data-ui][data-theme] .fab-sheet-grip { background: var(--c-line-2); }
+:root[data-ui][data-theme] .fab-sheet-title {
+  margin: 8px 8px 8px;
+  font-family: var(--fuente);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  color: var(--c-t1);
+}
+:root[data-ui][data-theme] .fab-option {
+  gap: 14px;
+  min-height: 64px;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--c-t1);
+}
+:root[data-ui][data-theme] .fab-option:hover,
+:root[data-ui][data-theme] .fab-option:active { background: var(--c-s2); }
+:root[data-ui][data-theme] .fab-option:focus-visible { outline: 2px solid var(--c-ac); outline-offset: -2px; }
+:root[data-ui][data-theme] .fab-option-icon { width: 44px; height: 44px; border-radius: 50%; }
+:root[data-ui][data-theme] .fab-option-icon svg { width: 20px; height: 20px; }
+:root[data-ui][data-theme] .fab-option-icon.accent,
+:root[data-ui][data-theme] .fab-option-icon.accent2 { color: var(--c-ac); background: var(--c-ac-suave); }
+:root[data-ui][data-theme] .fab-option-icon.positive { color: var(--c-pos); background: var(--c-pos-suave); }
+:root[data-ui][data-theme] .fab-option-icon.negative { color: var(--c-neg); background: var(--c-neg-suave); }
+:root[data-ui][data-theme] .fab-option-icon.warning { color: var(--c-warn); background: var(--c-warn-suave); }
+:root[data-ui][data-theme] .fab-option-text strong { font-size: 0.9375rem; font-weight: 600; }
+:root[data-ui][data-theme] .fab-option-text small { font-size: 0.8125rem; color: var(--c-t2); }
+:root[data-ui][data-theme] .fab-option-chevron { color: var(--c-t3); }
+:root[data-ui][data-theme] .fab-cancel {
+  margin-top: 8px;
+  min-height: 52px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--c-s2);
+  color: var(--c-t1);
+  font-family: var(--fuente);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* ── Menu de fila (⋯) ── */
+:root[data-ui][data-theme] .row-context-menu {
+  width: 210px;
+  padding: 6px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-md);
+  background: var(--c-s1);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--c-sombra-alta);
+  font-family: var(--fuente);
+}
+:root[data-ui][data-theme] .row-context-menu button {
+  min-height: 46px;
+  border-radius: var(--r-sm);
+  color: var(--c-t1);
+  font-family: var(--fuente);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+:root[data-ui][data-theme] .row-context-menu button:hover,
+:root[data-ui][data-theme] .row-context-menu button:focus-visible { background: var(--c-s2); outline: none; }
+:root[data-ui][data-theme] .row-context-menu button.danger { color: var(--c-neg); }
+
+/* ── Avisos ── */
+:root[data-ui][data-theme] .toast-stack {
+  left: 50%;
+  right: auto;
+  width: min(calc(100% - 32px), 420px);
+  transform: translateX(-50%);
+  bottom: calc(var(--barra-alto) + 16px + env(safe-area-inset-bottom));
+}
+:root[data-ui][data-theme] body.detail-open .toast-stack,
+:root[data-ui][data-theme] body.editor-open .toast-stack { bottom: calc(84px + env(safe-area-inset-bottom)); }
+:root[data-ui][data-theme] .toast {
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--c-s2);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--c-sombra-alta);
+  color: var(--c-t1);
+  font-family: var(--fuente);
+  animation: avisoEntra 0.24s ease;
+}
+:root[data-ui][data-theme="light"] .toast { background: #16181C; color: #F4F5F7; }
+:root[data-ui][data-theme="light"] .toast p { color: #C3C7CE; }
+:root[data-ui][data-theme] .toast strong { font-size: 0.9375rem; font-weight: 600; margin-bottom: 2px; }
+:root[data-ui][data-theme] .toast p { margin: 0; font-size: 0.8125rem; color: var(--c-t2); }
+:root[data-ui][data-theme] .toast.positive .toast-icon { color: var(--c-pos); }
+:root[data-ui][data-theme] .toast.negative .toast-icon { color: var(--c-neg); }
+:root[data-ui][data-theme] .toast.warning .toast-icon { color: var(--c-warn); }
+:root[data-ui][data-theme] .toast.neutral .toast-icon { color: var(--c-t2); }
+:root[data-ui][data-theme="light"] .toast.positive .toast-icon { color: #3DDC97; }
+:root[data-ui][data-theme="light"] .toast.negative .toast-icon { color: #FF6B70; }
+:root[data-ui][data-theme="light"] .toast.warning .toast-icon { color: #F5B94A; }
+:root[data-ui][data-theme="light"] .toast.neutral .toast-icon { color: #C3C7CE; }
+:root[data-ui][data-theme] .toast-progress { display: none; }
+:root[data-ui][data-theme] .toast.is-compact {
+  margin: 0 auto;
+  padding: 10px 16px;
+  border-radius: var(--r-pill);
+}
+:root[data-ui][data-theme] .toast.is-compact .toast-content strong { margin: 0; font-size: 0.875rem; }
+:root[data-ui][data-theme] .toast-undo-btn {
+  min-height: 40px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--c-ac);
+  font-family: var(--fuente);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+:root[data-ui][data-theme="light"] .toast-undo-btn { color: #3DDC97; }
+@keyframes avisoEntra {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}

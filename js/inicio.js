@@ -167,7 +167,48 @@ function renderMainValueCard(snapshot) {
   renderHomeGreeting();
 }
 
-// ── Grafico del saldo (SVG propio: ligero y nitido a cualquier ancho) ──
+// ── Grafico de area (SVG propio: ligero y nitido a cualquier ancho) ──
+// points: [{ at, value }] en orden. Se dibuja al ancho real del contenedor.
+function areaChartSvg(points, width, { height = 150, label = "", id = "graficoRelleno" } = {}) {
+  const sampled = downsampleHistoryPoints(points, 140);
+  const top = 10;
+  const bottom = 8;
+  const values = sampled.map((point) => point.value);
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  if (max - min < Math.abs(max) * 0.002) {
+    // Serie casi plana: se centra la linea en vez de exagerar el ruido.
+    const pad = Math.max(Math.abs(max) * 0.01, 1e-9);
+    min -= pad;
+    max += pad;
+  }
+  const first = sampled[0].at;
+  const span = Math.max(1, sampled[sampled.length - 1].at - first);
+  const xy = sampled.map((point) => [
+    2 + ((point.at - first) / span) * (width - 8),
+    top + (1 - (point.value - min) / (max - min)) * (height - top - bottom)
+  ]);
+  const line = xy.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+  const end = xy[xy.length - 1];
+  const area = `${line} L${end[0].toFixed(1)} ${height} L${xy[0][0].toFixed(1)} ${height} Z`;
+  return `
+    <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${escapeHtml(label)}">
+      <defs>
+        <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" class="grafico-stop-alto"></stop>
+          <stop offset="100%" class="grafico-stop-bajo"></stop>
+        </linearGradient>
+      </defs>
+      <path class="grafico-area" d="${area}" fill="url(#${id})"></path>
+      <path class="grafico-linea" d="${line}" fill="none"></path>
+      <circle class="grafico-punto" cx="${end[0].toFixed(1)}" cy="${end[1].toFixed(1)}" r="4.5"></circle>
+    </svg>`;
+}
+
+function chartWidthOf(box) {
+  return Math.round(box.clientWidth || Math.min(608, window.innerWidth - 32));
+}
+
 function renderHomeChart(snapshot = null) {
   const box = dom.graficoSaldo;
   if (!box) {
@@ -176,54 +217,16 @@ function renderHomeChart(snapshot = null) {
   const current = (snapshot || buildSnapshot()).totals.currentValue;
   const points = homeHistoryPoints(state.prefs.homeRange).map((point) => ({
     at: new Date(point.at).getTime(),
-    total: Number(point.total)
+    value: Number(point.total)
   }));
   if (current > 0) {
-    points.push({ at: Date.now(), total: current });
+    points.push({ at: Date.now(), value: current });
   }
   if (points.length < 3) {
     box.innerHTML = `<div class="grafico-vacio">${escapeHtml(t("inicio.graficoVacio"))}</div>`;
     return;
   }
-
-  const sampled = downsampleHistoryPoints(points, 140);
-  const width = Math.round(box.clientWidth || Math.min(608, window.innerWidth - 32));
-  const height = 150;
-  const top = 10;
-  const bottom = 8;
-  const values = sampled.map((point) => point.total);
-  let min = Math.min(...values);
-  let max = Math.max(...values);
-  if (max - min < max * 0.002) {
-    // Saldo casi plano: se centra la linea en vez de exagerar el ruido.
-    const pad = Math.max(max * 0.01, 1);
-    min -= pad;
-    max += pad;
-  }
-  const first = sampled[0].at;
-  const span = Math.max(1, sampled[sampled.length - 1].at - first);
-  const xy = sampled.map((point) => [
-    2 + ((point.at - first) / span) * (width - 8),
-    top + (1 - (point.total - min) / (max - min)) * (height - top - bottom)
-  ]);
-  const line = xy.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
-  const end = xy[xy.length - 1];
-  const area = `${line} L${end[0].toFixed(1)} ${height} L${xy[0][0].toFixed(1)} ${height} Z`;
-  const tone = values[values.length - 1] >= values[0] ? "sube" : "baja";
-
-  box.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="grafico-${tone}" role="img" aria-label="${escapeHtml(t("inicio.graficoAria"))}">
-      <defs>
-        <linearGradient id="graficoRelleno" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" class="grafico-stop-alto"></stop>
-          <stop offset="100%" class="grafico-stop-bajo"></stop>
-        </linearGradient>
-      </defs>
-      <path class="grafico-area" d="${area}" fill="url(#graficoRelleno)"></path>
-      <path class="grafico-linea" d="${line}" fill="none"></path>
-      <circle class="grafico-punto" cx="${end[0].toFixed(1)}" cy="${end[1].toFixed(1)}" r="4.5"></circle>
-    </svg>
-  `;
+  box.innerHTML = areaChartSvg(points, chartWidthOf(box), { label: t("inicio.graficoAria"), id: "graficoRelleno" });
 }
 
 // ── Resumen: hoy, invertido, mejor y peor de las ultimas 24 h ──

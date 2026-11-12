@@ -12,7 +12,8 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 - **Qué es:** PWA de cartera de criptomonedas en JavaScript vanilla, **sin build**.
   Ficheros: `index.html`, la app en **`js/`** (21 scripts por tema: `config.js`
   primero, `arranque.js` el último), `styles.css` (hoja antigua) y **`css/`**
-  (el rediseño: `tokens.css`, `componentes.css`, `inicio.css`, `ajustes.css`), `i18n.js`, `finance.js`
+  (el rediseño: `tokens.css`, `componentes.css`, `inicio.css`, `ajustes.css`,
+  `hojas.css`, `detalle.css`), `i18n.js`, `finance.js`
   (cálculos puros + tests con Vitest), `wallet-core.js` (lógica pura de
   billeteras + tests), `sw.js`, `api/cg.js` (proxy de CoinGecko; clave en
   `COINGECKO_API_KEY`) y `api/wallet.js` (lector de billeteras; clave en

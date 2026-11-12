@@ -1,0 +1,249 @@
+/* =============================================================================
+   detalle.css - Ficha de un activo (pantalla completa): cabecera, precio,
+   grafico, tarjetas (posicion, objetivos, mercado, notas, actividad) y la
+   botonera fija de abajo.
+   ============================================================================= */
+
+:root[data-ui][data-theme] .asset-detail {
+  background: var(--c-bg);
+  color: var(--c-t1);
+}
+
+:root[data-ui] .ficha {
+  max-width: 640px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--bloque-gap);
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+/* ── Cabecera ── */
+:root[data-ui] .ficha-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 0;
+}
+:root[data-ui] .ficha-titulo {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+:root[data-ui] .ficha-titulo .logo-activo { width: 32px; height: 32px; font-size: 0.5625rem; }
+:root[data-ui] .ficha-nombre {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+:root[data-ui] .ficha-nombre strong {
+  font-size: 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root[data-ui] .ficha-nombre small { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .ficha-favorito[aria-pressed="true"] { color: var(--c-ac); }
+
+/* ── Precio ── */
+:root[data-ui] .ficha-precio {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 4px 0;
+}
+:root[data-ui] .ficha-precio .saldo-valor { font-size: 2.5rem; }
+
+/* ── Grafico ── */
+:root[data-ui] .ficha-grafico .segmentado { margin-top: 12px; }
+
+/* ── Tarjetas ── */
+:root[data-ui] .ficha-bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+:root[data-ui] .ficha-bloque-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+:root[data-ui] .enlace {
+  min-height: 32px;
+  padding: 0 4px;
+  margin: -6px -4px;
+  border: 0;
+  background: none;
+  color: var(--c-ac);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+:root[data-ui] .enlace:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 2px; border-radius: 6px; }
+:root[data-ui] .ficha-vacio { margin: 0; font-size: 0.875rem; color: var(--c-t2); }
+
+/* Tu posicion */
+:root[data-ui] .ficha-posicion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+:root[data-ui] .ficha-posicion-valor {
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+:root[data-ui] .ficha-billetera { margin: -4px 0 0; }
+:root[data-ui] .ficha-datos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  margin: 0;
+}
+:root[data-ui] .ficha-dato { min-width: 0; }
+:root[data-ui] .ficha-dato dt { font-size: 0.75rem; color: var(--c-t2); margin-bottom: 3px; }
+:root[data-ui] .ficha-dato dd {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--c-t1);
+  overflow-wrap: anywhere;
+}
+:root[data-ui] .ficha-dato dd small { font-size: 0.75rem; font-weight: 500; }
+:root[data-ui] .ficha-dato .positive { color: var(--c-pos); }
+:root[data-ui] .ficha-dato .negative { color: var(--c-neg); }
+
+/* Objetivos */
+:root[data-ui] .ficha-objetivos { display: flex; flex-direction: column; gap: 16px; }
+:root[data-ui] .ficha-objetivo { display: flex; flex-direction: column; gap: 7px; }
+:root[data-ui] .ficha-objetivo-fila {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.875rem;
+  color: var(--c-t2);
+}
+:root[data-ui] .ficha-objetivo-fila strong { color: var(--c-t1); font-weight: 600; }
+:root[data-ui] .ficha-objetivo-falta { white-space: nowrap; }
+:root[data-ui] .ficha-objetivo.alcanzado .ficha-objetivo-falta { color: var(--c-pos); font-weight: 600; }
+:root[data-ui] .ficha-barra {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--c-s2);
+  overflow: hidden;
+}
+:root[data-ui] .ficha-barra span { display: block; height: 6px; border-radius: 3px; background: var(--c-ac); }
+:root[data-ui] .ficha-objetivo.alcanzado .ficha-barra span { background: var(--c-pos); }
+:root[data-ui] .ficha-aviso {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: var(--c-t2);
+}
+:root[data-ui] .ficha-aviso svg { width: 13px; height: 13px; }
+:root[data-ui] .ficha-aviso.enviado { color: var(--c-pos); }
+
+/* Mercado y notas: lista etiqueta / valor */
+:root[data-ui] .ficha-lista { margin: 0; display: flex; flex-direction: column; }
+:root[data-ui] .ficha-lista > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid var(--c-line);
+  font-size: 0.875rem;
+}
+:root[data-ui] .ficha-lista > div:first-child { border-top: 0; padding-top: 0; }
+:root[data-ui] .ficha-lista dt { color: var(--c-t2); }
+:root[data-ui] .ficha-lista dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+:root[data-ui] .ficha-lista dd small { font-weight: 500; color: var(--c-t2); }
+:root[data-ui] .ficha-nota {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Actividad */
+:root[data-ui] .ficha-actividad { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+:root[data-ui] .ficha-actividad li {
+  display: flex;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid var(--c-line);
+}
+:root[data-ui] .ficha-actividad li:first-child { border-top: 0; padding-top: 0; }
+:root[data-ui] .ficha-actividad-punto {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--c-t3);
+}
+:root[data-ui] .ficha-actividad-punto.positive { background: var(--c-pos); }
+:root[data-ui] .ficha-actividad-punto.negative { background: var(--c-neg); }
+:root[data-ui] .ficha-actividad-punto.warning { background: var(--c-warn); }
+:root[data-ui] .ficha-actividad div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+:root[data-ui] .ficha-actividad strong { font-size: 0.875rem; font-weight: 600; }
+:root[data-ui] .ficha-actividad p { margin: 0; font-size: 0.8125rem; color: var(--c-t2); overflow-wrap: anywhere; }
+:root[data-ui] .ficha-actividad time { font-size: 0.75rem; color: var(--c-t3); }
+
+/* ── Botonera fija ── */
+:root[data-ui] .ficha-pie {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 2;
+  width: min(640px, 100%);
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px max(16px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: var(--c-nav);
+  -webkit-backdrop-filter: saturate(160%) blur(20px);
+  backdrop-filter: saturate(160%) blur(20px);
+  border-top: 1px solid var(--c-line);
+}
+:root[data-ui] .ficha-pie.es-billetera { grid-template-columns: minmax(0, 1fr); }
+:root[data-ui] .ficha-boton {
+  min-height: 52px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--c-s2);
+  color: var(--c-t1);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+:root[data-ui] .ficha-boton.es-primario { background: var(--c-ac); color: var(--c-sobre-ac); }
+:root[data-ui] .ficha-boton:active { transform: scale(0.98); }
+:root[data-ui] .ficha-boton:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 2px; }
+
+@media (max-width: 360px) {
+  :root[data-ui] .ficha-precio .saldo-valor { font-size: 2.125rem; }
+  :root[data-ui] .ficha-posicion-valor { font-size: 1.5rem; }
+}

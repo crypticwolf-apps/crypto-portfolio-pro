@@ -1049,7 +1049,21 @@ window.APP_I18N = {
       "apariencia.bloque.resumen": "Resumen de hoy",
       "apariencia.bloque.activos": "Tus activos",
       "apariencia.bloque.reparto": "Reparto",
-      "apariencia.bloque.mercado": "Mercado y miedo/codicia"
+      "apariencia.bloque.mercado": "Mercado y miedo/codicia",
+      "ficha.precioDe": "Precio de {activo}",
+      "ficha.hoyFuente": "24 h · {fuente}",
+      "ficha.tuPosicion": "Tu posicion",
+      "ficha.ganancia": "Ganancia",
+      "ficha.hoy": "Hoy",
+      "ficha.objetivos": "Objetivos de venta",
+      "ficha.objetivosVacio": "Aun no tienes objetivos de venta para este activo.",
+      "ficha.objetivosAnadir": "Anadir objetivos",
+      "ficha.falta": "Falta +{pct}%",
+      "ficha.avisoEnviado": "Aviso enviado",
+      "ficha.avisoPendiente": "Aviso pendiente",
+      "ficha.capitalizacion": "Capitalizacion",
+      "ficha.notaAnadir": "Anadir",
+      "ficha.actividad": "Actividad"
     }
   }
 };

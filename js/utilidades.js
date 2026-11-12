@@ -154,10 +154,10 @@ function updateSaveMessage(message) {
 
 function showToast(title, detail, tone = "neutral") {
   const icons = {
-    positive: '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="#3effa8" stroke-width="1.5"/><path d="M6 10.5l2.5 2.5L14 7.5" stroke="#3effa8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    negative: '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="#ff5555" stroke-width="1.5"/><path d="M7 7l6 6M13 7l-6 6" stroke="#ff5555" stroke-width="1.8" stroke-linecap="round"/></svg>',
-    warning: '<svg viewBox="0 0 20 20" fill="none"><path d="M10 2L1 18h18L10 2z" stroke="#ffc947" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v4M10 14.5v.5" stroke="#ffc947" stroke-width="1.8" stroke-linecap="round"/></svg>',
-    neutral: '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="#5aabff" stroke-width="1.5"/><path d="M10 6v5M10 13.5v.5" stroke="#5aabff" stroke-width="1.8" stroke-linecap="round"/></svg>'
+    positive: '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M6 10.5l2.5 2.5L14 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    negative: '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M7 7l6 6M13 7l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    warning: '<svg viewBox="0 0 20 20" fill="none"><path d="M10 2L1 18h18L10 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v4M10 14.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    neutral: '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v5M10 13.5v.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
   };
   // Guardar, borrar o registrar algo son confirmaciones rutinarias: molesta
   // que tapen media pantalla cuatro segundos. Se reducen a una linea breve.

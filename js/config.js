@@ -496,7 +496,6 @@ const state = {
   editingAlertId: null,
   rowMenuOpen: false,
   detailRowId: null,
-  detailTab: "summary",
   detailRange: "1d",
   news: [],
   newsAt: 0,
