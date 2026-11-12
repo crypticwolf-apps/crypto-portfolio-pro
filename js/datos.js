@@ -892,16 +892,18 @@ function persistState(manual) {
 function normalizeAppearancePrefs(prefs, hasStoredTheme = true) {
   const pick = (value, options) => (options.includes(value) ? value : options[0]);
   prefs.theme = hasStoredTheme ? pick(prefs.theme, APARIENCIA.temas) : "auto";
-  prefs.oled = prefs.oled === true;
   prefs.accent = pick(prefs.accent, APARIENCIA.acentos);
   prefs.textSize = pick(prefs.textSize, APARIENCIA.textos);
-  prefs.spacing = pick(prefs.spacing, APARIENCIA.espacios);
   prefs.listMetric = pick(prefs.listMetric, APARIENCIA.metricas);
   prefs.homeRange = pick(prefs.homeRange, APARIENCIA.rangos);
   prefs.decimals = prefs.decimals !== false;
   prefs.hideOnOpen = prefs.hideOnOpen === true;
   prefs.groupSmall = prefs.groupSmall !== false;
   prefs.homeBlocks = normalizeHomeBlocks(prefs.homeBlocks);
+  // Opciones retiradas: el oscuro ya es siempre negro puro y la densidad es
+  // siempre la comoda.
+  delete prefs.oled;
+  delete prefs.spacing;
   return prefs;
 }
 

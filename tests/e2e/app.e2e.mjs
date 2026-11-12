@@ -365,9 +365,9 @@ async function recorridoCompleto(navegador, url, ancho) {
     for (const o of ops) { await page.selectOption("#mobileSortSelect", o); await page.waitForTimeout(120); }
   });
   await paso(g, "modo privacidad", app, async () => { await page.click("#toggleBalanceBtn"); await page.waitForTimeout(250); await page.click("#toggleBalanceBtn"); });
-  await paso(g, "apariencia: claro, automatico (sigue al sistema), negro puro y oscuro", app, async () => {
+  await paso(g, "apariencia: claro, automatico (sigue al sistema) y oscuro en negro puro", app, async () => {
     await page.click('[data-tab-target="more"]'); await page.waitForTimeout(300);
-    const tema = () => page.evaluate(() => [document.documentElement.dataset.theme, document.documentElement.dataset.oled, document.querySelector('meta[name="theme-color"]').content]);
+    const tema = () => page.evaluate(() => [document.documentElement.dataset.theme, getComputedStyle(document.body).backgroundColor, document.querySelector('meta[name="theme-color"]').content]);
     await page.click('[data-tema-set="light"]'); let r = await tema();
     if (r[0] !== "light" || r[2] !== "#F2F3F5") throw new Error("claro: " + r.join());
     await page.emulateMedia({ colorScheme: "dark" });
@@ -376,15 +376,15 @@ async function recorridoCompleto(navegador, url, ancho) {
     await page.emulateMedia({ colorScheme: "light" }); await page.waitForTimeout(200); r = await tema();
     if (r[0] !== "light") throw new Error("automatico no sigue al sistema: " + r.join());
     await page.emulateMedia({ colorScheme: null });
-    await page.click('[data-tema-set="dark"]'); await page.click('[data-ajuste="oled"]'); r = await tema();
-    if (r[0] !== "dark" || r[1] !== "on" || r[2] !== "#000000") throw new Error("negro puro: " + r.join());
-    await page.click('[data-ajuste="oled"]'); r = await tema();
-    if (r[1] !== "" || r[2] !== "#0A0B0D") throw new Error("oscuro: " + r.join());
+    await page.click('[data-tema-set="dark"]'); r = await tema();
+    if (r[0] !== "dark" || r[1] !== "rgb(0, 0, 0)" || r[2] !== "#000000") throw new Error("oscuro en negro puro: " + r.join());
+    const retirados = await page.locator('[data-ajuste="oled"], [data-espacio-set]').count();
+    if (retirados) throw new Error("siguen los mandos de negro puro o densidad: " + retirados);
   });
-  await paso(g, "apariencia: acento, texto grande y densidad sin desborde", app, async () => {
-    await page.click('[data-acento-set="violeta"]'); await page.click('[data-texto-set="l"]'); await page.click('[data-espacio-set="compacta"]');
-    const r = await page.evaluate(() => ({ acento: getComputedStyle(document.documentElement).getPropertyValue("--c-ac").trim(), letra: getComputedStyle(document.documentElement).fontSize, espacio: document.documentElement.dataset.espacio }));
-    if (r.acento.toUpperCase() !== "#A78BFA" || r.letra !== "17.5px" || r.espacio !== "compacta") throw new Error(JSON.stringify(r));
+  await paso(g, "apariencia: acento y texto grande sin desborde", app, async () => {
+    await page.click('[data-acento-set="violeta"]'); await page.click('[data-texto-set="l"]');
+    const r = await page.evaluate(() => ({ acento: getComputedStyle(document.documentElement).getPropertyValue("--c-ac").trim(), letra: getComputedStyle(document.documentElement).fontSize }));
+    if (r.acento.toUpperCase() !== "#A78BFA" || r.letra !== "17.5px") throw new Error(JSON.stringify(r));
     // Se revisa todo y luego se restaura SIEMPRE: si este paso fallara a
     // medias, los siguientes no deben heredar el texto grande ni la pestana.
     const problemas = [];
@@ -396,9 +396,9 @@ async function recorridoCompleto(navegador, url, ancho) {
       const c = await colisiones(page); if (c) problemas.push(`${tab}: ${c}`);
     }
     await page.click('[data-tab-target="more"]'); await page.waitForTimeout(300);
-    await page.click('[data-acento-set="esmeralda"]'); await page.click('[data-texto-set="m"]'); await page.click('[data-espacio-set="comoda"]');
+    await page.click('[data-acento-set="esmeralda"]'); await page.click('[data-texto-set="m"]');
     const guardado = await page.evaluate(() => JSON.parse(localStorage.getItem("crypto-dashboard-prefs-v2")));
-    if (guardado.accent !== "esmeralda" || guardado.textSize !== "m" || guardado.spacing !== "comoda") throw new Error("no se guardo: " + JSON.stringify(guardado));
+    if (guardado.accent !== "esmeralda" || guardado.textSize !== "m") throw new Error("no se guardo: " + JSON.stringify(guardado));
     if (problemas.length) throw new Error("con texto grande: " + problemas.join(" || "));
   });
   await paso(g, "apariencia: ocultar y reordenar bloques de inicio", app, async () => {

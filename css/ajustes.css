@@ -176,6 +176,8 @@
   color: var(--c-t1);
 }
 :root[data-ui] .apariencia-grupo > .segmentado { margin: 8px 0 12px; }
+/* Grupo con solo el selector (Tema, Tamano del texto): mismo aire arriba y abajo. */
+:root[data-ui] .apariencia-grupo > .segmentado:only-child { margin: 12px 0; }
 
 /* Tamano del texto: las tres "A" crecen */
 :root[data-ui] .segmentado.tamanos > button[data-texto-set="s"] { font-size: 0.8125rem; }
@@ -477,7 +479,7 @@
   :root[data-ui][data-theme] .more-actions-grid > button { padding: 0 8px; font-size: 0.8125rem; }
 }
 @media (max-width: 360px) {
-  /* "Automatico" y "Compacta" caben en su boton a 320 px. */
+  /* "Automatico" cabe en su boton a 320 px. */
   :root[data-ui] .apariencia-grupo { padding-left: 8px; padding-right: 8px; }
   :root[data-ui] .apariencia-grupo .segmentado > button { padding: 0 2px; font-size: 0.6875rem; }
 }

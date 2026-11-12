@@ -418,16 +418,10 @@ function bindEvents() {
   });
 }
 
-// Tema: claro, oscuro o automatico (sigue al sistema). El negro puro (OLED)
-// es un interruptor aparte que solo pinta sobre el oscuro. "oled" se acepta
-// como modo por compatibilidad con la version anterior.
+// Tema: claro, oscuro (siempre negro puro) o automatico (sigue al sistema).
+// "oled" se acepta como oscuro por compatibilidad con versiones anteriores.
 function setTheme(mode) {
-  if (mode === "oled") {
-    state.prefs.theme = "dark";
-    state.prefs.oled = true;
-  } else {
-    state.prefs.theme = APARIENCIA.temas.includes(mode) ? mode : "dark";
-  }
+  state.prefs.theme = APARIENCIA.temas.includes(mode) ? mode : "dark";
   applyTheme();
   savePreferences();
   renderDashboardOnly();
@@ -447,23 +441,15 @@ function resolvedTheme() {
 }
 
 function applyTheme() {
-  document.documentElement.dataset.theme = resolvedTheme();
-  applyOled();
+  const theme = resolvedTheme();
+  document.documentElement.dataset.theme = theme;
+  // El marco del navegador/PWA (barra de estado) casa con el fondo.
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    meta.setAttribute("content", THEME_COLORS[theme]);
+  });
   if (typeof renderAppearanceControls === "function") {
     renderAppearanceControls();
   }
-}
-
-// Negro puro: capa sobre el oscuro. Tambien fija el color del marco del
-// navegador/PWA (barra de estado) para que case con el fondo.
-function applyOled() {
-  const theme = resolvedTheme();
-  const oled = Boolean(state.prefs.oled) && theme === "dark";
-  document.documentElement.dataset.oled = oled ? "on" : "";
-  const color = oled ? THEME_COLORS.oled : (THEME_COLORS[theme] || THEME_COLORS.dark);
-  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
-    meta.setAttribute("content", color);
-  });
 }
 
 function bindEnvironmentEvents() {

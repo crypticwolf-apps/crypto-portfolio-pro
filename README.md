@@ -10,7 +10,7 @@ Aplicación web (PWA instalable) para gestionar inversiones en criptomonedas: ta
 - Resumen e insights: PnL agregado, top/peores activos (actual y 24h), activo más volátil.
 - Barra fija al hacer scroll con valor total, PnL y estado de API/guardado.
 - Gráficos (Chart.js, carga diferida): dona de distribución y línea de evolución con rangos 1h–total.
-- Moneda base USD/EUR con conversión del portafolio, 3 idiomas (es/en/fr), tema claro, oscuro o automatico, negro puro, 6 colores de acento, tamano de texto, densidad y pantalla de inicio personalizable.
+- Moneda base USD/EUR con conversión del portafolio, 3 idiomas (es/en/fr), tema claro, oscuro (negro puro) o automatico, 6 colores de acento, tamano de texto y pantalla de inicio personalizable.
 - Importación/exportación CSV y PDF con resumen, KPIs y gráfico de distribución.
 - Guardado automático en `localStorage`; funciona offline como PWA (service worker con cache del app shell).
 

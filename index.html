@@ -3,30 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0A0B0D" />
+    <meta name="theme-color" content="#000000" />
 
     <!-- Apariencia aplicada antes de pintar (sin parpadeo): tema efectivo
-         (claro, oscuro o automatico segun el sistema), negro puro, color de
-         acento, tamano del texto y espaciado. Misma logica que applyTheme(). -->
+         (claro, oscuro en negro puro o automatico segun el sistema), color de
+         acento y tamano del texto. Misma logica que applyTheme(). -->
     <script>
       (function () {
         var root = document.documentElement;
         try {
           var p = JSON.parse(localStorage.getItem("crypto-dashboard-prefs-v2") || "{}") || {};
-          var theme = p.theme === "light" || p.theme === "dark" ? p.theme : null;
+          // "oled" es el oscuro de versiones anteriores.
+          var theme = p.theme === "light" ? "light" : (p.theme === "dark" || p.theme === "oled" ? "dark" : null);
           if (!theme) {
             theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
           }
-          var oled = p.oled === true && theme === "dark";
           var acentos = ["esmeralda", "zafiro", "violeta", "oro", "coral", "grafito"];
           root.dataset.theme = theme;
-          root.dataset.oled = oled ? "on" : "";
           root.dataset.accent = acentos.indexOf(p.accent) >= 0 ? p.accent : "esmeralda";
           root.dataset.texto = p.textSize === "s" || p.textSize === "l" ? p.textSize : "m";
-          root.dataset.espacio = p.spacing === "compacta" ? "compacta" : "comoda";
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) {
-            meta.setAttribute("content", oled ? "#000000" : (theme === "light" ? "#F2F3F5" : "#0A0B0D"));
+            meta.setAttribute("content", theme === "light" ? "#F2F3F5" : "#000000");
           }
         } catch (e) {
           root.dataset.theme = "dark";
@@ -474,27 +472,17 @@
               <button type="button" data-tema-set="dark" aria-pressed="false" data-i18n="apariencia.oscuro">Oscuro</button>
               <button type="button" data-tema-set="auto" aria-pressed="false" data-i18n="apariencia.auto">Automatico</button>
             </div>
-            <div class="ajuste-fila">
-              <span class="ajuste-texto"><strong id="oledLabel" data-i18n="apariencia.oled">Negro puro (OLED)</strong><small data-i18n="apariencia.oledHint">Fondo negro total en modo oscuro. Ahorra bateria.</small></span>
-              <button class="interruptor" type="button" role="switch" aria-checked="false" aria-labelledby="oledLabel" data-ajuste="oled"></button>
-            </div>
           </div>
 
           <h3 class="apariencia-titulo" data-i18n="apariencia.acento">Color de acento</h3>
           <div class="acentos" role="group" aria-label="Color de acento" data-i18n-aria-label="apariencia.acento" id="acentos"></div>
 
-          <h3 class="apariencia-titulo" data-i18n="apariencia.textoDensidad">Texto y densidad</h3>
+          <h3 class="apariencia-titulo" id="tamanoLabel" data-i18n="apariencia.tamano">Tamano del texto</h3>
           <div class="apariencia-grupo">
-            <span class="ajuste-etiqueta" id="tamanoLabel" data-i18n="apariencia.tamano">Tamano del texto</span>
             <div class="segmentado en-tarjeta tamanos" role="group" aria-labelledby="tamanoLabel">
               <button type="button" data-texto-set="s" aria-pressed="false" aria-label="Texto pequeno" data-i18n-aria-label="apariencia.textoS">A</button>
               <button type="button" data-texto-set="m" aria-pressed="false" aria-label="Texto normal" data-i18n-aria-label="apariencia.textoM">A</button>
               <button type="button" data-texto-set="l" aria-pressed="false" aria-label="Texto grande" data-i18n-aria-label="apariencia.textoL">A</button>
-            </div>
-            <span class="ajuste-etiqueta" id="espacioLabel" data-i18n="apariencia.densidad">Densidad</span>
-            <div class="segmentado en-tarjeta" role="group" aria-labelledby="espacioLabel">
-              <button type="button" data-espacio-set="comoda" aria-pressed="false" data-i18n="apariencia.comoda">Comoda</button>
-              <button type="button" data-espacio-set="compacta" aria-pressed="false" data-i18n="apariencia.compacta">Compacta</button>
             </div>
           </div>
 

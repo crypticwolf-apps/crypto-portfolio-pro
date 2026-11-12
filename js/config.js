@@ -303,7 +303,6 @@ const TRANSLATIONS = window.APP_I18N?.TRANSLATIONS || {};
 
 const DEFAULT_PREFS = {
   theme: "dark",
-  oled: false,
   currency: "usd",
   language: "es",
   portfolioName: "",
@@ -321,7 +320,6 @@ const DEFAULT_PREFS = {
   // Apariencia (rediseno). theme admite "auto": sigue al sistema.
   accent: "esmeralda",
   textSize: "m",
-  spacing: "comoda",
   decimals: true,
   hideOnOpen: false,
   groupSmall: true,
@@ -335,7 +333,6 @@ const APARIENCIA = {
   temas: ["dark", "light", "auto"],
   acentos: ["esmeralda", "zafiro", "violeta", "oro", "coral", "grafito"],
   textos: ["m", "s", "l"],
-  espacios: ["comoda", "compacta"],
   metricas: ["24h", "pnl", "precio"],
   rangos: ["1m", "1d", "1s", "3m", "1a", "todo"],
   // Bloques de Inicio en su orden de fabrica.
@@ -365,7 +362,8 @@ const SORT_OPTIONS = [
   { key: "investment", labelKey: "sort.invested" },
   { key: "asset", labelKey: "sort.name" }
 ];
-const THEME_COLORS = { dark: "#0A0B0D", light: "#F2F3F5", oled: "#000000" };
+// Color del marco del navegador/PWA (barra de estado): igual que el fondo.
+const THEME_COLORS = { dark: "#000000", light: "#F2F3F5" };
 
 // Portafolio de demostración genérico (la app es pública): cifras redondas
 // y activos conocidos. Los coinId van sembrados para que el primer arranque

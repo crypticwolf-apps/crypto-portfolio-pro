@@ -9,10 +9,9 @@
 
    Atributos en <html> (los pone el script del <head> y applyAppearance()):
      data-theme   dark | light     (el efectivo; "automatico" lo resuelve JS)
-     data-oled    on | ""          (negro puro sobre el oscuro)
      data-accent  esmeralda | zafiro | violeta | oro | coral | grafito
      data-texto   s | m | l        (tamano del texto)
-     data-espacio comoda | compacta
+   El oscuro es siempre negro puro (pantallas OLED).
    Contraste comprobado: todo texto >= 4.5:1 sobre su superficie.
    ============================================================================= */
 
@@ -32,19 +31,14 @@
 }
 :root[data-ui][data-texto="s"] { font-size: 15px; }
 :root[data-ui][data-texto="l"] { font-size: 17.5px; }
-:root[data-ui][data-espacio="compacta"] {
-  --tarjeta-pad: 12px;
-  --fila-pad: 9px;
-  --bloque-gap: 10px;
-}
 
-/* ── Oscuro ── */
+/* ── Oscuro (negro puro: en OLED el fondo apaga los pixeles) ── */
 :root[data-ui][data-theme="dark"] {
   color-scheme: dark;
-  --c-bg: #0A0B0D;
-  --c-s1: #15161A;
-  --c-s2: #1D1F24;
-  --c-s3: #282B31;
+  --c-bg: #000000;
+  --c-s1: #0E0F11;
+  --c-s2: #18191C;
+  --c-s3: #222429;
   --c-line: rgba(255, 255, 255, 0.07);
   --c-line-2: rgba(255, 255, 255, 0.13);
   --c-t1: #F4F5F7;
@@ -56,19 +50,11 @@
   --c-pos-suave: rgba(61, 220, 151, 0.13);
   --c-neg-suave: rgba(255, 107, 112, 0.12);
   --c-warn-suave: rgba(245, 185, 74, 0.13);
-  --c-nav: rgba(10, 11, 13, 0.9);
+  --c-nav: rgba(0, 0, 0, 0.9);
   --c-sombra: none;
   --c-sombra-alta: 0 18px 50px rgba(0, 0, 0, 0.55);
   --c-velo: rgba(0, 0, 0, 0.62);
   --c-apagado: #3A3D44;
-}
-/* ── Negro puro (OLED) ── */
-:root[data-ui][data-theme="dark"][data-oled="on"] {
-  --c-bg: #000000;
-  --c-s1: #0E0F11;
-  --c-s2: #18191C;
-  --c-s3: #222429;
-  --c-nav: rgba(0, 0, 0, 0.9);
 }
 /* ── Claro ── */
 :root[data-ui][data-theme="light"] {

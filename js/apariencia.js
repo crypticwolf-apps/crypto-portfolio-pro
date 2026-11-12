@@ -1,8 +1,8 @@
 // =============================================================================
-// apariencia.js - Ajustes -> Apariencia: tema (claro, oscuro, automatico),
-// negro puro, color de acento, tamano del texto, densidad, decimales,
-// privacidad al abrir, saldos pequenos, dato de la lista y los bloques de
-// Inicio (cuales se ven y en que orden).
+// apariencia.js - Ajustes -> Apariencia: tema (claro, oscuro en negro puro,
+// automatico), color de acento, tamano del texto, decimales, privacidad al
+// abrir, saldos pequenos, dato de la lista y los bloques de Inicio (cuales se
+// ven y en que orden).
 // Los atributos de <html> que lee el CSS los pone applyAppearance(); el
 // script del <head> hace lo mismo antes de pintar para que no parpadee.
 // =============================================================================
@@ -16,7 +16,6 @@ function applyAppearance() {
   const root = document.documentElement;
   root.dataset.accent = state.prefs.accent;
   root.dataset.texto = state.prefs.textSize;
-  root.dataset.espacio = state.prefs.spacing;
   applyTheme();
   applyHomeBlocks();
 }
@@ -44,11 +43,6 @@ function bindAppearance() {
     const text = event.target.closest("[data-texto-set]");
     if (text) {
       updateAppearance("textSize", text.dataset.textoSet, APARIENCIA.textos);
-      return;
-    }
-    const spacing = event.target.closest("[data-espacio-set]");
-    if (spacing) {
-      updateAppearance("spacing", spacing.dataset.espacioSet, APARIENCIA.espacios);
       return;
     }
     const metric = event.target.closest("[data-metrica-set]");
@@ -100,22 +94,18 @@ function updateAppearance(key, value, options) {
   if (key === "listMetric") {
     renderAll();
   } else {
-    // Acento, texto o densidad: los graficos de Analitica leen los colores
+    // Acento o texto: los graficos de Analitica leen los colores
     // y medidas al pintarse.
     renderDashboardOnly();
   }
 }
 
 function toggleAppearanceSwitch(key) {
-  if (!["oled", "decimals", "hideOnOpen", "groupSmall"].includes(key)) {
+  if (!["decimals", "hideOnOpen", "groupSmall"].includes(key)) {
     return;
   }
   state.prefs[key] = !state.prefs[key];
   savePreferences();
-  if (key === "oled") {
-    applyTheme();
-    return;
-  }
   renderAppearanceControls();
   if (key === "decimals" || key === "groupSmall") {
     renderAll();
@@ -136,20 +126,10 @@ function renderAppearanceControls() {
   pressed("[data-tema-set]", "temaSet", state.prefs.theme);
   pressed("[data-acento-set]", "acentoSet", state.prefs.accent);
   pressed("[data-texto-set]", "textoSet", state.prefs.textSize);
-  pressed("[data-espacio-set]", "espacioSet", state.prefs.spacing);
   pressed("[data-metrica-set]", "metricaSet", state.prefs.listMetric);
   panel.querySelectorAll("[data-ajuste]").forEach((button) => {
     button.setAttribute("aria-checked", state.prefs[button.dataset.ajuste] ? "true" : "false");
   });
-
-  // El negro puro solo se ve en oscuro: en claro el interruptor se apaga a
-  // la vista pero conserva la eleccion para cuando se vuelva al oscuro.
-  const oledRow = panel.querySelector("[data-ajuste='oled']");
-  if (oledRow) {
-    const dark = resolvedTheme() === "dark";
-    oledRow.disabled = !dark;
-    oledRow.setAttribute("aria-checked", state.prefs.oled && dark ? "true" : "false");
-  }
 
   const hint = document.getElementById("agruparHint");
   if (hint) {
