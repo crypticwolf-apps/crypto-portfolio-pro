@@ -185,7 +185,7 @@ function bindFab() {
 function openFabSheet() {
   const sheet = document.getElementById("fabSheet");
   if (sheet) {
-    sheet.hidden = false;
+    showOverlay(sheet);
     document.body.classList.add("fab-open");
   }
 }
@@ -195,12 +195,7 @@ function closeFabSheet() {
   if (!sheet) {
     return;
   }
-  sheet.classList.add("is-closing");
-  window.setTimeout(() => {
-    sheet.hidden = true;
-    sheet.classList.remove("is-closing");
-    document.body.classList.remove("fab-open");
-  }, 200);
+  hideOverlay(sheet, 200, () => document.body.classList.remove("fab-open"));
 }
 
 function handleFabAction(action) {

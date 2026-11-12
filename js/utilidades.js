@@ -324,6 +324,11 @@ function formatCurrency(value, digits = 2) {
 // entero, con el simbolo si va delante) y el resto (decimales y simbolo si
 // va detras), que se pinta mas pequeno. Une las dos y sale formatCurrency.
 function moneyParts(value, digits = 2) {
+  // Por debajo de 1 las cifras que importan son los decimales (0,00001 PEPE):
+  // no se parte, todo va en grande.
+  if (Math.abs(value || 0) < 1) {
+    return { main: formatCurrency(value, digits), rest: "" };
+  }
   const parts = currencyFormatter(currencyFractionDigits(value, digits)).formatToParts(value || 0);
   let last = -1;
   parts.forEach((part, index) => {
@@ -468,6 +473,41 @@ function escapeCsvCell(value) {
     return stringValue;
   }
   return `"${stringValue.replace(/"/g, '""')}"`;
+}
+
+// ── Capas superpuestas (ficha, editor, hojas y menu del engranaje) ──
+// Se cierran con una animacion corta y despues se ocultan. Si la misma capa se
+// vuelve a abrir antes de que acabe (cerrar y tocar otra cosa enseguida), el
+// cierre pendiente no debe ocultarla ni vaciarla: abrir quita la marca.
+function showOverlay(el) {
+  el.classList.remove("is-closing");
+  delete el.dataset.cierre;
+  el.hidden = false;
+}
+
+function hideOverlay(el, ms, done) {
+  const token = String(Math.random());
+  el.dataset.cierre = token;
+  el.classList.add("is-closing");
+  window.setTimeout(() => {
+    if (el.dataset.cierre !== token) {
+      return; // se volvio a abrir mientras se cerraba
+    }
+    delete el.dataset.cierre;
+    el.classList.remove("is-closing");
+    el.hidden = true;
+    done?.();
+  }, ms);
+}
+
+// body.editor-open (bloquea el scroll de fondo) mientras quede abierta alguna
+// hoja o el editor, sea cual sea la que se cierra.
+function syncEditorOpenClass() {
+  const open = ["positionEditorPortal", "tradeSheet", "walletSheet"].some((id) => {
+    const node = document.getElementById(id);
+    return node && !node.hidden && !node.classList.contains("is-closing");
+  });
+  document.body.classList.toggle("editor-open", open);
 }
 
 function getCssVar(name) {

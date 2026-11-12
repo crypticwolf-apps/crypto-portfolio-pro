@@ -14,6 +14,10 @@ const DETAIL_RANGES = [
   { key: "total", labelKey: "detail.rangeTotal", ms: Infinity }
 ];
 const DETAIL_ACTIVITY_MAX = 10;
+// Con precio en vivo el grafico de la ficha se redibuja como mucho cada 15 s.
+const DETAIL_CHART_LIVE_MS = 15000;
+let detailChartAt = 0;
+let detailReturnFocus = null;
 
 const ICONOS_FICHA = {
   volver: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>',
@@ -59,11 +63,16 @@ function openAssetDetail(rowId) {
   if (!row || !screen) {
     return;
   }
+  // Al cerrar, el foco vuelve a donde estaba (la fila que se toco).
+  detailReturnFocus = document.activeElement instanceof HTMLElement && !screen.contains(document.activeElement)
+    ? document.activeElement
+    : null;
   state.detailRowId = rowId;
-  screen.hidden = false;
+  showOverlay(screen);
   document.body.classList.add("detail-open");
   renderAssetDetail();
   screen.scrollTop = 0;
+  screen.querySelector("[data-detail-close]")?.focus({ preventScroll: true });
 }
 
 function closeAssetDetail() {
@@ -72,13 +81,14 @@ function closeAssetDetail() {
     return;
   }
   state.detailRowId = null;
-  screen.classList.add("is-closing");
-  window.setTimeout(() => {
-    screen.hidden = true;
-    screen.classList.remove("is-closing");
+  hideOverlay(screen, 220, () => {
     screen.innerHTML = "";
     document.body.classList.remove("detail-open");
-  }, 220);
+  });
+  if (detailReturnFocus?.isConnected) {
+    detailReturnFocus.focus({ preventScroll: true });
+  }
+  detailReturnFocus = null;
 }
 
 function handleDetailAction(action) {
@@ -125,6 +135,9 @@ function renderAssetDetail() {
   const name = row.resolvedName || assetDisplayName(row);
   const wallet = isWalletRow(row);
 
+  screen.setAttribute("role", "dialog");
+  screen.setAttribute("aria-modal", "true");
+  screen.setAttribute("aria-label", name);
   screen.innerHTML = `
     <div class="ficha">
       <header class="ficha-cabecera">
@@ -169,6 +182,10 @@ function renderAssetDetail() {
 }
 
 function renderDetailPrice(row, metrics, name) {
+  return `<section class="ficha-precio" data-detail-body="precio">${detailPriceInner(row, metrics, name)}</section>`;
+}
+
+function detailPriceInner(row, metrics, name = row.resolvedName || assetDisplayName(row)) {
   const change = Number.isFinite(row.priceChange24h) ? row.priceChange24h : null;
   const price = metrics.currentPrice > 0
     ? (() => {
@@ -178,14 +195,44 @@ function renderDetailPrice(row, metrics, name) {
     : "--";
   const source = metrics.currentPrice > 0 ? priceSourceLabel(row) : t("row.noPrice");
   return `
-    <section class="ficha-precio">
-      <span class="saldo-etiqueta">${escapeHtml(t("ficha.precioDe", { activo: name }))}</span>
-      <strong class="saldo-valor" data-detail-role="price">${price}</strong>
-      <div class="saldo-cambio">
-        <span class="chip-cambio ${change === null ? "neutral" : toneClass(change)}">${ICONO_FLECHA_CAMBIO}<span>${change === null ? "--" : formatSignedPercent(change)}</span></span>
-        <span class="saldo-cambio-texto">${escapeHtml(t("ficha.hoyFuente", { fuente: source }))}</span>
-      </div>
-    </section>`;
+    <span class="saldo-etiqueta">${escapeHtml(t("ficha.precioDe", { activo: name }))}</span>
+    <strong class="saldo-valor" data-detail-role="price">${price}</strong>
+    <div class="saldo-cambio">
+      <span class="chip-cambio ${change === null ? "neutral" : toneClass(change)}">${ICONO_FLECHA_CAMBIO}<span>${change === null ? "--" : formatSignedPercent(change)}</span></span>
+      <span class="saldo-cambio-texto">${escapeHtml(t("ficha.hoyFuente", { fuente: source }))}</span>
+    </div>`;
+}
+
+// Precio en vivo con la ficha abierta: solo se cambia lo que lleva cifras
+// (precio, posicion, objetivos y mercado). La cabecera, los enlaces Editar y
+// la botonera no se tocan: rehacerlos en cada tick se comia el toque de
+// quien pulsaba Comprar justo entonces.
+function refreshAssetDetailLive() {
+  const screen = document.getElementById("assetDetailScreen");
+  const row = getRowById(state.detailRowId);
+  if (!screen || !row || screen.hidden) {
+    return;
+  }
+  if (!screen.querySelector(".ficha")) {
+    renderAssetDetail();
+    return;
+  }
+  const metrics = computeRowMetrics(row);
+  const bodies = {
+    precio: () => detailPriceInner(row, metrics),
+    posicion: () => detailPositionBody(row, metrics),
+    objetivos: () => detailTargetsBody(row, metrics),
+    mercado: () => detailMarketBody(row)
+  };
+  Object.entries(bodies).forEach(([key, html]) => {
+    const node = screen.querySelector(`[data-detail-body="${key}"]`);
+    if (node) {
+      node.innerHTML = html();
+    }
+  });
+  if (Date.now() - detailChartAt > DETAIL_CHART_LIVE_MS) {
+    renderDetailChart(row);
+  }
 }
 
 // Grafico del precio guardado de la posicion (mas el precio de ahora).
@@ -194,6 +241,7 @@ function renderDetailChart(row) {
   if (!box || !row) {
     return;
   }
+  detailChartAt = Date.now();
   const range = DETAIL_RANGES.find((r) => r.key === state.detailRange) || DETAIL_RANGES[0];
   const cutoff = Number.isFinite(range.ms) ? Date.now() - range.ms : 0;
   const points = (row.priceHistory || [])
@@ -220,6 +268,17 @@ function detailCell(label, value, tone = "", sub = "") {
 }
 
 function renderDetailPosition(row, metrics) {
+  return `
+    <section class="tarjeta ficha-bloque">
+      <div class="ficha-bloque-cabecera">
+        <h2 class="titulo-tarjeta">${escapeHtml(t("ficha.tuPosicion"))}</h2>
+        <button class="enlace" type="button" data-detail-action="edit">${escapeHtml(t("buttons.edit"))}</button>
+      </div>
+      <div class="ficha-bloque-cuerpo" data-detail-body="posicion">${detailPositionBody(row, metrics)}</div>
+    </section>`;
+}
+
+function detailPositionBody(row, metrics) {
   const totalValue = state.rows.reduce((sum, item) => {
     const v = computeRowMetrics(item).currentValue;
     return sum + (v > 0 ? v : 0);
@@ -233,69 +292,74 @@ function renderDetailPosition(row, metrics) {
     ? `${state.prefs.hideBalance ? "••••" : escapeHtml(formatNumber(metrics.tokens, metrics.tokens >= 1 ? 4 : 8))} ${escapeHtml(row.symbol || "")}`
     : "--";
   const hasCost = metrics.investment > 0;
-
   return `
-    <section class="tarjeta ficha-bloque">
-      <div class="ficha-bloque-cabecera">
-        <h2 class="titulo-tarjeta">${escapeHtml(t("ficha.tuPosicion"))}</h2>
-        <button class="enlace" type="button" data-detail-action="edit">${escapeHtml(t("buttons.edit"))}</button>
-      </div>
-      <div class="ficha-posicion">
-        <strong class="ficha-posicion-valor">${maskedCurrency(metrics.currentValue)}</strong>
-        ${hasCost ? `<span class="chip-cambio ${toneClass(metrics.pnlPct)}">${ICONO_FLECHA_CAMBIO}<span>${formatPercent(metrics.pnlPct)}</span></span>` : ""}
-      </div>
-      ${isWalletRow(row) ? `<p class="ficha-billetera">${walletBadgeHtml(row)}</p>` : ""}
-      <dl class="ficha-datos">
-        ${detailCell(t("detail.quantity"), qty)}
-        ${detailCell(t("detail.avgPrice"), metrics.entryPrice > 0 ? escapeHtml(formatCurrency(metrics.entryPrice, getPriceDigits(metrics.entryPrice))) : "--")}
-        ${detailCell(t("detail.invested"), escapeHtml(maskedCurrency(metrics.investment)))}
-        ${detailCell(t("ficha.ganancia"), hasCost ? escapeHtml(maskedSignedCurrency(metrics.pnlUsd)) : "--", hasCost ? toneClass(metrics.pnlUsd) : "")}
-        ${detailCell(t("ficha.hoy"), pnl24 != null ? escapeHtml(maskedSignedCurrency(pnl24)) : "--", pnl24 != null ? toneClass(pnl24) : "", change != null ? formatSignedPercent(change) : "")}
-        ${detailCell(t("detail.weight"), weight != null ? `${weight.toFixed(1)}%` : "--")}
-      </dl>
-    </section>`;
+    <div class="ficha-posicion">
+      <strong class="ficha-posicion-valor">${maskedCurrency(metrics.currentValue)}</strong>
+      ${hasCost ? `<span class="chip-cambio ${toneClass(metrics.pnlPct)}">${ICONO_FLECHA_CAMBIO}<span>${formatPercent(metrics.pnlPct)}</span></span>` : ""}
+    </div>
+    ${isWalletRow(row) ? `<p class="ficha-billetera">${walletBadgeHtml(row)}</p>` : ""}
+    <dl class="ficha-datos">
+      ${detailCell(t("detail.quantity"), qty)}
+      ${detailCell(t("detail.avgPrice"), metrics.entryPrice > 0 ? escapeHtml(formatCurrency(metrics.entryPrice, getPriceDigits(metrics.entryPrice))) : "--")}
+      ${detailCell(t("detail.invested"), escapeHtml(maskedCurrency(metrics.investment)))}
+      ${detailCell(t("ficha.ganancia"), hasCost ? escapeHtml(maskedSignedCurrency(metrics.pnlUsd)) : "--", hasCost ? toneClass(metrics.pnlUsd) : "")}
+      ${detailCell(t("ficha.hoy"), pnl24 != null ? escapeHtml(maskedSignedCurrency(pnl24)) : "--", pnl24 != null ? toneClass(pnl24) : "", change != null ? formatSignedPercent(change) : "")}
+      ${detailCell(t("detail.weight"), weight != null ? `${weight.toFixed(1)}%` : "--")}
+    </dl>`;
 }
 
 // Objetivos de venta (TP1-3): progreso hasta cada uno y si ya se aviso.
+function detailTargetsOf(metrics) {
+  return [["TP1", metrics.tp1, "tp1"], ["TP2", metrics.tp2, "tp2"], ["TP3", metrics.tp3, "tp3"]].filter(([, v]) => v > 0);
+}
+
 function renderDetailTargets(row, metrics) {
-  const targets = [["TP1", metrics.tp1, "tp1"], ["TP2", metrics.tp2, "tp2"], ["TP3", metrics.tp3, "tp3"]].filter(([, v]) => v > 0);
-  const head = `
-    <div class="ficha-bloque-cabecera">
-      <h2 class="titulo-tarjeta">${escapeHtml(t("ficha.objetivos"))}</h2>
-      ${targets.length ? `<button class="enlace" type="button" data-detail-action="edit">${escapeHtml(t("buttons.edit"))}</button>` : ""}
-    </div>`;
-  if (!targets.length) {
-    return `
-      <section class="tarjeta ficha-bloque">
-        ${head}
-        <p class="ficha-vacio">${escapeHtml(t("ficha.objetivosVacio"))}</p>
-        <button class="boton-secundario" type="button" data-detail-action="edit">${escapeHtml(t("ficha.objetivosAnadir"))}</button>
-      </section>`;
-  }
+  const hasTargets = detailTargetsOf(metrics).length > 0;
   return `
     <section class="tarjeta ficha-bloque">
-      ${head}
-      <div class="ficha-objetivos">
-        ${targets.map(([label, value, key]) => {
-          const reached = metrics.currentPrice > 0 && metrics.currentPrice >= value;
-          const progress = metrics.currentPrice > 0 ? Math.max(0, Math.min(100, (metrics.currentPrice / value) * 100)) : 0;
-          const dist = metrics.currentPrice > 0 ? (value / metrics.currentPrice - 1) * 100 : null;
-          const fired = Boolean(row.alertsFired?.[key]);
-          return `
-            <div class="ficha-objetivo ${reached ? "alcanzado" : ""}">
-              <div class="ficha-objetivo-fila">
-                <span><strong>${label}</strong> · ${escapeHtml(formatCurrency(value, getPriceDigits(value)))}</span>
-                <span class="ficha-objetivo-falta">${reached ? escapeHtml(t("detail.reached")) : dist === null ? "--" : escapeHtml(t("ficha.falta", { pct: dist.toFixed(1) }))}</span>
-              </div>
-              <div class="ficha-barra" aria-hidden="true"><span style="width:${progress.toFixed(1)}%"></span></div>
-              <small class="ficha-aviso ${fired ? "enviado" : ""}">${ICONOS_FICHA.campana}${escapeHtml(t(fired ? "ficha.avisoEnviado" : "ficha.avisoPendiente"))}</small>
-            </div>`;
-        }).join("")}
+      <div class="ficha-bloque-cabecera">
+        <h2 class="titulo-tarjeta">${escapeHtml(t("ficha.objetivos"))}</h2>
+        ${hasTargets ? `<button class="enlace" type="button" data-detail-action="edit">${escapeHtml(t("buttons.edit"))}</button>` : ""}
       </div>
+      <div class="ficha-bloque-cuerpo" data-detail-body="objetivos">${detailTargetsBody(row, metrics)}</div>
+      ${hasTargets ? "" : `<button class="boton-secundario" type="button" data-detail-action="edit">${escapeHtml(t("ficha.objetivosAnadir"))}</button>`}
     </section>`;
 }
 
+function detailTargetsBody(row, metrics) {
+  const targets = detailTargetsOf(metrics);
+  if (!targets.length) {
+    return `<p class="ficha-vacio">${escapeHtml(t("ficha.objetivosVacio"))}</p>`;
+  }
+  return `
+    <div class="ficha-objetivos">
+      ${targets.map(([label, value, key]) => {
+        const reached = metrics.currentPrice > 0 && metrics.currentPrice >= value;
+        const progress = metrics.currentPrice > 0 ? Math.max(0, Math.min(100, (metrics.currentPrice / value) * 100)) : 0;
+        const dist = metrics.currentPrice > 0 ? (value / metrics.currentPrice - 1) * 100 : null;
+        const fired = Boolean(row.alertsFired?.[key]);
+        return `
+          <div class="ficha-objetivo ${reached ? "alcanzado" : ""}">
+            <div class="ficha-objetivo-fila">
+              <span><strong>${label}</strong> · ${escapeHtml(formatCurrency(value, getPriceDigits(value)))}</span>
+              <span class="ficha-objetivo-falta">${reached ? escapeHtml(t("detail.reached")) : dist === null ? "--" : escapeHtml(t("ficha.falta", { pct: dist.toFixed(1) }))}</span>
+            </div>
+            <div class="ficha-barra" aria-hidden="true"><span style="width:${progress.toFixed(1)}%"></span></div>
+            <small class="ficha-aviso ${fired ? "enviado" : ""}">${ICONOS_FICHA.campana}${escapeHtml(t(fired ? "ficha.avisoEnviado" : "ficha.avisoPendiente"))}</small>
+          </div>`;
+      }).join("")}
+    </div>`;
+}
+
 function renderDetailMarket(row) {
+  return `
+    <section class="tarjeta ficha-bloque">
+      <h2 class="titulo-tarjeta">${escapeHtml(t("market.title"))}</h2>
+      <div class="ficha-bloque-cuerpo" data-detail-body="mercado">${detailMarketBody(row)}</div>
+    </section>`;
+}
+
+function detailMarketBody(row) {
   const price = (value) => (Number.isFinite(value) ? escapeHtml(formatCurrency(value, getPriceDigits(value))) : "--");
   const rows = [
     [t("ficha.capitalizacion"), Number.isFinite(row.marketCap) ? escapeHtml(formatCompactCurrency(row.marketCap)) : "--"],
@@ -305,13 +369,7 @@ function renderDetailMarket(row) {
     [t("detail.volume24h"), Number.isFinite(row.volume24h) ? escapeHtml(formatCompactCurrency(row.volume24h)) : "--"],
     [t("detail.priceSource"), `${escapeHtml(priceSourceLabel(row))}${row.lastPriceAt ? ` <small>· ${escapeHtml(formatRelativeTime(new Date(row.lastPriceAt).getTime()))}</small>` : ""}`]
   ];
-  return `
-    <section class="tarjeta ficha-bloque">
-      <h2 class="titulo-tarjeta">${escapeHtml(t("market.title"))}</h2>
-      <dl class="ficha-lista">
-        ${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${value}</dd></div>`).join("")}
-      </dl>
-    </section>`;
+  return `<dl class="ficha-lista">${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${value}</dd></div>`).join("")}</dl>`;
 }
 
 function renderDetailNotes(row) {

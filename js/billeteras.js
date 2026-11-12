@@ -264,8 +264,8 @@ function openWalletSheet(walletId = null) {
   walletDraft = wallet
     ? { mode: "review", walletId: wallet.id, chain: wallet.chain, address: wallet.address, name: wallet.name, step: "loading", holdings: [], costMode: "manual", showHidden: false, failedNetworks: [], error: "", detect: null }
     : { mode: "new", walletId: null, chain: "", address: "", name: "", step: "input", holdings: [], costMode: "manual", showHidden: false, failedNetworks: [], error: "", detect: null };
-  sheet.hidden = false;
-  document.body.classList.add("editor-open");
+  showOverlay(sheet);
+  syncEditorOpenClass();
   renderWalletSheet();
   if (wallet) {
     loadWalletPreview();
@@ -280,15 +280,11 @@ function closeWalletSheet() {
     return;
   }
   walletDraft = null;
-  sheet.classList.add("is-closing");
-  window.setTimeout(() => {
-    sheet.hidden = true;
-    sheet.classList.remove("is-closing");
+  hideOverlay(sheet, 200, () => {
     sheet.innerHTML = "";
-    if (!state.editorRowId && document.getElementById("tradeSheet")?.hidden !== false) {
-      document.body.classList.remove("editor-open");
-    }
-  }, 200);
+    syncEditorOpenClass();
+  });
+  syncEditorOpenClass();
 }
 
 function walletDetectHtml(detect) {

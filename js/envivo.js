@@ -541,7 +541,7 @@ function updateRowPriceCells(rowId, direction) {
     refreshEditorLiveData();
   }
   if (state.detailRowId === rowId) {
-    renderAssetDetail();
+    refreshAssetDetailLive();
   }
 }
 

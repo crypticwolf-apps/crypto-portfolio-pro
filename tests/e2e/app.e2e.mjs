@@ -304,6 +304,16 @@ async function recorridoCompleto(navegador, url, ancho) {
       if (pulsado !== "true") throw new Error("rango sin marcar: " + k);
     }
     const d = await desborde(page); if (d) throw new Error(d);
+    // Con precios en vivo, los ticks cambian las cifras pero no rehacen los
+    // botones (si no, un toque a mitad de tick se perdia).
+    const vivo = await page.evaluate(async () => {
+      const boton = document.querySelector('#assetDetailScreen .ficha-pie [data-detail-action="buy"]');
+      const editar = document.querySelector('#assetDetailScreen .enlace[data-detail-action="edit"]');
+      const antes = document.querySelector('#assetDetailScreen [data-detail-role="price"]').textContent;
+      await new Promise((ok) => setTimeout(ok, 1500));
+      return { boton: boton.isConnected, editar: editar.isConnected, cambia: document.querySelector('#assetDetailScreen [data-detail-role="price"]').textContent !== antes };
+    });
+    if (!vivo.boton || !vivo.editar || !vivo.cambia) throw new Error("en vivo: " + JSON.stringify(vivo));
     await page.click('#assetDetailScreen [data-detail-action="favorite"]'); await page.waitForTimeout(200);
     const fav = await page.evaluate(() => document.querySelector('#assetDetailScreen [data-detail-action="favorite"]').getAttribute("aria-pressed"));
     await page.click('#assetDetailScreen [data-detail-action="favorite"]');
@@ -354,6 +364,21 @@ async function recorridoCompleto(navegador, url, ancho) {
     const orden = await page.evaluate(() => [...document.querySelectorAll("#inicioBloques > [data-bloque]")].map((b) => b.dataset.bloque).join());
     if (orden !== "grafico,activos,acciones,resumen,reparto,mercado") throw new Error("orden: " + orden);
     await page.keyboard.press("ArrowDown"); await page.keyboard.press("ArrowDown");
+  });
+  await paso(g, "apariencia: arrastrar un bloque y soltar fuera de la lista", app, async () => {
+    await page.evaluate(() => document.getElementById("bloquesInicio").scrollIntoView({ block: "center" }));
+    await page.waitForTimeout(200);
+    const asa = await page.locator('#bloquesInicio [data-bloque-id="mercado"] [data-asa]').boundingBox();
+    await page.mouse.move(asa.x + asa.width / 2, asa.y + asa.height / 2); await page.mouse.down();
+    await page.mouse.move(asa.x + asa.width / 2, 4, { steps: 10 }); await page.mouse.up(); await page.waitForTimeout(200);
+    const r = await page.evaluate(() => ({
+      orden: [...document.querySelectorAll("#inicioBloques > [data-bloque]")].map((b) => b.dataset.bloque)[0],
+      colgado: document.querySelectorAll("#bloquesInicio .arrastrando").length
+    }));
+    if (r.orden !== "mercado" || r.colgado) throw new Error(JSON.stringify(r));
+    // Se deja como estaba: mercado al final.
+    await page.focus('#bloquesInicio [data-bloque-id="mercado"] [data-asa]');
+    for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowDown");
   });
   await paso(g, "apariencia: sin decimales y precio como dato de la lista", app, async () => {
     await page.click('[data-ajuste="decimals"]'); await page.waitForTimeout(200);
@@ -445,6 +470,26 @@ async function casosSueltos(navegador, url) {
     if (!r.grupo || !r.oculto || r.filas !== 2) throw new Error(JSON.stringify(r));
     await page.click("[data-grupo-toggle]");
     if (await page.evaluate(() => document.getElementById("grupoPequenosLista").hidden)) throw new Error("no se despliega");
+  });
+  await paso(g, "cerrar y volver a abrir enseguida: ficha, editor y hoja de compra", virgen, async (page) => {
+    await page.evaluate(() => {
+      openAssetDetail(state.rows[0].id); closeAssetDetail(); openAssetDetail(state.rows[1].id);
+    });
+    await page.waitForTimeout(450);
+    const ficha = await page.evaluate(() => ({ visible: !document.getElementById("assetDetailScreen").hidden, ficha: !!document.querySelector("#assetDetailScreen .ficha") }));
+    await page.evaluate(() => closeAssetDetail()); await page.waitForTimeout(350);
+    await page.evaluate(() => { openPositionEditor(state.rows[0].id); closePositionEditor(); openPositionEditor(state.rows[1].id); });
+    await page.waitForTimeout(450);
+    const editor = await page.evaluate(() => ({ visible: !document.getElementById("positionEditorPortal").hidden, form: !!document.querySelector("#positionEditorPortal form"), bloqueo: document.body.classList.contains("editor-open") }));
+    await page.evaluate(() => closePositionEditor()); await page.waitForTimeout(350);
+    await page.evaluate(() => { openTradeSheet("buy"); closeTradeSheet(); openTradeSheet("sell"); });
+    await page.waitForTimeout(450);
+    const hoja = await page.evaluate(() => ({ visible: !document.getElementById("tradeSheet").hidden, modo: document.querySelector("#tradeSheet form")?.dataset.tradeMode, bloqueo: document.body.classList.contains("editor-open") }));
+    await page.evaluate(() => closeTradeSheet()); await page.waitForTimeout(350);
+    const libre = await page.evaluate(() => document.body.classList.contains("editor-open"));
+    if (!ficha.visible || !ficha.ficha || !editor.visible || !editor.form || !editor.bloqueo || !hoja.visible || hoja.modo !== "sell" || !hoja.bloqueo || libre) {
+      throw new Error(JSON.stringify({ ficha, editor, hoja, libre }));
+    }
   });
   await paso(g, "un aviso no se queda con el toque de lo que tiene debajo", virgen, async (page) => {
     const r = await page.evaluate(() => {

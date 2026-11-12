@@ -631,9 +631,15 @@ function updateLiveRowUi(rowId) {
   if (state.editorRowId === rowId) {
     refreshEditorLiveData();
   }
-  // La pantalla de detalle abierta también se mantiene al día.
+  // La ficha abierta tambien se mantiene al dia. Con el editor encima se
+  // rehace entera (pueden cambiar objetivos o notas); si no, solo sus cifras,
+  // para no comerse un toque en sus botones (refrescos de precio).
   if (state.detailRowId === rowId) {
-    renderAssetDetail();
+    if (state.editorRowId) {
+      renderAssetDetail();
+    } else {
+      refreshAssetDetailLive();
+    }
   }
 
   if (!row || !rowElement) {

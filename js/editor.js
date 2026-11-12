@@ -71,8 +71,8 @@ function openPositionEditor(rowId) {
   closeRowMenu();
   state.editorRowId = rowId;
   renderPositionEditor(row);
-  editorPortal.hidden = false;
-  document.body.classList.add("editor-open");
+  showOverlay(editorPortal);
+  syncEditorOpenClass();
   // Foco al primer campo tras la animación (sin provocar zoom en iOS).
   window.setTimeout(() => {
     const firstField = editorPortal.querySelector("[data-editor-field='tokens']");
@@ -88,15 +88,15 @@ function closePositionEditor() {
   }
   clearTimeout(editorSearchTimer);
   state.editorRowId = null;
-  editorPortal.classList.add("is-closing");
-  const finish = () => {
-    editorPortal.hidden = true;
-    editorPortal.classList.remove("is-closing");
-    document.body.classList.remove("editor-open");
+  // La ficha que haya debajo se rehace con lo editado (objetivos, notas).
+  if (state.detailRowId) {
+    renderAssetDetail();
+  }
+  hideOverlay(editorPortal, 220, () => {
     editorPortal.innerHTML = "";
-  };
-  // Respeta la animación pero garantiza el cierre aunque no dispare.
-  window.setTimeout(finish, 220);
+    syncEditorOpenClass();
+  });
+  syncEditorOpenClass();
 }
 
 function renderPositionEditor(row) {

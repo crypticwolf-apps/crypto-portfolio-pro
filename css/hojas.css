@@ -474,6 +474,10 @@
   transform: translateX(-50%);
   bottom: calc(var(--barra-alto) + 16px + env(safe-area-inset-bottom));
 }
+/* En escritorio la barra flota 16 px por encima del borde: el aviso, encima. */
+@media (min-width: 700px) {
+  :root[data-ui][data-theme] .toast-stack { bottom: calc(var(--barra-alto) + 40px); }
+}
 :root[data-ui][data-theme] body.detail-open .toast-stack { bottom: calc(84px + env(safe-area-inset-bottom)); }
 /* Con una hoja abierta, arriba (sobre el fondo oscurecido): asi no tapan
    el formulario. */

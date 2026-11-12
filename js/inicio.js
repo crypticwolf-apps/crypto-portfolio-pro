@@ -444,7 +444,7 @@ function renderPortfolioMobile(rows) {
             <span class="fila-activo-sub">${escapeHtml(t("inicio.nActivos", { n: small.length }))}</span>
           </span>
           <span class="fila-activo-cifras">
-            <span class="fila-activo-valor">${maskedCurrency(total)}</span>
+            <span class="fila-activo-valor" data-role="grupoValor">${maskedCurrency(total)}</span>
             <span class="fila-activo-cambio" data-role="grupoAccion">${escapeHtml(t(grupoPequenosAbierto ? "inicio.ocultar" : "inicio.ver"))}</span>
           </span>
         </button>
@@ -456,9 +456,13 @@ function renderPortfolioMobile(rows) {
   box.innerHTML = html;
 }
 
+function assetRowNode(rowId) {
+  return document.querySelector(`#portfolioMobileList [data-card-row="${CSS.escape(String(rowId))}"]`);
+}
+
 // Repinta una sola fila (cambio de datos de esa posicion).
 function updateMobileCard(rowId) {
-  const node = document.querySelector(`#portfolioMobileList [data-card-row="${rowId}"]`);
+  const node = assetRowNode(rowId);
   const row = getRowById(rowId);
   if (node && row) {
     node.outerHTML = assetRowHtml(row);
@@ -467,7 +471,7 @@ function updateMobileCard(rowId) {
 
 // Tick de precio en vivo: solo cambian el valor y el dato de la derecha.
 function updateAssetRowLive(rowId, direction) {
-  const node = document.querySelector(`#portfolioMobileList [data-card-row="${rowId}"]`);
+  const node = assetRowNode(rowId);
   const row = getRowById(rowId);
   if (!node || !row) {
     return false;
@@ -490,6 +494,17 @@ function updateAssetRowLive(rowId, direction) {
     if (metric.tone) {
       metricNode.classList.add(metric.tone);
     }
+  }
+  // Fila dentro de "Saldos pequenos": su total tambien cambia.
+  const group = node.closest("#grupoPequenosLista");
+  const groupValue = group?.parentElement?.querySelector("[data-role='grupoValor']");
+  if (groupValue) {
+    const total = [...group.querySelectorAll("[data-card-row]")]
+      .reduce((sum, item) => {
+        const groupRow = getRowById(item.dataset.cardRow);
+        return sum + (groupRow ? computeRowMetrics(groupRow).currentValue : 0);
+      }, 0);
+    groupValue.textContent = maskedCurrency(total);
   }
   return true;
 }

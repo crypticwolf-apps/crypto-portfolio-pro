@@ -129,8 +129,8 @@ function openTradeSheet(mode, preselectRowId = null) {
     </form>
   `;
 
-  sheet.hidden = false;
-  document.body.classList.add("editor-open");
+  showOverlay(sheet);
+  syncEditorOpenClass();
 
   const select = sheet.querySelector("[data-trade-field='rowId']");
   if (mode === "alert") {
@@ -268,15 +268,11 @@ function closeTradeSheet() {
   // Cancelar deja la operacion original intacta: solo se olvida la edicion.
   state.editingTradeId = null;
   state.editingAlertId = null;
-  sheet.classList.add("is-closing");
-  window.setTimeout(() => {
-    sheet.hidden = true;
-    sheet.classList.remove("is-closing");
+  hideOverlay(sheet, 200, () => {
     sheet.innerHTML = "";
-    if (!state.editorRowId) {
-      document.body.classList.remove("editor-open");
-    }
-  }, 200);
+    syncEditorOpenClass();
+  });
+  syncEditorOpenClass();
 }
 
 // Registra una operación estructurada (compra/venta) para PnL realizado

@@ -217,23 +217,12 @@ function bindHomeBlocksDrag(list) {
   }
   let dragging = null;
 
-  list.addEventListener("pointerdown", (event) => {
-    const handle = event.target.closest("[data-asa]");
-    if (!handle || (event.pointerType === "mouse" && event.button !== 0)) {
+  // El bloque se coloca delante del primero cuyo centro queda por debajo del
+  // dedo: se mueve en el DOM al momento, sin animaciones que medir.
+  const onMove = (event) => {
+    if (!dragging || event.pointerId !== dragging.pointerId) {
       return;
     }
-    dragging = { item: handle.closest(".bloque-item"), handle, moved: false };
-    dragging.item.classList.add("arrastrando");
-    handle.setPointerCapture?.(event.pointerId);
-    event.preventDefault();
-  });
-
-  list.addEventListener("pointermove", (event) => {
-    if (!dragging) {
-      return;
-    }
-    // El bloque se coloca delante del primero cuyo centro queda por debajo
-    // del dedo: se mueve en el DOM al momento, sin animaciones que medir.
     const others = [...list.querySelectorAll(".bloque-item")].filter((item) => item !== dragging.item);
     const before = others.find((item) => {
       const box = item.getBoundingClientRect();
@@ -248,20 +237,36 @@ function bindHomeBlocksDrag(list) {
       list.appendChild(dragging.item);
       dragging.moved = true;
     }
-  });
-
-  const finish = () => {
-    if (!dragging) {
+  };
+  // Mover el bloque en el DOM le quita la captura del puntero: por eso el
+  // movimiento y el soltar se escuchan en la ventana mientras dura el
+  // arrastre (si el dedo sale de la lista, el soltar igual llega).
+  const finish = (event) => {
+    if (!dragging || (event && event.pointerId !== dragging.pointerId)) {
       return;
     }
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", finish);
+    window.removeEventListener("pointercancel", finish);
     dragging.item.classList.remove("arrastrando");
     if (dragging.moved) {
       saveHomeBlocksOrder(list);
     }
     dragging = null;
   };
-  list.addEventListener("pointerup", finish);
-  list.addEventListener("pointercancel", finish);
+
+  list.addEventListener("pointerdown", (event) => {
+    const handle = event.target.closest("[data-asa]");
+    if (!handle || dragging || (event.pointerType === "mouse" && event.button !== 0)) {
+      return;
+    }
+    dragging = { item: handle.closest(".bloque-item"), pointerId: event.pointerId, moved: false };
+    dragging.item.classList.add("arrastrando");
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+    event.preventDefault();
+  });
 
   // Teclado: flechas arriba y abajo sobre el asa.
   list.addEventListener("keydown", (event) => {
