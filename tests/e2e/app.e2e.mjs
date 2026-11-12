@@ -216,7 +216,9 @@ async function abrirApp(navegador, url, { ancho = 375, sembrar = true, proxyCaid
 async function paso(grupo, nombre, app, fn) {
   const antes = app.errores.length;
   let error = null;
-  try { await fn(app.page); } catch (e) { error = e.message.split("\n")[0]; }
+  // E2E_DETALLE=1: el error completo (con el registro de Playwright) para
+  // depurar; por defecto, solo su primera linea.
+  try { await fn(app.page); } catch (e) { error = process.env.E2E_DETALLE ? e.message : e.message.split("\n")[0]; }
   await app.page.waitForTimeout(200);
   const nuevos = app.errores.slice(antes);
   if (!error && nuevos.length) error = nuevos.join(" | ");

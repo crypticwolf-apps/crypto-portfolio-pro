@@ -245,6 +245,9 @@
   padding: 8px 20px 18px;
   gap: 16px;
 }
+/* El cuerpo hace scroll: sus piezas no se encogen nunca. Un hijo con
+   overflow (la lista de la billetera) se encogia y recortaba sus filas. */
+:root[data-ui][data-theme] .editor-body > * { flex-shrink: 0; }
 :root[data-ui][data-theme] .editor-grid-2,
 :root[data-ui][data-theme] .editor-tp-grid { gap: 12px; align-items: end; }
 :root[data-ui][data-theme] .editor-readonly {

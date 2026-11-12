@@ -245,5 +245,7 @@
 
 @media (max-width: 360px) {
   :root[data-ui] .ficha-precio .saldo-valor { font-size: 2.125rem; }
+  :root[data-ui] .ficha-datos { gap: 12px 12px; }
+  :root[data-ui] .ficha-dato dd { font-size: 0.875rem; }
   :root[data-ui] .ficha-posicion-valor { font-size: 1.5rem; }
 }
