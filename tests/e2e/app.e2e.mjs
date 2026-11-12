@@ -444,6 +444,15 @@ async function casosSueltos(navegador, url) {
     await page.click("[data-grupo-toggle]");
     if (await page.evaluate(() => document.getElementById("grupoPequenosLista").hidden)) throw new Error("no se despliega");
   });
+  await paso(g, "un aviso no se queda con el toque de lo que tiene debajo", virgen, async (page) => {
+    const r = await page.evaluate(() => {
+      showToast("Prueba", "Aviso encima de la lista", "positive");
+      const caja = document.querySelector("#toastStack .toast").getBoundingClientRect();
+      const debajo = document.elementFromPoint(caja.left + caja.width / 2, caja.top + caja.height / 2);
+      return debajo?.closest(".toast") ? "el aviso" : "ok";
+    });
+    if (r !== "ok") throw new Error("el toque lo recibe " + r);
+  });
   await paso(g, "ocultar saldos al abrir: la app arranca en privado", virgen, async (page) => {
     await page.evaluate(() => { state.prefs.hideOnOpen = true; state.prefs.hideBalance = false; savePreferences(); });
     await page.reload(); await page.waitForTimeout(2500);
