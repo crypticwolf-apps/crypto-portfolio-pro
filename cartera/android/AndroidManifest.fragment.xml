@@ -1,3 +1,0 @@
-<!-- Incorporar este atributo al elemento application existente. -->
-<application android:icon="@mipmap/ic_launcher" />
-<!-- El prefijo android se declara en el elemento manifest del proyecto. -->
