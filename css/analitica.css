@@ -41,12 +41,17 @@
 :root[data-ui] .as-main-pct.negative { background: var(--c-neg-suave); color: var(--c-neg); }
 :root[data-ui] .as-phrase { font-size: 0.8125rem; line-height: 1.45; color: var(--c-t2); }
 :root[data-ui] .as-secondary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-  gap: 12px;
+  /* Cada cifra ocupa lo que mide y, si no cabe en la linea, baja a la
+     siguiente: nunca se parte un importe (solo uno enorme, como ultimo
+     recurso, por max-width). */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
   padding-top: 14px;
   border-top: 1px solid var(--c-line);
 }
+:root[data-ui] .as-sec,
+:root[data-ui] .acts-totals > div { flex: 1 0 auto; max-width: 100%; }
 :root[data-ui] .as-sec { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 :root[data-ui] .as-sec span { font-size: 0.75rem; color: var(--c-t2); }
 :root[data-ui] .as-sec b {
@@ -135,7 +140,7 @@
 :root[data-ui] .compare-block { display: flex; flex-direction: column; gap: 14px; }
 :root[data-ui] .compare-row {
   display: grid;
-  grid-template-columns: minmax(0, 104px) minmax(0, 1fr) 66px;
+  grid-template-columns: minmax(0, 104px) minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   font-size: 0.875rem;
@@ -187,14 +192,15 @@
 :root[data-ui] .insight-list { display: flex; flex-direction: column; }
 :root[data-ui] .insight-item {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 4px 10px;
   padding: 9px 0;
   border-top: 1px solid var(--c-line);
 }
 :root[data-ui] .insight-item:first-child { border-top: 0; }
-:root[data-ui] .insight-item-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+:root[data-ui] .insight-item-main { flex: 1 1 140px; display: flex; align-items: center; gap: 10px; min-width: 0; }
 :root[data-ui] .insight-item-main > div { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 :root[data-ui] .insight-item-rank {
   width: 22px;
@@ -211,7 +217,7 @@
 }
 :root[data-ui] .insight-item strong { font-size: 0.875rem; font-weight: 600; }
 :root[data-ui] .insight-item small { font-size: 0.75rem; color: var(--c-t2); }
-:root[data-ui] .insight-item-metric { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; }
+:root[data-ui] .insight-item-metric { flex: 0 0 auto; margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; }
 :root[data-ui] .insight-item-metric strong.positive { color: var(--c-pos); }
 :root[data-ui] .insight-item-metric strong.negative { color: var(--c-neg); }
 :root[data-ui] .insight-empty { font-size: 0.8125rem; color: var(--c-t2); }
@@ -219,9 +225,9 @@
 /* ── Compras y ventas ── */
 :root[data-ui] .acts-block { display: flex; flex-direction: column; gap: 16px; }
 :root[data-ui] .acts-totals {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
 }
 :root[data-ui] .acts-totals > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 :root[data-ui] .acts-totals span { font-size: 0.75rem; color: var(--c-t2); }

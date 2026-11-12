@@ -83,11 +83,18 @@
 /* Cifras en rejilla (resumen global, escenario, resumen del activo) */
 :root[data-ui] .tp-global-grid,
 :root[data-ui] .tp-summary,
-:root[data-ui] .tp-scenario-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+:root[data-ui] .tp-scenario-grid,
+:root[data-ui] .tp-step-grid {
+  /* Columnas iguales mientras las cifras caben; la que no cabe pasa a su
+     propia fila (un importe nunca se parte). */
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
+:root[data-ui] .tp-global-grid > div,
+:root[data-ui] .tp-summary > div,
+:root[data-ui] .tp-scenario-grid > div { flex: 1 1 calc(50% - 6px); min-width: max-content; }
+:root[data-ui] .tp-step-grid > div { flex: 1 1 calc(33.333% - 8px); min-width: max-content; }
 :root[data-ui] .tp-global-grid > div,
 :root[data-ui] .tp-summary > div,
 :root[data-ui] .tp-scenario-grid > div,
@@ -95,7 +102,6 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
 }
 :root[data-ui] .tp-global-grid span,
 :root[data-ui] .tp-summary span,
@@ -334,16 +340,7 @@
   color: var(--c-t2);
 }
 :root[data-ui] .tp-step-top strong { color: var(--c-t1); font-size: 0.9375rem; }
-:root[data-ui] .tp-step-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
-  gap: 10px;
-}
-/* Importes enteros: si no caben en la columna, la rejilla se recoloca. */
-:root[data-ui] .tp-step-grid b,
-:root[data-ui] .tp-global-grid b,
-:root[data-ui] .tp-summary b,
-:root[data-ui] .tp-scenario-grid b { overflow-wrap: normal; white-space: nowrap; }
+
 :root[data-ui] .tp-reached-tag {
   display: inline-block;
   margin-left: 4px;
@@ -418,5 +415,4 @@
   :root[data-ui] .tp-config-row { grid-template-columns: 34px minmax(0, 1fr) 76px 32px; gap: 6px; }
   :root[data-ui] .tp-config-del,
   :root[data-ui] .tp-config-del-spacer { width: 32px; height: 32px; }
-  :root[data-ui] .tp-step-grid { gap: 6px; }
 }

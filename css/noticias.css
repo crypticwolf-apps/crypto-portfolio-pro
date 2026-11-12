@@ -89,6 +89,7 @@
 :root[data-ui] .news-impact.media { background: var(--c-warn-suave); color: var(--c-warn); }
 :root[data-ui] .news-impact.alta { background: var(--c-neg-suave); color: var(--c-neg); }
 :root[data-ui] .news-title {
+  overflow-wrap: anywhere;
   font-size: 1rem;
   font-weight: 600;
   line-height: 1.35;

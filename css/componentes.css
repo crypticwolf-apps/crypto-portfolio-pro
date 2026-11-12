@@ -67,7 +67,7 @@
 :root[data-ui] .segmentado.en-tarjeta { background: var(--c-s2); box-shadow: none; }
 :root[data-ui] .segmentado > button {
   min-height: 36px;
-  padding: 0 4px;
+  padding: 0 2px;
   border: 0;
   border-radius: var(--r-sm);
   background: transparent;
@@ -289,3 +289,10 @@
 :root[data-ui] .sticky-bar .sticky-bar-pnl { flex: 0 0 auto; font-weight: 600; white-space: nowrap; }
 :root[data-ui] .sticky-bar .sticky-bar-sep,
 :root[data-ui] .sticky-bar .sticky-bar-right { display: none; }
+
+/* Selectores de seis opciones (periodos) en pantallas estrechas: letra algo
+   menor para que "Total" o "Todo" quepan enteros. */
+@media (max-width: 360px) {
+  :root[data-ui] .segmentado:has(> :nth-child(6)) > button { font-size: 0.75rem; }
+  :root[data-ui][data-texto="l"] .segmentado:has(> :nth-child(6)) > button { font-size: 0.6875rem; }
+}

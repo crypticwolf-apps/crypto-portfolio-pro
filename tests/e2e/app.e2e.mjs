@@ -249,6 +249,33 @@ const desborde = (page) => page.evaluate(() => {
   }
   return "";
 });
+// Texto que se sale de su caja (pisa al vecino) e importes partidos en dos
+// lineas. El desborde de pagina no lo ve: el texto puede montarse dentro.
+const colisiones = (page) => page.evaluate(() => {
+  const out = [];
+  for (const el of document.querySelectorAll(".tab-section *, #assetDetailScreen *")) {
+    if (el.children.length || !el.textContent.trim()) continue;
+    const caja = el.getBoundingClientRect();
+    if (!caja.width || !caja.height || el.closest("[hidden]")) continue;
+    const seccion = el.closest(".tab-section");
+    if (seccion && getComputedStyle(seccion).display === "none") continue;
+    const cs = getComputedStyle(el);
+    const texto = el.textContent.trim();
+    if (cs.textOverflow === "ellipsis" && el.matches(".segmentado > button") && el.scrollWidth > el.clientWidth + 1) out.push("cortado: " + texto);
+    if (el.scrollWidth > el.clientWidth + 2 && cs.overflowX === "visible" && cs.textOverflow !== "ellipsis" && cs.display !== "inline") {
+      let recortado = false;
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        if (getComputedStyle(p).overflowX !== "visible") { recortado = p.scrollWidth > p.clientWidth; break; }
+      }
+      if (!recortado) out.push("se sale: " + texto.slice(0, 40));
+    }
+    if (/\d[\d.,]*\s?(US\$|€)$/.test(texto) && texto.length < 22) {
+      const linea = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.3;
+      if (caja.height > linea * 1.6) out.push("partido: " + texto);
+    }
+  }
+  return [...new Set(out)].slice(0, 6).join(" | ");
+});
 const cerrarHoja = (page) => page.click(".icon-circle-btn[data-trade-close]");
 const leerFila = (page, id) => page.evaluate((i) => JSON.parse(localStorage.getItem("crypto-dashboard-rows-v3")).rows.find((r) => r.id === i), id);
 
@@ -267,6 +294,9 @@ async function recorridoCompleto(navegador, url, ancho) {
       const alto = await page.evaluate((t) => [...document.querySelectorAll(`.tab-section[data-tab="${t}"]`)].reduce((a, s) => a + s.getBoundingClientRect().height, 0), tab);
       if (!(alto > 0)) throw new Error(`la seccion ${tab} mide 0 de alto`);
       const d = await desborde(page); if (d) throw new Error(d);
+      await page.evaluate((t) => document.querySelectorAll(`.tab-section[data-tab="${t}"] details`).forEach((x) => { x.open = true; }), tab);
+      await page.waitForTimeout(150);
+      const c = await colisiones(page); if (c) throw new Error(c);
     });
   }
   await paso(g, "analitica: anillo de distribucion y leyenda que suma 100 %", app, async () => {
@@ -355,14 +385,21 @@ async function recorridoCompleto(navegador, url, ancho) {
     await page.click('[data-acento-set="violeta"]'); await page.click('[data-texto-set="l"]'); await page.click('[data-espacio-set="compacta"]');
     const r = await page.evaluate(() => ({ acento: getComputedStyle(document.documentElement).getPropertyValue("--c-ac").trim(), letra: getComputedStyle(document.documentElement).fontSize, espacio: document.documentElement.dataset.espacio }));
     if (r.acento.toUpperCase() !== "#A78BFA" || r.letra !== "17.5px" || r.espacio !== "compacta") throw new Error(JSON.stringify(r));
-    for (const tab of ["more", "home"]) {
+    // Se revisa todo y luego se restaura SIEMPRE: si este paso fallara a
+    // medias, los siguientes no deben heredar el texto grande ni la pestana.
+    const problemas = [];
+    for (const tab of ["more", "home", "news", "plan", "analytics"]) {
       await page.click(`[data-tab-target="${tab}"]`); await page.waitForTimeout(400);
-      const d = await desborde(page); if (d) throw new Error(`${tab} con texto grande: ${d}`);
+      await page.evaluate((t) => document.querySelectorAll(`.tab-section[data-tab="${t}"] details`).forEach((x) => { x.open = true; }), tab);
+      await page.waitForTimeout(150);
+      const d = await desborde(page); if (d) problemas.push(`${tab}: ${d}`);
+      const c = await colisiones(page); if (c) problemas.push(`${tab}: ${c}`);
     }
     await page.click('[data-tab-target="more"]'); await page.waitForTimeout(300);
     await page.click('[data-acento-set="esmeralda"]'); await page.click('[data-texto-set="m"]'); await page.click('[data-espacio-set="comoda"]');
     const guardado = await page.evaluate(() => JSON.parse(localStorage.getItem("crypto-dashboard-prefs-v2")));
     if (guardado.accent !== "esmeralda" || guardado.textSize !== "m" || guardado.spacing !== "comoda") throw new Error("no se guardo: " + JSON.stringify(guardado));
+    if (problemas.length) throw new Error("con texto grande: " + problemas.join(" || "));
   });
   await paso(g, "apariencia: ocultar y reordenar bloques de inicio", app, async () => {
     await page.click('[data-bloque-switch="mercado"]');

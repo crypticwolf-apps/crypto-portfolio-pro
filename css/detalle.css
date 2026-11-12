@@ -111,12 +111,14 @@
 }
 :root[data-ui] .ficha-billetera { margin: -4px 0 0; }
 :root[data-ui] .ficha-datos {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Dos columnas iguales mientras las cifras caben; una cifra que no cabe en
+     media fila pasa a ocupar la fila entera (nunca se parte). */
+  display: flex;
+  flex-wrap: wrap;
   gap: 14px 16px;
   margin: 0;
 }
-:root[data-ui] .ficha-dato { min-width: 0; }
+:root[data-ui] .ficha-dato { flex: 1 1 calc(50% - 8px); min-width: max-content; }
 :root[data-ui] .ficha-dato dt { font-size: 0.75rem; color: var(--c-t2); margin-bottom: 3px; }
 :root[data-ui] .ficha-dato dd {
   margin: 0;
@@ -250,7 +252,8 @@
 
 @media (max-width: 360px) {
   :root[data-ui] .ficha-precio .saldo-valor { font-size: 2.125rem; }
-  :root[data-ui] .ficha-datos { gap: 12px 12px; }
+  :root[data-ui] .ficha-datos { gap: 12px; }
+  :root[data-ui] .ficha-dato { flex-basis: calc(50% - 6px); }
   :root[data-ui] .ficha-dato dd { font-size: 0.875rem; }
   :root[data-ui] .ficha-posicion-valor { font-size: 1.5rem; }
 }
