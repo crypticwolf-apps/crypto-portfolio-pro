@@ -24,7 +24,6 @@
           root.dataset.accent = acentos.indexOf(p.accent) >= 0 ? p.accent : "esmeralda";
           root.dataset.texto = p.textSize === "s" || p.textSize === "l" ? p.textSize : "m";
           root.dataset.espacio = p.spacing === "compacta" ? "compacta" : "comoda";
-          root.dataset.density = "compact";
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) {
             meta.setAttribute("content", oled ? "#000000" : (theme === "light" ? "#F2F3F5" : "#0A0B0D"));
@@ -68,14 +67,19 @@
       />
     </noscript>
 
-    <link rel="stylesheet" href="./styles.css" />
-    <!-- Rediseno: sistema visual nuevo por encima de la hoja antigua. -->
+    <!-- Estilos: sistema visual (tokens), base comun, piezas y una hoja por
+         pantalla. Todo bajo :root[data-ui]; ver la cabecera de tokens.css. -->
     <link rel="stylesheet" href="./css/tokens.css" />
+    <link rel="stylesheet" href="./css/base.css" />
     <link rel="stylesheet" href="./css/componentes.css" />
     <link rel="stylesheet" href="./css/inicio.css" />
     <link rel="stylesheet" href="./css/ajustes.css" />
     <link rel="stylesheet" href="./css/hojas.css" />
     <link rel="stylesheet" href="./css/detalle.css" />
+    <link rel="stylesheet" href="./css/analitica.css" />
+    <link rel="stylesheet" href="./css/plan.css" />
+    <link rel="stylesheet" href="./css/noticias.css" />
+    <link rel="stylesheet" href="./css/escritorio.css" />
     <link rel="manifest" href="./manifest.webmanifest" />
 
     <script src="./i18n.js" defer></script>
@@ -325,10 +329,7 @@
           <div class="panel-heading compact-heading">
             <h2 class="home-section-title" data-i18n="charts.portfolioDistribution">Distribucion del portafolio</h2>
           </div>
-          <div class="chart-stage">
-            <div class="chart-skeleton" aria-hidden="true"></div>
-            <canvas id="portfolioPieChart" height="280"></canvas>
-          </div>
+          <div id="analyticsDonut" class="dona"></div>
         </section>
 
         <!-- 3. Por categoria -->

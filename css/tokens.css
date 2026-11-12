@@ -1,9 +1,11 @@
 /* =============================================================================
-   tokens.css - Sistema visual de la app (rediseno 2026).
+   tokens.css - Sistema visual de la app: colores (oscuro, negro puro y
+   claro), acentos, series de graficos, letra, radios y espaciado.
    -----------------------------------------------------------------------------
-   Todo lo nuevo cuelga de :root[data-ui] (atributo fijo en <html>), asi gana
-   siempre a la hoja antigua (styles.css) sin !important: sus reglas mas
-   fuertes son del tipo :root[data-theme="light"] select (0,2,1).
+   Todas las hojas de css/ cuelgan de :root[data-ui] (atributo fijo en <html>).
+   Orden de carga en index.html: tokens, base, componentes y una hoja por
+   pantalla (inicio, ajustes, hojas, detalle, analitica, plan, noticias,
+   escritorio).
 
    Atributos en <html> (los pone el script del <head> y applyAppearance()):
      data-theme   dark | light     (el efectivo; "automatico" lo resuelve JS)
@@ -93,6 +95,20 @@
   --c-apagado: #C9CDD3;
 }
 
+/* ── Series de los graficos (reparto, anillo, compras/ventas) ──
+   Paleta categorica validada (CVD y contraste) para cada superficie:
+   adyacentes con dE >= 8 en daltonismo y >= 19 en vision normal. En claro,
+   tres tonos quedan por debajo de 3:1: por eso cada grafico lleva leyenda con
+   nombre y cifra. El orden de los slots es parte de la validacion. */
+:root[data-ui][data-theme="dark"] {
+  --serie-1: #3987E5; --serie-2: #D95926; --serie-3: #199E70;
+  --serie-4: #C98500; --serie-5: #D55181; --serie-6: #008300;
+}
+:root[data-ui][data-theme="light"] {
+  --serie-1: #2A78D6; --serie-2: #EB6834; --serie-3: #1BAF7A;
+  --serie-4: #EDA100; --serie-5: #E87BA4; --serie-6: #008300;
+}
+
 /* ── Color de acento (el primero de cada par: oscuro; el segundo: claro) ── */
 :root[data-ui][data-theme="dark"][data-accent="esmeralda"] { --c-ac: #34D399; --c-ac-suave: rgba(52, 211, 153, 0.16); --c-sobre-ac: #0A0B0D; }
 :root[data-ui][data-theme="light"][data-accent="esmeralda"] { --c-ac: #087A54; --c-ac-suave: rgba(8, 122, 84, 0.10); --c-sobre-ac: #FFFFFF; }
@@ -106,57 +122,6 @@
 :root[data-ui][data-theme="light"][data-accent="coral"] { --c-ac: #C9452C; --c-ac-suave: rgba(201, 69, 44, 0.10); --c-sobre-ac: #FFFFFF; }
 :root[data-ui][data-theme="dark"][data-accent="grafito"] { --c-ac: #E8E9EC; --c-ac-suave: rgba(232, 233, 236, 0.13); --c-sobre-ac: #0A0B0D; }
 :root[data-ui][data-theme="light"][data-accent="grafito"] { --c-ac: #16181C; --c-ac-suave: rgba(22, 24, 28, 0.08); --c-sobre-ac: #FFFFFF; }
-
-/* ── Puente con la hoja antigua ──
-   Las pantallas que aun no se han rehecho (Noticias, Plan, Analitica,
-   hojas y detalle) leen estas variables: asi ya salen con los colores y la
-   letra nuevos. Se borra cuando desaparezca styles.css (fase 3). */
-:root[data-ui][data-theme] {
-  --bg: var(--c-bg);
-  --bg-2: var(--c-bg);
-  --bg-3: var(--c-s1);
-  --panel: var(--c-s1);
-  --panel-strong: var(--c-s1);
-  --panel-soft: var(--c-s2);
-  --panel-hover: var(--c-s2);
-  --line: var(--c-line);
-  --line-strong: var(--c-line-2);
-  --line-accent: var(--c-ac-suave);
-  --text: var(--c-t1);
-  --text-2: var(--c-t2);
-  --muted: var(--c-t3);
-  --muted-2: var(--c-t3);
-  --accent: var(--c-ac);
-  --accent-dim: var(--c-ac-suave);
-  --accent-2: var(--c-ac);
-  --accent-2-dim: var(--c-ac-suave);
-  --danger: var(--c-neg);
-  --warning: var(--c-warn);
-  --positive: var(--c-pos);
-  --negative: var(--c-neg);
-  --neutral: var(--c-t2);
-  --positive-bg: var(--c-pos-suave);
-  --negative-bg: var(--c-neg-suave);
-  --warning-bg: var(--c-warn-suave);
-  --glow-accent: none;
-  --glow-blue: none;
-  --shadow: var(--c-sombra);
-  --shadow-sm: var(--c-sombra);
-  --shadow-md: var(--c-sombra);
-  --shadow-lg: var(--c-sombra-alta);
-  --font-display: var(--fuente);
-  --font-body: var(--fuente);
-  --font-mono: var(--fuente);
-  --glass-bg: var(--c-s1);
-  --glass-bg-strong: var(--c-s1);
-  --glass-inner: linear-gradient(transparent, transparent);
-  --glass-card: linear-gradient(var(--c-s1), var(--c-s1));
-  --glass-border: var(--c-line);
-  --glass-highlight: transparent;
-  --glass-shadow: var(--c-sombra);
-  --field-bg: var(--c-s2);
-  --surface-glass: var(--c-s1);
-}
 
 /* ── Base ── */
 :root[data-ui][data-theme] body {

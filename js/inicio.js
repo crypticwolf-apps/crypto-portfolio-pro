@@ -18,6 +18,9 @@ const LOGO_RESERVA = ["#5B6CF0", "#0E9F8A", "#C2410C", "#9333EA", "#0369A1", "#B
 const SALDO_PEQUENO = 1;
 const ICONO_FLECHA_CAMBIO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>';
 
+// Activos con color propio en los graficos (reparto e anillo); el resto, "Otros".
+const SERIES_MAX = 6;
+
 let grupoPequenosAbierto = false;
 let graficoResizeTimer = null;
 
@@ -291,6 +294,24 @@ function assetColor(row) {
   return LOGO_RESERVA[hash % LOGO_RESERVA.length];
 }
 
+// Color de cada activo en los graficos (reparto de Inicio y anillo de
+// Analitica). Los SERIES_MAX con mas valor reciben un color de la paleta
+// validada (--serie-1..6) en el orden en que se anadieron a la cartera: asi un
+// activo no cambia de color porque cambie su puesto en el ranking, y es el
+// mismo en las dos pantallas.
+function seriesColorMap(snapshot) {
+  const top = snapshot.items
+    .filter(({ metrics }) => metrics.currentValue > 0)
+    .sort((a, b) => b.metrics.currentValue - a.metrics.currentValue)
+    .slice(0, SERIES_MAX)
+    .map(({ row }) => row);
+  const map = new Map();
+  top
+    .sort((a, b) => state.rows.indexOf(a) - state.rows.indexOf(b))
+    .forEach((row, index) => map.set(row.id, `var(--serie-${index + 1})`));
+  return map;
+}
+
 // Texto legible sobre un color de fondo (logo sin imagen).
 function inkOn(hex) {
   const n = parseInt(String(hex).slice(1), 16);
@@ -316,12 +337,13 @@ function renderAllocationCard(snapshot) {
     return;
   }
 
+  const colors = seriesColorMap(snapshot);
   const top = items.length > 4 ? items.slice(0, 3) : items;
   const rest = items.length > 4 ? items.slice(3) : [];
   const parts = top.map(({ row, metrics }) => ({
     name: assetDisplayName(row),
     pct: (metrics.currentValue / sum) * 100,
-    color: assetColor(row)
+    color: colors.get(row.id) || "var(--c-t3)"
   }));
   if (rest.length) {
     parts.push({

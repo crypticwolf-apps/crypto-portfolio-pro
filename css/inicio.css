@@ -462,3 +462,7 @@
   }
   :root[data-ui] .bloque[data-bloque="activos"] { display: none; }
 }
+
+/* Punto de "en vivo": late despacio mientras llegan precios. */
+:root[data-ui] .live-dot { animation: latidoVivo 2s ease-in-out infinite; }
+@keyframes latidoVivo { 50% { opacity: 0.35; } }

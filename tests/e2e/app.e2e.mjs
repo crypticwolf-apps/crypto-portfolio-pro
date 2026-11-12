@@ -269,6 +269,16 @@ async function recorridoCompleto(navegador, url, ancho) {
       const d = await desborde(page); if (d) throw new Error(d);
     });
   }
+  await paso(g, "analitica: anillo de distribucion y leyenda que suma 100 %", app, async () => {
+    await page.click('[data-tab-target="analytics"]'); await page.waitForTimeout(500);
+    const r = await page.evaluate(() => ({
+      segmentos: document.querySelectorAll("#analyticsDonut g circle").length,
+      leyenda: document.querySelectorAll("#analyticsDonut .dona-leyenda li").length,
+      suma: [...document.querySelectorAll("#analyticsDonut .dona-leyenda strong")].reduce((t, x) => t + parseFloat(x.textContent), 0),
+      centro: document.querySelector("#analyticsDonut .dona-centro strong")?.textContent
+    }));
+    if (r.segmentos !== r.leyenda || r.leyenda < 2 || Math.abs(r.suma - 100) > 0.6 || r.centro !== "6") throw new Error(JSON.stringify(r));
+  });
   await paso(g, "noticias cargadas", app, async () => {
     await page.click('[data-tab-target="news"]'); await page.waitForTimeout(600);
     const n = await page.evaluate(() => document.querySelectorAll(".news-card").length);
@@ -460,6 +470,14 @@ async function casosSueltos(navegador, url) {
   await paso(g, "primera apertura sin datos guardados", virgen, async (page) => {
     const n = await page.evaluate(() => document.querySelectorAll("#portfolioMobileList .fila-activo").length);
     if (!n) throw new Error("no se pinto ninguna posicion");
+  });
+  await paso(g, "todas las hojas de estilo de css/ cargan", virgen, async (page) => {
+    const r = await page.evaluate(() => {
+      const enlaces = [...document.querySelectorAll('link[rel="stylesheet"][href*="css/"]')].map((l) => l.href);
+      const cargadas = [...document.styleSheets].filter((h) => h.href && enlaces.includes(h.href)).filter((h) => { try { return h.cssRules.length > 0; } catch { return false; } });
+      return { enlaces: enlaces.length, cargadas: cargadas.length };
+    });
+    if (r.enlaces < 11 || r.cargadas !== r.enlaces) throw new Error(JSON.stringify(r));
   });
   await paso(g, "saldos pequenos agrupados al final y desplegables", virgen, async (page) => {
     await page.evaluate(() => {

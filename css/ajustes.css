@@ -298,3 +298,181 @@
   letter-spacing: 0;
   text-transform: none;
 }
+
+/* ── Contenido de los bloques de Ajustes ── */
+
+/* Tarjeta "Anade la app a tu iPhone" */
+:root[data-ui] .install-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+:root[data-ui] .install-card-icon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--c-ac-suave);
+  color: var(--c-ac);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+:root[data-ui] .install-card-icon svg { width: 22px; height: 22px; }
+:root[data-ui] .install-card strong { display: block; font-size: 0.9375rem; font-weight: 600; }
+:root[data-ui] .install-card p { margin-top: 2px; font-size: 0.8125rem; line-height: 1.45; color: var(--c-t2); }
+
+/* Preferencias */
+:root[data-ui] .top-actions { display: flex; flex-direction: column; gap: 14px; }
+:root[data-ui] .inline-field { display: block; min-width: 0; }
+:root[data-ui] .inline-field select,
+:root[data-ui] .inline-field input { width: 100%; }
+:root[data-ui] .autorefresh-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+:root[data-ui] .autorefresh-meta { margin: 0; font-size: 0.8125rem; color: var(--c-t2); }
+:root[data-ui] .status-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+:root[data-ui] .status-card,
+:root[data-ui] .diag-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--c-bg);
+}
+:root[data-ui] .status-label,
+:root[data-ui] .diag-grid span { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .status-card strong,
+:root[data-ui] .diag-grid b { font-size: 0.9375rem; font-weight: 600; color: var(--c-t1); overflow-wrap: anywhere; }
+:root[data-ui] .status-card strong.positive { color: var(--c-pos); }
+:root[data-ui] .status-card strong.negative { color: var(--c-neg); }
+:root[data-ui] .status-card strong.warning { color: var(--c-warn); }
+:root[data-ui] .status-card small { font-size: 0.75rem; line-height: 1.4; color: var(--c-t2); }
+
+/* Datos y diagnostico */
+:root[data-ui] .more-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+:root[data-ui] .more-actions-grid > button { width: 100%; min-height: 46px; }
+:root[data-ui] .diag-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+/* Listas de billeteras y alertas */
+:root[data-ui] .alerts-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+:root[data-ui] .alert-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--c-line);
+}
+:root[data-ui] .alert-item:first-child { border-top: 0; padding-top: 0; }
+:root[data-ui] .alert-item-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+:root[data-ui] .alert-item-main strong { font-size: 0.9375rem; font-weight: 600; overflow-wrap: anywhere; }
+:root[data-ui] .alert-item-main small { font-size: 0.8125rem; line-height: 1.4; color: var(--c-t2); }
+:root[data-ui] .wallet-item-main {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+:root[data-ui] .wallet-item-main small { overflow-wrap: anywhere; }
+:root[data-ui] .wallet-item-new { color: var(--c-ac); font-weight: 600; }
+:root[data-ui] .wallet-item.is-error .wallet-item-status { color: var(--c-neg); }
+:root[data-ui] .alert-item-actions { flex: 0 0 auto; display: flex; gap: 6px; }
+:root[data-ui] .alerts-box + .wallets-actions,
+:root[data-ui] .alerts-box + .ghost-btn { margin-top: 14px; }
+:root[data-ui] .wallets-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+:root[data-ui] .coinstats-key {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--c-line);
+}
+:root[data-ui] .coinstats-key input {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+}
+:root[data-ui] .coinstats-key-status { margin: 0; font-size: 0.8125rem; line-height: 1.45; color: var(--c-t2); }
+:root[data-ui] .coinstats-key-status.is-on { color: var(--c-pos); }
+
+/* Soporte al proyecto */
+:root[data-ui] .footer-grid { display: flex; flex-direction: column; gap: 20px; }
+:root[data-ui] .footer-copy { display: flex; flex-direction: column; gap: 10px; }
+:root[data-ui] .footer-copy .eyebrow,
+:root[data-ui] .footer-wallets .eyebrow {
+  margin: 6px 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--c-t3);
+}
+:root[data-ui] .footer-copy h2 { font-size: 1.0625rem; font-weight: 600; }
+:root[data-ui] .footer-copy p { font-size: 0.875rem; line-height: 1.55; color: var(--c-t2); }
+:root[data-ui] .footer-links { display: flex; flex-direction: column; }
+:root[data-ui] .footer-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  border-top: 1px solid var(--c-line);
+  color: var(--c-t1);
+  font-size: 0.9375rem;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+:root[data-ui] .footer-link:first-child { border-top: 0; }
+:root[data-ui] .footer-link svg { width: 18px; height: 18px; color: var(--c-ac); }
+:root[data-ui] .footer-wallets { display: flex; flex-direction: column; gap: 10px; }
+:root[data-ui] .wallet-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--c-bg);
+}
+:root[data-ui] .wallet-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+:root[data-ui] .wallet-card-head span { font-size: 0.875rem; font-weight: 600; }
+:root[data-ui][data-theme] .wallet-copy-btn { min-height: 34px; padding: 0 14px; font-size: 0.8125rem; }
+:root[data-ui][data-theme] .wallet-copy-btn.is-copied { background: var(--c-pos-suave); color: var(--c-pos); }
+:root[data-ui] .wallet-card code {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--c-t2);
+  word-break: break-all;
+  cursor: pointer;
+}
+:root[data-ui] .wallet-card code.is-copied { color: var(--c-pos); }
+/* La cabecera del bloque ya dice "Soporte al proyecto / Desarrollado por
+   CrypticWolf": dentro no se repite. */
+:root[data-ui] .app-footer .footer-copy > .eyebrow:first-child,
+:root[data-ui] .app-footer .footer-copy > h2 { display: none; }
+@media (max-width: 360px) {
+  :root[data-ui][data-theme] .more-actions-grid > button { padding: 0 8px; font-size: 0.8125rem; }
+}

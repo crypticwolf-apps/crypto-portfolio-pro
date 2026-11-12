@@ -11,9 +11,8 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 - **Carpeta:** `D:\Mega\Proyectos\Proyecto mixto\Portafolio Crypto`
 - **Qué es:** PWA de cartera de criptomonedas en JavaScript vanilla, **sin build**.
   Ficheros: `index.html`, la app en **`js/`** (21 scripts por tema: `config.js`
-  primero, `arranque.js` el último), `styles.css` (hoja antigua) y **`css/`**
-  (el rediseño: `tokens.css`, `componentes.css`, `inicio.css`, `ajustes.css`,
-  `hojas.css`, `detalle.css`), `i18n.js`, `finance.js`
+  primero, `arranque.js` el último), **`css/`** (estilos: `tokens.css` sistema visual, `base.css`,
+  `componentes.css` y una hoja por pantalla; la antigua `styles.css` ya no existe), `i18n.js`, `finance.js`
   (cálculos puros + tests con Vitest), `wallet-core.js` (lógica pura de
   billeteras + tests), `sw.js`, `api/cg.js` (proxy de CoinGecko; clave en
   `COINGECKO_API_KEY`) y `api/wallet.js` (lector de billeteras; clave en
@@ -47,13 +46,15 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 
 ## Trampas ya conocidas (no repetirlas)
 
-- **Especificidad CSS:** hay muchas reglas con ámbito
-  `:root[data-density="compact"]` (la vista compacta está siempre activa). Una
-  regla nueva sin ese prefijo **queda anulada** y parece que el cambio no se
-  aplica. Declara los cambios con el mismo prefijo.
+- **Especificidad CSS:** todas las hojas de `css/` usan el prefijo
+  `:root[data-ui]` (y `:root[data-ui][data-theme]` en `hojas.css`). Una regla
+  nueva sin ese prefijo **queda anulada** y parece que el cambio no se aplica.
+- **Letra Inter en local:** si la máquina tiene Inter instalada, los tests no
+  ven lo que ve la CI (que usa una letra de reserva más ancha). Para
+  reproducirlo, excluir Inter con fontconfig (`FONTCONFIG_FILE`).
 - **Visibilidad de pestañas:** la regla que muestra la pestaña activa
   **enumera los nombres uno a uno**
-  (`body[data-active-tab="X"] .tab-section[data-tab="X"]`). Si añades o renombras
+  (`body[data-active-tab="X"] .tab-section[data-tab="X"]`, en `css/base.css`). Si añades o renombras
   una pestaña hay que añadirla ahí, o quedará invisible aunque su HTML exista.
 - **TDZ (resuelto de raíz):** `init()` está en la **última línea** de
   `js/arranque.js`, el último script, así que toda `const`/`let` existe antes

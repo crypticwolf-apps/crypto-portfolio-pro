@@ -5,7 +5,7 @@
 //  - APIs de precios .......... network-first; si la red falla se devuelve la
 //    última respuesta cacheada marcada con "X-SW-Fallback: 1" para que la app
 //    la etiquete como datos sin conexión (nunca como precio en tiempo real).
-const VERSION = "v21";
+const VERSION = "v22";
 const SHELL_CACHE = `crypto-portfolio-shell-${VERSION}`;
 const CDN_CACHE = `crypto-portfolio-cdn-${VERSION}`;
 const API_CACHE = `crypto-portfolio-api-${VERSION}`;
@@ -14,13 +14,17 @@ const ACTIVE_CACHES = [SHELL_CACHE, CDN_CACHE, API_CACHE];
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css",
   "./css/tokens.css",
+  "./css/base.css",
   "./css/componentes.css",
   "./css/inicio.css",
   "./css/ajustes.css",
   "./css/hojas.css",
   "./css/detalle.css",
+  "./css/analitica.css",
+  "./css/plan.css",
+  "./css/noticias.css",
+  "./css/escritorio.css",
   "./js/config.js",
   "./js/utilidades.js",
   "./js/datos.js",

@@ -20,7 +20,6 @@ function init() {
   detectIosInstallCard();
   startAutoRefresh();
   startLivePrices();
-  observeChartsPanelForLazyLoad();
   observeHeroForStickyBar();
   document.querySelector(".diag-details")?.addEventListener("toggle", (e) => {
     if (e.target.open) renderDiagnostics();
@@ -64,20 +63,6 @@ function setActiveTab(tab) {
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-current", active ? "page" : "false");
   });
-
-  if (nextTab === "analytics" && state.prefs.showCharts) {
-    // Chart.js se carga perezosamente solo al abrir Analitica; los skeletons
-    // del panel se ocultan cuando el primer render termina.
-    ensureChartJs()
-      .then(() => {
-        try { state.charts.pie?.destroy(); } catch { /* noop */ }
-        try { state.charts.line?.destroy(); } catch { /* noop */ }
-        state.charts.pie = null;
-        state.charts.line = null;
-        updateCharts(buildSnapshot());
-      })
-      .catch(() => {});
-  }
 
   if (nextTab === "news") {
     renderNews();
@@ -516,20 +501,6 @@ function bindEnvironmentEvents() {
       stopLivePrices();
     });
 
-    // Los gráficos se recalculan al girar el dispositivo o cambiar el tamaño.
-    let chartResizeTimer = null;
-    const scheduleChartResize = () => {
-      if (chartResizeTimer) {
-        window.clearTimeout(chartResizeTimer);
-      }
-      chartResizeTimer = window.setTimeout(() => {
-        chartResizeTimer = null;
-        state.charts.pie?.resize();
-        state.charts.line?.resize();
-      }, 180);
-    };
-    window.addEventListener("resize", scheduleChartResize);
-    window.addEventListener("orientationchange", scheduleChartResize);
   }
 }
 

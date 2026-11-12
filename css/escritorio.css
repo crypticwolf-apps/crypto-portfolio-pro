@@ -1,0 +1,88 @@
+/* =============================================================================
+   escritorio.css - Tabla de posiciones y su barra de acciones. Solo se ve en
+   pantallas anchas (>= 1100 px, ver inicio.css); en movil y tableta manda la
+   lista de Inicio.
+   ============================================================================= */
+
+:root[data-ui] .desktop-only-toolbar { padding: 12px; }
+:root[data-ui] .toolbar,
+:root[data-ui] .toolbar-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+:root[data-ui] .table-panel { padding: var(--tarjeta-pad) 0 4px; }
+:root[data-ui] .table-panel .panel-heading { padding: 0 var(--tarjeta-pad); }
+:root[data-ui] .table-wrap { overflow-x: auto; }
+:root[data-ui] .table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+:root[data-ui] .table-wrap th,
+:root[data-ui] .table-wrap td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--c-line);
+  text-align: left;
+  vertical-align: middle;
+}
+:root[data-ui] .table-wrap th { font-size: 0.75rem; font-weight: 500; color: var(--c-t2); white-space: nowrap; }
+:root[data-ui] .table-wrap :is(th, td):is(.col-price, .col-invested, .col-value, .col-pnl) { text-align: right; }
+:root[data-ui] .table-wrap .col-actions { text-align: right; }
+:root[data-ui] .th-sort-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+}
+:root[data-ui] .th-sort-btn.is-active { color: var(--c-ac); }
+:root[data-ui] .portfolio-row { cursor: pointer; transition: background-color 0.15s ease; }
+:root[data-ui] .portfolio-row:hover { background: var(--c-s2); }
+:root[data-ui] .portfolio-row:focus-visible { outline: 2px solid var(--c-ac); outline-offset: -2px; }
+:root[data-ui] .asset-field { display: flex; align-items: center; gap: 10px; min-width: 0; }
+:root[data-ui] .asset-id { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+:root[data-ui] .asset-id strong { font-size: 0.9375rem; font-weight: 600; }
+:root[data-ui] .asset-id small { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .fav-dot { color: var(--c-ac); font-size: 0.75rem; }
+:root[data-ui] .stack-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+:root[data-ui] .stack-cell strong,
+:root[data-ui] .invested-col strong { font-size: 0.9375rem; font-weight: 600; }
+:root[data-ui] .stack-cell .numeric { font-size: 0.8125rem; }
+:root[data-ui] .stack-cell small { color: var(--c-t3); }
+:root[data-ui] .quote-time { font-size: 0.6875rem; color: var(--c-t3); }
+:root[data-ui] .quote-time.is-stale { color: var(--c-warn); }
+:root[data-ui] .weight-chip {
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: var(--c-s2);
+  color: var(--c-t2);
+  font-size: 0.6875rem;
+}
+:root[data-ui] .row-actions { display: flex; justify-content: flex-end; gap: 6px; }
+:root[data-ui] .icon-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--c-s2);
+  color: var(--c-t1);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+:root[data-ui] .icon-btn.ghost-icon { width: 34px; padding: 0; }
+:root[data-ui] .totals-row td { border-bottom: 0; border-top: 1px solid var(--c-line-2); font-weight: 600; }
+:root[data-ui] .totals-label-cell { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .totals-inline-meta { display: block; font-size: 0.75rem; font-weight: 500; }
+:root[data-ui] .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+:root[data-ui] .empty-state p { color: var(--c-t2); }
+
+/* Destello del precio en vivo en la tabla */
+:root[data-ui] .price-up { animation: filaSube 0.9s ease; }
+:root[data-ui] .price-down { animation: filaBaja 0.9s ease; }

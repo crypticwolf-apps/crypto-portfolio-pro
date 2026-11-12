@@ -296,7 +296,7 @@ function renderAnalyticsSummary(snapshot) {
   const res = getPeriodResult(period, snapshot);
 
   const chips = ANALYTICS_PERIODS
-    .map((p) => `<button class="as-period ${p.key === period ? "is-active" : ""}" type="button" data-period="${p.key}">${escapeHtml(t(p.label))}</button>`)
+    .map((p) => `<button type="button" data-period="${p.key}" aria-pressed="${p.key === period ? "true" : "false"}">${escapeHtml(t(p.label))}</button>`)
     .join("");
 
   // Importe y porcentaje salen SIEMPRE del mismo cálculo (getPeriodResult):
@@ -320,7 +320,8 @@ function renderAnalyticsSummary(snapshot) {
   const deployed = getDeployedCapital(snapshot);
   const secondary = [
     { label: t("analytics.totalValue"), value: maskedCurrency(snapshot.totals.currentValue), hint: t("summary.hintValue") },
-    { label: t("analytics.invested"), value: maskedCurrency(deployed), hint: t("summary.hintInvested") }
+    { label: t("analytics.invested"), value: maskedCurrency(deployed), hint: t("summary.hintInvested") },
+    { label: t("analytics.realizedPnl"), value: maskedSignedCurrency(realized), tone: toneClass(realized) }
   ];
   // En "Total" el porcentaje ya está en la cifra principal: no se repite aquí
   // (evita métricas duplicadas). En un periodo concreto se añade el acumulado.
@@ -330,7 +331,7 @@ function renderAnalyticsSummary(snapshot) {
 
   box.innerHTML = `
     <div class="as-clean">
-      <div class="as-period-row" role="group" aria-label="${escapeHtml(t("summary.periodAria"))}">${chips}</div>
+      <div class="segmentado en-tarjeta as-period-row" role="group" aria-label="${escapeHtml(t("summary.periodAria"))}">${chips}</div>
       <div class="as-hero">
         <span class="as-label" title="${escapeHtml(period === "total" ? t("summary.hintNet") : t("summary.hintPeriod"))}">${escapeHtml(period === "total" ? t("summary.netTotal") : t("summary.periodResult", { period: periodLabel }))}</span>
         <div class="as-hero-main" aria-live="polite">${mainBlock}</div>
@@ -380,7 +381,7 @@ function renderAnalyticsActivityStats() {
           <small>${escapeHtml(m.label)}</small>
         </div>`).join("")}
     </div>
-    <div class="acts-legend"><span class="buy">■ ${escapeHtml(t("analytics.buys"))}</span><span class="sell">■ ${escapeHtml(t("analytics.sells"))}</span></div>
+    <div class="acts-legend"><span><i class="buy" aria-hidden="true"></i>${escapeHtml(t("analytics.buys"))}</span><span><i class="sell" aria-hidden="true"></i>${escapeHtml(t("analytics.sells"))}</span></div>
   `;
 }
 
@@ -449,17 +450,84 @@ function renderAnalyticsCategory(snapshot) {
     box.innerHTML = `<p class="movers-empty">${escapeHtml(t("home.noData"))}</p>`;
     return;
   }
-  const colors = {
-    l1: "#f6b34c", l2: "#7da4ff", defi: "#3effa8", ia: "#c58bff", meme: "#ff8fc7",
-    gaming: "#5ad1ff", infra: "#8fe388", rwa: "#ffd166", privacy: "#9aa7b8",
-    payments: "#6ee7d6", exchange: "#ffa07a", stable: "#6d9ec4", otros: "#7b8b9a"
-  };
+  // Cada fila lleva su nombre escrito: una sola tinta (el acento) basta.
   box.innerHTML = rows.map((r) => `
     <div class="category-row">
-      <span class="category-label"><i style="background:${colors[r.key] || colors.otros}"></i>${escapeHtml(t("sector." + r.key))}</span>
-      <div class="category-bar"><span style="width:${r.pct.toFixed(1)}%;background:${colors[r.key] || colors.otros}"></span></div>
-      <strong>${r.pct.toFixed(1)}%</strong>
+      <div class="category-head">
+        <span class="category-label">${escapeHtml(t("sector." + r.key))}</span>
+        <strong>${r.pct.toFixed(1)}%</strong>
+      </div>
+      <div class="category-bar" aria-hidden="true"><span style="width:${r.pct.toFixed(1)}%"></span></div>
       <small class="category-assets">${escapeHtml(r.assets.slice(0, 4).join(" · "))}${r.assets.length > 4 ? " +" + (r.assets.length - 4) : ""}</small>
     </div>
   `).join("");
+}
+
+// ── Distribucion: anillo SVG propio ──
+// Antes era una tarta 3D de Chart.js; ahora se dibuja aqui (ligero, nitido y
+// con los colores de la paleta validada). Chart.js solo se carga para el PDF.
+// Hasta 6 activos con color propio (el mismo que en el reparto de Inicio) y
+// el resto en "Otros"; la leyenda lleva nombre, % y valor de cada uno.
+function renderAnalyticsDonut(snapshot) {
+  const box = document.getElementById("analyticsDonut");
+  if (!box) {
+    return;
+  }
+  const items = snapshot.items
+    .filter(({ metrics }) => metrics.currentValue > 0)
+    .sort((a, b) => b.metrics.currentValue - a.metrics.currentValue);
+  const total = items.reduce((sum, { metrics }) => sum + metrics.currentValue, 0);
+  if (!(total > 0)) {
+    box.innerHTML = `<p class="movers-empty">${escapeHtml(t("charts.insufficientData"))}</p>`;
+    return;
+  }
+  const colors = seriesColorMap(snapshot);
+  const top = items.slice(0, SERIES_MAX);
+  const rest = items.slice(SERIES_MAX);
+  const parts = top.map(({ row, metrics }) => ({
+    name: assetDisplayName(row),
+    value: metrics.currentValue,
+    color: colors.get(row.id) || "var(--c-t3)"
+  }));
+  if (rest.length) {
+    parts.push({
+      name: t("charts.others"),
+      value: rest.reduce((sum, { metrics }) => sum + metrics.currentValue, 0),
+      color: "var(--c-t3)"
+    });
+  }
+
+  const radius = 62;
+  const circumference = 2 * Math.PI * radius;
+  // 2 px de hueco entre segmentos (si hay mas de uno).
+  const gap = parts.length > 1 ? 2 : 0;
+  let acc = 0;
+  const segments = parts.map((part) => {
+    const length = (part.value / total) * circumference;
+    const dash = Math.max(0, length - gap);
+    const html = `<circle cx="75" cy="75" r="${radius}" fill="none" stroke-width="16" style="stroke:${part.color}" stroke-dasharray="${dash.toFixed(2)} ${(circumference - dash).toFixed(2)}" stroke-dashoffset="${(-acc).toFixed(2)}"><title>${escapeHtml(`${part.name}: ${((part.value / total) * 100).toFixed(1)}%`)}</title></circle>`;
+    acc += length;
+    return html;
+  }).join("");
+
+  box.innerHTML = `
+    <div class="dona-figura">
+      <svg viewBox="0 0 150 150" role="img" aria-label="${escapeHtml(t("charts.portfolioDistribution"))}">
+        <circle cx="75" cy="75" r="${radius}" fill="none" stroke-width="16" class="dona-pista"></circle>
+        <g transform="rotate(-90 75 75)">${segments}</g>
+      </svg>
+      <div class="dona-centro">
+        <strong>${items.length}</strong>
+        <span>${escapeHtml(t(items.length === 1 ? "analitica.activo" : "analitica.activos"))}</span>
+      </div>
+    </div>
+    <ul class="dona-leyenda" role="list">
+      ${parts.map((part) => `
+        <li>
+          <i style="background:${part.color}" aria-hidden="true"></i>
+          <span class="dona-nombre">${escapeHtml(part.name)}</span>
+          <strong>${((part.value / total) * 100).toFixed(1)}%</strong>
+          <small>${escapeHtml(maskedCurrency(part.value))}</small>
+        </li>`).join("")}
+    </ul>`;
 }

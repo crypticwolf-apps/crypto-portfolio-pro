@@ -1,0 +1,451 @@
+/* =============================================================================
+   base.css - Lo que antes daba la hoja antigua y no es de ninguna pantalla:
+   reinicio de estilos, reglas que muestran u ocultan cosas (hidden, pestanas,
+   bloqueo del scroll), cargador, barra fija y la estructura de las capas
+   (ficha, hojas, editor, menu del engranaje, menu de fila y avisos) con sus
+   animaciones. El aspecto de cada pieza vive en su hoja (hojas.css, etc.).
+   ============================================================================= */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  margin: 0;
+  min-height: 100dvh;
+  line-height: 1.4;
+}
+h1, h2, h3, h4, p, figure, dl, dd { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+img { max-width: 100%; }
+svg { flex-shrink: 0; }
+code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+/* Oculto es oculto, aunque una regla de la pieza le ponga display. */
+[hidden],
+.hidden { display: none !important; }
+.sr-only,
+.solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Cifras con anchura fija y tonos por defecto (sin especificidad: cualquier
+   regla de una pieza manda sobre estas). */
+:where(.money, .numeric) { font-variant-numeric: tabular-nums; }
+:where(.positive) { color: var(--c-pos); }
+:where(.negative) { color: var(--c-neg); }
+:where(.warning) { color: var(--c-warn); }
+:where(.muted, .neutral) { color: var(--c-t2); }
+a { color: var(--c-ac); }
+
+/* ── Estructura de la app y pestanas ── */
+:root[data-ui] .app-shell {
+  margin: 0 auto;
+  display: block;
+}
+.tab-section { display: none; }
+body[data-active-tab="home"] .tab-section[data-tab="home"],
+body[data-active-tab="news"] .tab-section[data-tab="news"],
+body[data-active-tab="plan"] .tab-section[data-tab="plan"],
+body[data-active-tab="analytics"] .tab-section[data-tab="analytics"],
+body[data-active-tab="more"] .tab-section[data-tab="more"] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bloque-gap);
+  animation: pestanaEntra 0.22s ease;
+}
+@keyframes pestanaEntra {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Con una capa abierta, el fondo no se desplaza. */
+body.editor-open,
+body.fab-open,
+body.detail-open { overflow: hidden; }
+
+/* ── Cabecera de cada pestana ── */
+:root[data-ui] .home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+:root[data-ui] .home-header-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+:root[data-ui] .home-header-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Tarjeta generica de las pantallas (antes .panel) ── */
+:root[data-ui] .panel {
+  margin: 0;
+  padding: var(--tarjeta-pad);
+  border: 0;
+  border-radius: var(--r-lg);
+  background: var(--c-s1);
+  box-shadow: var(--c-sombra);
+  color: var(--c-t1);
+  min-width: 0;
+}
+:root[data-ui] .panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+:root[data-ui] .home-section-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--c-t1);
+}
+:root[data-ui] .movers-empty,
+:root[data-ui] .detail-empty {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--c-t2);
+}
+
+/* ── Boton redondo antiguo (estructura; el aspecto en hojas.css) ── */
+.icon-circle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 50%;
+  text-decoration: none;
+  transition: transform 0.12s ease;
+}
+.icon-circle-btn:active { transform: scale(0.94); }
+.icon-circle-btn.is-spinning svg,
+.wallet-spinner { animation: girar 0.9s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* Avatar de activo generico (hojas, Plan, tabla) */
+:root[data-ui] .asset-avatar {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--c-s2);
+  color: var(--c-t2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+:root[data-ui] .asset-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ── Cargador ("Sincronizando precios...") ── */
+:root[data-ui] .app-loader {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 70;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 32px);
+  padding: 9px 16px 9px 12px;
+  border-radius: var(--r-pill);
+  background: var(--c-s1);
+  box-shadow: var(--c-sombra-alta);
+  color: var(--c-t1);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -12px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+:root[data-ui] .app-loader.is-visible { opacity: 1; transform: translate(-50%, 0); }
+:root[data-ui] .loader-ring {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 2px solid var(--c-line-2);
+  border-top-color: var(--c-ac);
+  animation: girar 0.8s linear infinite;
+}
+
+/* ── Barra fija superior (estructura; aspecto en componentes.css) ── */
+.sticky-bar {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.sticky-bar.is-visible { opacity: 1; pointer-events: auto; }
+.sticky-bar-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-ui] .sticky-bar-pnl {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  font-size: 0.8125rem;
+  background: var(--c-s2);
+  color: var(--c-t2);
+}
+:root[data-ui] .sticky-bar-pnl.positive { background: var(--c-pos-suave); color: var(--c-pos); }
+:root[data-ui] .sticky-bar-pnl.negative { background: var(--c-neg-suave); color: var(--c-neg); }
+
+/* ── Ficha de activo (pantalla completa) ── */
+.asset-detail {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  animation: fichaEntra 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.asset-detail.is-closing { animation: fichaSale 0.2s ease forwards; }
+@keyframes fichaEntra { from { transform: translateX(6%); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes fichaSale { to { transform: translateX(6%); opacity: 0; } }
+
+/* ── Hojas y editor ── */
+.editor-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+}
+.editor-backdrop {
+  position: absolute;
+  inset: 0;
+  animation: veloEntra 0.2s ease;
+}
+.editor-panel {
+  position: relative;
+  z-index: 1;
+  margin: auto;
+  max-height: min(90dvh, 780px);
+  display: flex;
+  flex-direction: column;
+  animation: hojaAparece 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.editor-portal.is-closing .editor-panel { animation: hojaDesaparece 0.2s ease forwards; }
+.editor-portal.is-closing .editor-backdrop { animation: veloSale 0.2s ease forwards; }
+.editor-grip { display: none; }
+.editor-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.editor-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+.editor-field { position: relative; display: flex; flex-direction: column; min-width: 0; }
+.editor-readonly { display: flex; flex-direction: column; }
+.editor-grid-2 { display: grid; grid-template-columns: 1fr 1fr; }
+.editor-tp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.editor-foot { display: flex; }
+.editor-foot .ghost-btn { flex: 0 0 auto; }
+.editor-foot .primary-btn { flex: 1 1 auto; }
+.editor-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.editor-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.editor-suggestion span { flex: 1 1 auto; min-width: 0; }
+.editor-suggestion strong { display: block; }
+.editor-wallet-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+}
+.editor-wallet-btn span { display: flex; flex-direction: column; min-width: 0; }
+.trade-calc { min-height: 1.2em; }
+.alert-kind,
+.trade-quick,
+.alert-tp-suggest { display: flex; flex-wrap: wrap; align-items: center; }
+.alert-kind-chip { flex: 1 1 auto; }
+
+/* Hoja de billetera */
+.wallet-assets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.wallet-assets[data-show-hidden="0"] [data-wallet-hidden] { display: none; }
+.wallet-asset-row { display: flex; align-items: center; cursor: pointer; }
+.wallet-asset.is-linked .wallet-asset-row { opacity: 0.6; cursor: default; }
+.wallet-asset-id { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.wallet-asset-id strong,
+.wallet-asset-id small,
+.wallet-asset-val small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wallet-asset-val { flex: 0 0 auto; max-width: 42%; display: flex; flex-direction: column; align-items: flex-end; }
+.wallet-toggle-hidden {
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-weight: 600;
+}
+.wallet-cost { display: flex; flex-wrap: wrap; align-items: center; }
+.wallet-cost > span,
+.wallet-cost small { width: 100%; }
+.wallet-loading { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.wallet-spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid; }
+.wallet-total { margin: 0; display: flex; justify-content: space-between; gap: 8px; }
+.wallet-summary,
+.wallet-safety,
+.wallet-detect { margin: 0; }
+.wallet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 120px;
+  margin-left: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wallet-chip svg { width: 10px; height: 10px; }
+
+@media (max-width: 768px) {
+  .editor-panel {
+    margin: auto 0 0;
+    max-height: 92dvh;
+    animation: hojaSube 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .editor-portal.is-closing .editor-panel { animation: hojaBaja 0.22s ease forwards; }
+  .editor-grip {
+    display: block;
+    width: 38px;
+    height: 4px;
+    margin: 0 auto 10px;
+    border-radius: 99px;
+  }
+}
+
+/* ── Menu del engranaje ── */
+.fab-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.fab-sheet-backdrop { position: absolute; inset: 0; animation: veloEntra 0.2s ease; }
+.fab-sheet-panel {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 100%);
+  max-height: 92dvh;
+  overflow-y: auto;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  animation: hojaSube 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.fab-sheet.is-closing .fab-sheet-panel { animation: hojaBaja 0.2s ease forwards; }
+.fab-sheet.is-closing .fab-sheet-backdrop { animation: veloSale 0.2s ease forwards; }
+.fab-sheet-grip { width: 38px; height: 4px; margin: 6px auto 4px; border-radius: 99px; }
+.fab-option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+}
+.fab-option-icon { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; }
+.fab-option-text { flex: 1 1 auto; min-width: 0; }
+.fab-option-text strong { display: block; }
+.fab-option-chevron { font-size: 1.3rem; }
+@media (min-width: 769px) {
+  .fab-sheet { align-items: center; }
+  .fab-sheet-panel { border-radius: var(--r-xl); animation: hojaAparece 0.24s ease; }
+}
+
+/* ── Menu de fila (⋯) ── */
+.row-context-menu {
+  position: fixed;
+  z-index: 210;
+  animation: veloEntra 0.14s ease;
+}
+.row-context-menu button {
+  display: block;
+  width: 100%;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.row-context-menu button:disabled { opacity: 0.4; }
+
+/* ── Avisos ── */
+.toast-stack {
+  position: fixed;
+  z-index: 200;
+  display: grid;
+  gap: 8px;
+}
+.toast {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+}
+.toast-icon { width: 20px; height: 20px; flex: 0 0 auto; }
+.toast-icon svg { width: 100%; height: 100%; }
+.toast-content { flex: 1 1 auto; min-width: 0; }
+.toast strong { display: block; }
+.toast.is-compact { width: fit-content; max-width: 100%; }
+.toast.is-compact .toast-icon { width: 16px; height: 16px; }
+.toast-undo-btn { flex: 0 0 auto; padding: 0 12px; }
+
+@keyframes veloEntra { from { opacity: 0; } to { opacity: 1; } }
+@keyframes veloSale { to { opacity: 0; } }
+@keyframes hojaAparece { from { transform: translateY(16px) scale(0.98); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes hojaDesaparece { to { transform: translateY(12px); opacity: 0; } }
+@keyframes hojaSube { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes hojaBaja { to { transform: translateY(100%); } }

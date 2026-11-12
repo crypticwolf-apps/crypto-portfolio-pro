@@ -1,0 +1,303 @@
+/* =============================================================================
+   analitica.css - Pestana Analitica: rendimiento por periodo, anillo de
+   distribucion, categorias, comparativa 24 h, rankings y compras/ventas.
+   ============================================================================= */
+
+:root[data-ui] .analytics-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Rendimiento ── */
+:root[data-ui] .as-clean { display: flex; flex-direction: column; gap: 16px; }
+:root[data-ui] .as-hero { display: flex; flex-direction: column; gap: 6px; }
+:root[data-ui] .as-label { font-size: 0.8125rem; color: var(--c-t2); }
+:root[data-ui] .as-hero-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+:root[data-ui] .as-main {
+  font-size: 2.125rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--c-t1);
+}
+:root[data-ui] .as-main.positive { color: var(--c-pos); }
+:root[data-ui] .as-main.negative { color: var(--c-neg); }
+:root[data-ui] .as-main.muted { color: var(--c-t3); }
+:root[data-ui] .as-main-pct {
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  background: var(--c-s2);
+  color: var(--c-t2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+:root[data-ui] .as-main-pct.positive { background: var(--c-pos-suave); color: var(--c-pos); }
+:root[data-ui] .as-main-pct.negative { background: var(--c-neg-suave); color: var(--c-neg); }
+:root[data-ui] .as-phrase { font-size: 0.8125rem; line-height: 1.45; color: var(--c-t2); }
+:root[data-ui] .as-secondary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--c-line);
+}
+:root[data-ui] .as-sec { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+:root[data-ui] .as-sec span { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .as-sec b {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--c-t1);
+  overflow-wrap: anywhere;
+}
+:root[data-ui] .as-sec b.positive { color: var(--c-pos); }
+:root[data-ui] .as-sec b.negative { color: var(--c-neg); }
+:root[data-ui] .as-empty p { font-size: 0.875rem; color: var(--c-t2); }
+
+/* ── Distribucion: anillo y leyenda ── */
+:root[data-ui] .dona {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+:root[data-ui] .dona-figura {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  flex: 0 0 auto;
+}
+:root[data-ui] .dona-figura svg { width: 140px; height: 140px; display: block; }
+:root[data-ui] .dona-pista { stroke: var(--c-s2); }
+:root[data-ui] .dona-centro {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  pointer-events: none;
+}
+:root[data-ui] .dona-centro strong { font-size: 1.375rem; font-weight: 600; }
+:root[data-ui] .dona-centro span { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .dona-leyenda {
+  flex: 1 1 130px;
+  min-width: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+:root[data-ui] .dona-leyenda li {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 1px;
+  font-size: 0.8125rem;
+}
+:root[data-ui] .dona-leyenda i { width: 8px; height: 8px; border-radius: 50%; }
+:root[data-ui] .dona-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-t1); }
+:root[data-ui] .dona-leyenda strong { font-weight: 600; }
+:root[data-ui] .dona-leyenda small { grid-column: 2 / 4; font-size: 0.75rem; color: var(--c-t2); }
+
+/* ── Por categoria ── */
+:root[data-ui] .category-block { display: flex; flex-direction: column; gap: 16px; }
+:root[data-ui] .category-row { display: flex; flex-direction: column; gap: 6px; }
+:root[data-ui] .category-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.875rem;
+}
+:root[data-ui] .category-label { font-weight: 500; min-width: 0; }
+:root[data-ui] .category-head strong { font-weight: 600; }
+:root[data-ui] .category-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--c-s2);
+  overflow: hidden;
+}
+:root[data-ui] .category-bar span { display: block; height: 6px; border-radius: 3px; background: var(--c-ac); }
+:root[data-ui] .category-assets { font-size: 0.75rem; color: var(--c-t2); }
+
+/* ── Comparativa 24 h ── */
+:root[data-ui] .compare-block { display: flex; flex-direction: column; gap: 14px; }
+:root[data-ui] .compare-row {
+  display: grid;
+  grid-template-columns: minmax(0, 104px) minmax(0, 1fr) 66px;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.875rem;
+}
+:root[data-ui] .compare-label { color: var(--c-t2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-ui] .compare-row.is-accent .compare-label { color: var(--c-t1); font-weight: 600; }
+:root[data-ui] .compare-bar { height: 6px; border-radius: 3px; background: var(--c-s2); overflow: hidden; }
+:root[data-ui] .compare-bar span { display: block; height: 6px; border-radius: 3px; background: var(--c-t3); }
+:root[data-ui] .compare-bar span.positive { background: var(--c-pos); }
+:root[data-ui] .compare-bar span.negative { background: var(--c-neg); }
+:root[data-ui] .compare-pct { text-align: right; font-weight: 600; }
+
+/* ── Rankings ── */
+:root[data-ui] .insights-rankings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+@media (min-width: 600px) {
+  :root[data-ui] .insights-rankings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+:root[data-ui] .insight-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--c-bg);
+}
+:root[data-ui] .insight-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+:root[data-ui] .insight-card-head h3 { font-size: 0.9375rem; font-weight: 600; }
+:root[data-ui] .insight-card-head p { margin-top: 2px; font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .insight-chip {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: var(--c-s2);
+  color: var(--c-t2);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+:root[data-ui] .insight-chip.positive { background: var(--c-pos-suave); color: var(--c-pos); }
+:root[data-ui] .insight-chip.negative { background: var(--c-neg-suave); color: var(--c-neg); }
+:root[data-ui] .insight-list { display: flex; flex-direction: column; }
+:root[data-ui] .insight-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--c-line);
+}
+:root[data-ui] .insight-item:first-child { border-top: 0; }
+:root[data-ui] .insight-item-main { display: flex; align-items: center; gap: 10px; min-width: 0; }
+:root[data-ui] .insight-item-main > div { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+:root[data-ui] .insight-item-rank {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--c-s2);
+  color: var(--c-t2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+:root[data-ui] .insight-item strong { font-size: 0.875rem; font-weight: 600; }
+:root[data-ui] .insight-item small { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .insight-item-metric { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; }
+:root[data-ui] .insight-item-metric strong.positive { color: var(--c-pos); }
+:root[data-ui] .insight-item-metric strong.negative { color: var(--c-neg); }
+:root[data-ui] .insight-empty { font-size: 0.8125rem; color: var(--c-t2); }
+
+/* ── Compras y ventas ── */
+:root[data-ui] .acts-block { display: flex; flex-direction: column; gap: 16px; }
+:root[data-ui] .acts-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+:root[data-ui] .acts-totals > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+:root[data-ui] .acts-totals span { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .acts-totals b { font-size: 0.875rem; font-weight: 600; overflow-wrap: anywhere; }
+:root[data-ui] .acts-totals b.positive { color: var(--c-pos); }
+:root[data-ui] .acts-totals b.negative { color: var(--c-neg); }
+:root[data-ui] .acts-months {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--c-line);
+}
+:root[data-ui] .acts-month { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+:root[data-ui] .acts-bars { height: 48px; display: flex; align-items: flex-end; gap: 2px; }
+:root[data-ui] .acts-bar { width: 8px; border-radius: 4px 4px 0 0; }
+:root[data-ui] .acts-bar.buy,
+:root[data-ui] .acts-legend i.buy { background: var(--serie-1); }
+:root[data-ui] .acts-bar.sell,
+:root[data-ui] .acts-legend i.sell { background: var(--serie-2); }
+:root[data-ui] .acts-month small { font-size: 0.6875rem; color: var(--c-t2); }
+:root[data-ui] .acts-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 0.75rem;
+  color: var(--c-t2);
+}
+:root[data-ui] .acts-legend span { display: inline-flex; align-items: center; gap: 6px; }
+:root[data-ui] .acts-legend i { width: 8px; height: 8px; border-radius: 2px; }
+
+/* Registro de operaciones */
+:root[data-ui] .trades-log:empty { display: none; }
+:root[data-ui] .trades-log { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
+:root[data-ui] .trades-log-title { font-size: 0.875rem; font-weight: 600; margin-bottom: 4px; }
+:root[data-ui] .trades-log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+:root[data-ui] .trade-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "tag main importe" "tag main acciones";
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 4px;
+  padding: 10px 0;
+  border-top: 1px solid var(--c-line);
+}
+:root[data-ui] .trade-item:first-child { border-top: 0; }
+:root[data-ui] .trade-item-tag {
+  grid-area: tag;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: var(--c-s2);
+  color: var(--c-t2);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+:root[data-ui] .trade-item.is-buy .trade-item-tag { background: var(--c-ac-suave); color: var(--c-ac); }
+:root[data-ui] .trade-item-main { grid-area: main; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+:root[data-ui] .trade-item-main strong { font-size: 0.875rem; font-weight: 600; }
+:root[data-ui] .trade-item-main small {
+  font-size: 0.75rem;
+  color: var(--c-t2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-ui] .trade-item-amount { grid-area: importe; justify-self: end; font-size: 0.875rem; font-weight: 600; }
+:root[data-ui] .trade-item-actions { grid-area: acciones; justify-self: end; display: flex; gap: 6px; }
+:root[data-ui][data-theme] .trade-item-actions .icon-circle-btn,
+:root[data-ui][data-theme] .alert-item-actions .icon-circle-btn {
+  width: 34px;
+  height: 34px;
+  background: var(--c-s2);
+  box-shadow: none;
+  color: var(--c-t2);
+}
+:root[data-ui][data-theme] .trade-item-actions .icon-circle-btn svg,
+:root[data-ui][data-theme] .alert-item-actions .icon-circle-btn svg { width: 16px; height: 16px; }
+:root[data-ui] .trades-log-more { align-self: flex-start; margin-top: 6px; }

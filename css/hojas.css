@@ -74,6 +74,8 @@
 :root[data-ui][data-theme] select,
 :root[data-ui][data-theme] #currencySelect,
 :root[data-ui][data-theme] #autoRefreshSelect {
+  appearance: none;
+  -webkit-appearance: none;
   min-height: 46px;
   padding: 0 40px 0 14px;
   border: 1px solid transparent;

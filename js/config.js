@@ -127,9 +127,6 @@ const APP_TABS = ["home", "news", "plan", "analytics", "more"];
 // o proveedor caido. Los dos son publicos y de solo lectura, sin claves.
 // CoinGecko sigue siendo la fuente de verdad de capitalizacion, ranking e
 // historico; el WebSocket solo adelanta el precio y la variacion de 24h.
-// Bandera de carga perezosa de Chart.js: tiene que declararse antes de la
-// llamada a init(), que puede alcanzar ensureChartJs durante el arranque.
-let chartsLibLoading = false;
 
 const LIVE_BINANCE_WS = "wss://stream.binance.com:9443/stream";
 const LIVE_BINANCE_PAIRS_URL = "https://api.binance.com/api/v3/ticker/price";
@@ -555,7 +552,6 @@ const dom = {
   importFileInput: document.getElementById("importFileInput"),
   toggleChartsBtn: document.getElementById("toggleChartsBtn"),
   chartsPanel: document.getElementById("chartsPanel"),
-  portfolioPieChart: document.getElementById("portfolioPieChart"),
   portfolioLineChart: document.getElementById("portfolioLineChart"),
   lineRangeControl: document.getElementById("lineRangeControl"),
   activityList: document.getElementById("activityList"),

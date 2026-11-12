@@ -17,8 +17,6 @@ function applyAppearance() {
   root.dataset.accent = state.prefs.accent;
   root.dataset.texto = state.prefs.textSize;
   root.dataset.espacio = state.prefs.spacing;
-  // La hoja antigua se diseno para la vista compacta: se queda siempre.
-  root.dataset.density = "compact";
   applyTheme();
   applyHomeBlocks();
 }

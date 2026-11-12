@@ -1063,7 +1063,9 @@ window.APP_I18N = {
       "ficha.avisoPendiente": "Aviso pendiente",
       "ficha.capitalizacion": "Capitalizacion",
       "ficha.notaAnadir": "Anadir",
-      "ficha.actividad": "Actividad"
+      "ficha.actividad": "Actividad",
+      "analitica.activo": "activo",
+      "analitica.activos": "activos"
     }
   }
 };
