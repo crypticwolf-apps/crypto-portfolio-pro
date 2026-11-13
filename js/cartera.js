@@ -62,6 +62,8 @@ function renderAll() {
   renderActivity();
   renderStatusCards();
   renderChartsVisibility();
+  // Escritorio: el Plan esta a la vista y sigue los cambios de la cartera.
+  escRepintarPlan();
 }
 
 // Subscriber-style: only repaint activity when state.activity actually changes.
@@ -84,6 +86,10 @@ const MQ_ESCRITORIO = typeof window.matchMedia === "function" ? window.matchMedi
 const seccionesPendientes = new Set();
 
 function pestanaVisible(tab) {
+  // En escritorio todo esta en la misma pagina; Ajustes, solo con su panel abierto.
+  if (modoEscritorio()) {
+    return tab !== "more" || escEstado.ajustesAbiertos;
+  }
   return state.prefs.activeTab === tab;
 }
 
@@ -394,9 +400,9 @@ function renderRow(row, totalValue = 0) {
 
   return `
     <tr class="portfolio-row ${rowTone} ${row.favorite ? "is-fav" : ""}" data-row-id="${row.id}" tabindex="0" role="button" aria-label="${escapeHtml(t("buttons.edit"))} ${escapeHtml(assetDisplayName(row))}">
-      <td class="asset-cell col-asset" data-label="${escapeHtml(t("table.columns.asset"))}">
+      <td class="col-asset">
         <div class="asset-field">
-          <div class="asset-avatar" data-role="assetAvatar">${renderAssetAvatar(row)}</div>
+          <span class="asset-logo" data-role="assetAvatar">${assetLogoHtml(row)}</span>
           <div class="asset-id">
             <strong data-role="assetName">${escapeHtml(assetDisplayName(row))}</strong>
             <small data-role="assetSub">${escapeHtml(row.resolvedName && row.symbol ? row.resolvedName : t("row.noAsset"))}</small>${walletBadgeHtml(row)}
@@ -405,36 +411,43 @@ function renderRow(row, totalValue = 0) {
         </div>
       </td>
 
-      <td class="price-col col-price" data-label="${escapeHtml(t("table.columns.priceCol"))}">
+      <td class="col-price">
         <div class="stack-cell">
           <strong class="money" data-role="rowPrice">${priceText}</strong>
-          <span class="numeric ${toneClass(row.priceChange24h || 0)}" data-role="rowChange">${changeText}<small> 24h</small></span>
           <span class="quote-time ${stale ? "is-stale" : ""}" data-role="rowQuote">${escapeHtml(quoteTimeLabel(row))}</span>
         </div>
       </td>
 
-      <td class="invested-col col-invested" data-label="${escapeHtml(t("table.columns.invested"))}">
+      <td class="col-change">
+        <span class="numeric ${toneClass(row.priceChange24h || 0)}" data-role="rowChange">${changeText}</span>
+      </td>
+
+      <td class="col-invested">
         <strong class="money" data-role="rowInvested">${maskedCurrency(metrics.investment)}</strong>
       </td>
 
-      <td class="value-col col-value" data-label="${escapeHtml(t("table.columns.value"))}">
-        <div class="stack-cell">
-          <strong class="money" data-role="rowValue">${maskedCurrency(metrics.currentValue)}</strong>
-          <span class="weight-chip" data-role="rowWeight">${weight != null ? weight.toFixed(1) + "%" : "--"}</span>
-        </div>
+      <td class="col-value">
+        <strong class="money" data-role="rowValue">${maskedCurrency(metrics.currentValue)}</strong>
       </td>
 
-      <td class="pnl-col col-pnl" data-label="${escapeHtml(t("table.columns.performance"))}">
+      <td class="col-pnl">
         <div class="stack-cell">
           <strong class="money ${toneClass(metrics.pnlUsd)}" data-role="rowPnlAbs">${maskedSignedCurrency(metrics.pnlUsd)}</strong>
           <span class="numeric ${toneClass(metrics.pnlPct)}" data-role="rowPnlPct">${formatPercent(metrics.pnlPct)}</span>
         </div>
       </td>
 
-      <td class="actions-cell col-actions" data-label="${escapeHtml(t("table.columns.actions"))}">
+      <td class="col-weight">
+        <div class="peso-celda">
+          <span class="peso-barra" aria-hidden="true"><i data-role="rowWeightBar" style="width:${weight != null ? Math.min(100, weight).toFixed(1) : 0}%"></i></span>
+          <span class="peso-texto" data-role="rowWeight">${weight != null ? weight.toFixed(1) + "%" : "--"}</span>
+        </div>
+      </td>
+
+      <td class="col-actions">
         <div class="row-actions">
-          <button class="icon-btn edit-btn" type="button" data-action="edit-row" data-row-id="${row.id}">${escapeHtml(t("buttons.edit"))}</button>
-          <button class="icon-btn ghost-icon" type="button" data-action="row-menu" data-row-id="${row.id}" aria-label="${escapeHtml(t("buttons.moreActions"))}" aria-haspopup="menu">⋯</button>
+          <button class="boton-icono boton-fila" type="button" data-action="edit-row" data-row-id="${row.id}" aria-label="${escapeHtml(t("buttons.edit"))} ${escapeHtml(assetDisplayName(row))}" title="${escapeHtml(t("buttons.edit"))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg></button>
+          <button class="boton-icono boton-fila" type="button" data-action="row-menu" data-row-id="${row.id}" aria-label="${escapeHtml(t("buttons.moreActions"))}" aria-haspopup="menu" title="${escapeHtml(t("buttons.moreActions"))}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
         </div>
       </td>
     </tr>
@@ -534,7 +547,8 @@ function updateStickyBarVisibility() {
   if (!dom.stickyBar) {
     return;
   }
-  const visible = state.prefs.activeTab === "home" && !state.heroVisible;
+  // En escritorio la cabecera ya va fija arriba: la barra no hace falta.
+  const visible = !modoEscritorio() && state.prefs.activeTab === "home" && !state.heroVisible;
   dom.stickyBar.classList.toggle("is-visible", visible);
   dom.stickyBar.setAttribute("aria-hidden", visible ? "false" : "true");
 }
@@ -547,17 +561,22 @@ function renderTotalsRow(snapshot) {
     ? (totalPnl / snapshot.totals.investment) * 100
     : 0;
 
-  // Fila de totales alineada con las 6 columnas de solo lectura.
+  // Fila de totales alineada con las columnas de la tabla.
+  const change = getPortfolio24hChange(snapshot);
   dom.totalsFoot.innerHTML = `
     <tr class="totals-row">
       <td class="totals-label-cell col-asset">${escapeHtml(t("table.totals"))}</td>
       <td class="col-price"></td>
-      <td class="totals-inline-cell money col-invested" data-label="${escapeHtml(t("summary.totalInvested"))}">${maskedCurrency(snapshot.totals.investment)}</td>
-      <td class="totals-inline-cell money col-value" data-label="${escapeHtml(t("summary.totalValue"))}">${maskedCurrency(snapshot.totals.currentValue)}</td>
-      <td class="totals-inline-cell col-pnl" data-label="${escapeHtml(t("summary.gainLoss"))}">
-        <span class="money ${toneClass(totalPnl)}">${maskedSignedCurrency(totalPnl)}</span>
-        <span class="totals-inline-meta ${toneClass(totalPnlPct)}">${formatPercent(totalPnlPct)}</span>
+      <td class="col-change"><span class="numeric ${change ? toneClass(change.pct) : ""}">${change ? formatSignedPercent(change.pct) : "--"}</span></td>
+      <td class="col-invested"><strong class="money">${maskedCurrency(snapshot.totals.investment)}</strong></td>
+      <td class="col-value"><strong class="money">${maskedCurrency(snapshot.totals.currentValue)}</strong></td>
+      <td class="col-pnl">
+        <div class="stack-cell">
+          <strong class="money ${toneClass(totalPnl)}">${maskedSignedCurrency(totalPnl)}</strong>
+          <span class="numeric ${toneClass(totalPnlPct)}">${formatPercent(totalPnlPct)}</span>
+        </div>
       </td>
+      <td class="col-weight"><span class="peso-texto">${snapshot.totals.currentValue > 0 ? "100%" : "--"}</span></td>
       <td class="col-actions"></td>
     </tr>
   `;
@@ -708,7 +727,7 @@ function updateLiveRowUi(rowId) {
   };
 
   rowElement.className = `portfolio-row ${metrics.pnlUsd > 0 ? "row-profit" : metrics.pnlUsd < 0 ? "row-loss" : ""} ${row.favorite ? "is-fav" : ""}`;
-  setRole("assetAvatar", (node) => { node.innerHTML = renderAssetAvatar(row); });
+  setRole("assetAvatar", (node) => { node.innerHTML = assetLogoHtml(row); });
   setRole("assetName", (node) => { node.textContent = assetDisplayName(row); });
   setRole("assetSub", (node) => {
     node.textContent = row.resolvedName && row.symbol ? row.resolvedName : t("row.noAsset");
@@ -719,7 +738,7 @@ function updateLiveRowUi(rowId) {
       : "--";
   });
   setRole("rowChange", (node) => {
-    node.innerHTML = `${Number.isFinite(row.priceChange24h) ? formatSignedPercent(row.priceChange24h) : "--"}<small> 24h</small>`;
+    node.textContent = Number.isFinite(row.priceChange24h) ? formatSignedPercent(row.priceChange24h) : "--";
     node.className = `numeric ${toneClass(row.priceChange24h || 0)}`;
   });
   setRole("rowQuote", (node) => {
@@ -729,6 +748,7 @@ function updateLiveRowUi(rowId) {
   setRole("rowInvested", (node) => { node.textContent = maskedCurrency(metrics.investment); });
   setRole("rowValue", (node) => { node.textContent = maskedCurrency(metrics.currentValue); });
   setRole("rowWeight", (node) => { node.textContent = weight != null ? `${weight.toFixed(1)}%` : "--"; });
+  setRole("rowWeightBar", (node) => { node.style.width = `${weight != null ? Math.min(100, weight).toFixed(1) : 0}%`; });
   setRole("rowPnlAbs", (node) => {
     node.textContent = maskedSignedCurrency(metrics.pnlUsd);
     node.className = `money ${toneClass(metrics.pnlUsd)}`;

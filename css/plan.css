@@ -9,6 +9,9 @@
   flex-direction: column;
   gap: 12px;
 }
+/* Agrupan bloques para la version de escritorio; aqui no cambian nada. */
+:root[data-ui] .tp-globales,
+:root[data-ui] .tp-activos { display: contents; }
 :root[data-ui] .tp-foldall { min-height: 36px; padding: 0 14px; font-size: 0.8125rem; }
 
 /* ── Bloque plegable ── */

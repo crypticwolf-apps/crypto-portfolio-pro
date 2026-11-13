@@ -470,6 +470,7 @@ function sortValueFor(item, key) {
     case "currentPrice":
       return item.metrics.currentPrice;
     case "currentValue":
+    case "weight":
       return item.metrics.currentValue;
     case "pnlUsd":
       return item.metrics.pnlUsd;

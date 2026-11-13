@@ -94,6 +94,10 @@ function newsImpactTone(v) {
 }
 
 function renderNews() {
+  // Escritorio: a la vista, las primeras filas de noticias.
+  if (modoEscritorio()) {
+    window.requestAnimationFrame(() => escAjustarNoticias());
+  }
   const box = document.getElementById("newsList");
   if (!box) return;
   const estado = document.getElementById("newsStatus");

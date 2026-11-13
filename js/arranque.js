@@ -13,10 +13,15 @@ function init() {
   bindHome();
   bindAppearance();
   bindWallets();
+  bindEscritorio();
   bindEnvironmentEvents();
   applyBalanceVisibility();
   renderAll();
   setActiveTab(state.prefs.activeTab);
+  // Pantalla ancha: toda la app en una pagina (escritorio.js).
+  if (MQ_ESCRITORIO?.matches) {
+    activarEscritorio();
+  }
   detectIosInstallCard();
   startAutoRefresh();
   startLivePrices();
@@ -30,6 +35,11 @@ function init() {
     renderStatusCards();
     renderLiveIndicator();
     renderMarketSection();
+    // Escritorio: las noticias estan siempre a la vista (fetchNews respeta
+    // su tiempo de validez y solo pide si han caducado).
+    if (modoEscritorio()) {
+      fetchNews(false);
+    }
     // Red de seguridad del feed en vivo: si el portafolio cambio de activos
     // (o la conexion se quedo muerta sin avisar) aqui se recompone solo.
     syncLivePrices();
@@ -51,6 +61,14 @@ function init() {
 // ── Pestañas ──
 function setActiveTab(tab) {
   const nextTab = APP_TABS.includes(tab) ? tab : "home";
+  // Escritorio: no hay pestanas, todo esta en la pagina. Ajustes se abre en su
+  // panel lateral; la pestana elegida en movil se conserva para cuando vuelva.
+  if (modoEscritorio()) {
+    if (nextTab === "more") {
+      abrirAjustes();
+    }
+    return;
+  }
   const previousTab = state.prefs.activeTab;
   if (previousTab && previousTab !== nextTab && document.body.dataset.activeTab) {
     tabScrollPositions[previousTab] = window.scrollY;
@@ -417,6 +435,8 @@ function bindEvents() {
         closePositionEditor();
       } else if (state.detailRowId) {
         closeAssetDetail();
+      } else if (escEstado.ajustesAbiertos && !document.body.classList.contains("editor-open") && !document.body.classList.contains("fab-open")) {
+        cerrarAjustes();
       }
     }
   });
@@ -490,11 +510,12 @@ function bindEnvironmentEvents() {
       setApiState("offline", t("status.offlineMeta"));
       stopLivePrices();
     });
-    // Al pasar a pantalla ancha aparece la tabla: se pinta si estaba pendiente.
+    // Pantalla ancha <-> estrecha: la app pasa a una pagina o vuelve a las
+    // pestanas, y se pinta lo que estuviera pendiente.
     if (MQ_ESCRITORIO?.addEventListener) {
-      MQ_ESCRITORIO.addEventListener("change", pintarPendientes);
+      MQ_ESCRITORIO.addEventListener("change", cambioDeAncho);
     } else if (MQ_ESCRITORIO?.addListener) {
-      MQ_ESCRITORIO.addListener(pintarPendientes);
+      MQ_ESCRITORIO.addListener(cambioDeAncho);
     }
 
   }

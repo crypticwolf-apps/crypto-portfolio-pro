@@ -422,17 +422,23 @@ function renderTpTool() {
       </div>
     `);
 
+  // tp-globales y tp-activos solo agrupan: en movil no cambian nada (display:
+  // contents) y en escritorio reparten los bloques a lo ancho.
   box.innerHTML = `
-    ${block1}
-    ${block2}
-    ${block3}
+    <div class="tp-globales">
+      ${block1}
+      ${block2}
+      ${block3}
+    </div>
     <div class="tp-detail-head"><h2 class="home-section-title">${escapeHtml(t("tp.detailTitle"))}</h2></div>
-    ${perAsset}
+    <div class="tp-activos">${perAsset}</div>
     ${noTpNotice}
     ${quickBar}
     <p class="plan-disclaimer">${escapeHtml(PLAN_DISCLAIMER)}</p>
   `;
   updateFoldAllBtn();
+  // Escritorio: activos repartidos en filas parejas.
+  escAjustarPlan();
 }
 
 /* ── Bindings ── */

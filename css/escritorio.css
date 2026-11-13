@@ -1,15 +1,322 @@
 /* =============================================================================
-   escritorio.css - Tabla de posiciones y su barra de acciones. Solo se ve en
-   pantallas anchas (>= 1100 px, ver inicio.css); en movil y tableta manda la
-   lista de Inicio.
+   escritorio.css - Version de escritorio (desde 1100 px, ver escritorio.js):
+   toda la app en una pagina, en bandas a todo el ancho: cabecera fija, saldo
+   y grafico | resumen y rendimiento, posiciones, analisis en una linea,
+   compras y ventas, plan y noticias. Ajustes, en un panel lateral. Tambien
+   el estilo de la tabla de posiciones.
+   En movil nada de esto se aplica (body.es-escritorio lo pone escritorio.js).
    ============================================================================= */
 
-:root[data-ui] .desktop-only-toolbar { padding: 12px; }
-:root[data-ui] .toolbar,
-:root[data-ui] .toolbar-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* Piezas que solo existen en escritorio (boton de Ajustes, cerrar el panel). */
+:root[data-ui] .solo-escritorio { display: none; }
+:root[data-ui] body.es-escritorio button.solo-escritorio { display: inline-flex; }
+:root[data-ui] body.es-escritorio div.solo-escritorio { display: flex; }
 
-:root[data-ui] .table-panel { padding: var(--tarjeta-pad) 0 4px; }
-:root[data-ui] .table-panel .panel-heading { padding: 0 var(--tarjeta-pad); }
+/* ── Armazon ── */
+:root[data-ui] body.es-escritorio {
+  --esc-borde: clamp(20px, 2.4vw, 40px);
+  --esc-hueco: 20px;
+}
+:root[data-ui] body.es-escritorio .app-shell {
+  max-width: none;
+  padding: 0 var(--esc-borde) 40px;
+}
+/* Lo que en escritorio no se ve: pestanas, barra inferior, barra fija y lo
+   que queda en las pestanas (la lista de activos y el reparto: la tabla y el
+   anillo dicen lo mismo). Ajustes solo con su panel abierto. */
+:root[data-ui] body.es-escritorio .barra-inferior,
+:root[data-ui] body.es-escritorio .sticky-bar,
+:root[data-ui] body.es-escritorio .app-shell > .tab-section { display: none; }
+
+:root[data-ui] .escritorio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esc-hueco);
+  width: 100%;
+  max-width: 2400px;
+  margin: 0 auto;
+}
+
+/* ── Cabecera fija ── */
+:root[data-ui] .esc-cabecera {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  margin: 0 calc(-1 * var(--esc-borde));
+  padding: 0 var(--esc-borde);
+  background: var(--c-nav);
+  -webkit-backdrop-filter: saturate(160%) blur(20px);
+  backdrop-filter: saturate(160%) blur(20px);
+  border-bottom: 1px solid var(--c-line);
+}
+:root[data-ui] .esc-cabecera .inicio-cabecera {
+  max-width: 2400px;
+  margin: 0 auto;
+  padding: 14px 0;
+}
+:root[data-ui] .esc-cabecera .inicio-nombre { font-size: 1.25rem; }
+/* Acciones rapidas en la cabecera: botones compactos entre el nombre y los
+   iconos (ojo, actualizar, ajustes). */
+:root[data-ui] .esc-cabecera .inicio-cabecera > .boton-icono { order: 2; }
+:root[data-ui] .esc-cabecera .acciones-rapidas {
+  order: 1;
+  display: flex;
+  gap: 8px;
+  padding: 0;
+  margin-right: 8px;
+  border: 0;
+}
+:root[data-ui] .esc-cabecera .accion {
+  flex-direction: row;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--c-s1);
+  box-shadow: var(--c-sombra);
+  color: var(--c-t1);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+:root[data-ui] .esc-cabecera .accion:hover { background: var(--c-s2); }
+:root[data-ui] .esc-cabecera .accion-icono {
+  width: 28px;
+  height: 28px;
+  background: var(--c-s2);
+  box-shadow: none;
+}
+:root[data-ui] .esc-cabecera .accion-icono svg { width: 16px; height: 16px; }
+:root[data-ui] .esc-cabecera .accion-icono.es-primaria { background: var(--c-ac); color: var(--c-sobre-ac); }
+:root[data-ui] .esc-cabecera .accion:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 2px; }
+
+/* ── Saldo y grafico | resumen de hoy y rendimiento ── */
+:root[data-ui] .esc-rejilla {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(360px, 1fr);
+  gap: var(--esc-hueco);
+  align-items: stretch;
+}
+:root[data-ui] .esc-saldo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 24px 20px;
+  border-radius: var(--r-lg);
+  background: var(--c-s1);
+  box-shadow: var(--c-sombra);
+}
+:root[data-ui] .esc-saldo .saldo { padding: 0; }
+:root[data-ui] .esc-saldo .bloque { padding: 0; }
+/* El grafico llena el alto que deja la columna de al lado. */
+:root[data-ui] .esc-saldo .bloque-grafico {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+:root[data-ui] .esc-saldo .grafico-saldo {
+  flex: 1 1 auto;
+  min-height: 200px;
+  height: auto;
+  margin: 0;
+}
+:root[data-ui] .esc-saldo .grafico-saldo svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+:root[data-ui] .esc-saldo .grafico-vacio { height: 100%; }
+:root[data-ui] .esc-saldo .bloque-grafico .segmentado { align-self: flex-start; width: min(100%, 420px); }
+:root[data-ui] .esc-saldo .grafico-meta { margin: 0; text-align: left; }
+
+/* Pila: tarjetas una encima de otra; la ultima se estira hasta el final de
+   la fila para que todas las de la fila acaben a la misma altura. */
+:root[data-ui] .esc-pila {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--esc-hueco);
+}
+:root[data-ui] .esc-pila > :last-child { flex: 1 1 auto; }
+
+/* ── Analisis de los activos, en una linea ──
+   Distribucion y comparativa | mejores y peores (ancho doble) | mercado y
+   categorias. En pantallas menos anchas, mejores y peores baja a su linea. */
+:root[data-ui] .esc-analisis {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-areas: "a1 a2 a3";
+  gap: var(--esc-hueco);
+  align-items: stretch;
+}
+:root[data-ui] .esc-pila-1 { grid-area: a1; }
+:root[data-ui] .esc-pila-2 { grid-area: a2; }
+:root[data-ui] .esc-pila-3 { grid-area: a3; }
+:root[data-ui] .esc-pila-2 .insights-rankings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 1499px) {
+  :root[data-ui] .esc-analisis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: "a1 a3" "a2 a2";
+  }
+  :root[data-ui] .esc-pila-2 .insights-rankings-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* ── Bandas a todo el ancho ── */
+:root[data-ui] .esc-banda { min-width: 0; display: flex; flex-direction: column; }
+
+/* Compras y ventas: el grafico y los totales a un lado, las operaciones al otro. */
+:root[data-ui] .esc-banda .panel:has(#analyticsActivityStats) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 32px;
+  align-items: start;
+}
+:root[data-ui] .esc-banda .panel:has(#analyticsActivityStats) > .panel-heading { grid-column: 1 / -1; }
+:root[data-ui] .esc-banda #tradesLog { margin-top: 0; }
+
+/* Bloques de Inicio y pestanas (Plan, Noticias) con aspecto de tarjeta. */
+:root[data-ui] .esc-pila > .bloque:not(.tarjeta),
+:root[data-ui] .escritorio .tab-section {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: var(--tarjeta-pad);
+  border-radius: var(--r-lg);
+  background: var(--c-s1);
+  box-shadow: var(--c-sombra);
+}
+:root[data-ui] .esc-pila > .bloque .cabecera-bloque { margin: 0; }
+:root[data-ui] .esc-pila > .bloque:not(.tarjeta) .titulo-bloque,
+:root[data-ui] .escritorio .tab-section .portfolio-name-display {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+:root[data-ui] .esc-pila > .bloque:not(.tarjeta) .tarjeta {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+:root[data-ui] .escritorio .tab-section .home-header {
+  margin: 0;
+  padding: 0;
+  align-items: center;
+}
+:root[data-ui] .escritorio .tab-section .home-status { font-size: 0.8125rem; }
+/* Lo que dentro de Plan y Noticias era tarjeta pasa a ser un recuadro. */
+:root[data-ui] .escritorio .tab-section .panel,
+:root[data-ui] .escritorio .tab-section .news-card,
+:root[data-ui] .escritorio .tab-section .news-empty,
+:root[data-ui] .escritorio .news-filter:not(.is-active) {
+  background: var(--c-bg);
+  box-shadow: none;
+}
+:root[data-ui] .escritorio .tab-section > * { flex-shrink: 0; }
+
+/* Rejillas de bloques (activos del Plan, noticias): --cols por fila, que
+   escritorio.js calcula para que las filas salgan parejas; los de la ultima
+   fila se ensanchan hasta llenarla, asi no queda hueco al final. */
+:root[data-ui] .escritorio :is(.tp-globales, .tp-activos, .news-list) {
+  --cols: 3;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: stretch;
+}
+:root[data-ui] .escritorio :is(.tp-globales, .tp-activos, .news-list) > * {
+  flex: 1 1 calc((100% - (var(--cols) - 1) * 12px) / var(--cols));
+  min-width: 0;
+}
+/* Un bloque del Plan abierto ocupa la fila entera (su contenido es ancho). */
+:root[data-ui] .escritorio :is(.tp-globales, .tp-activos) > .tp-fold[open] { flex-basis: 100%; }
+:root[data-ui] .escritorio .tp-detail-head { margin-top: 6px; }
+:root[data-ui] .escritorio .news-filters {
+  margin: 0;
+  padding: 2px 0;
+}
+:root[data-ui] .esc-ver-mas {
+  align-self: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--c-bg);
+  color: var(--c-ac);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+:root[data-ui] .esc-ver-mas:hover { background: var(--c-s2); }
+:root[data-ui] .esc-ver-mas:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 2px; }
+
+/* ── Ajustes: panel lateral ── */
+:root[data-ui] body.es-escritorio.ajustes-abierto { overflow: hidden; }
+:root[data-ui] body.es-escritorio.ajustes-abierto .app-shell > .tab-section[data-tab="more"] {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(480px, 92vw);
+  padding: 0 20px 32px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--c-bg);
+  border-left: 1px solid var(--c-line);
+  box-shadow: var(--c-sombra-alta);
+  animation: ajustesEntra 0.22s ease;
+}
+:root[data-ui] body.es-escritorio .tab-section[data-tab="more"] > * { flex-shrink: 0; }
+:root[data-ui] body.es-escritorio .tab-section[data-tab="more"] > .home-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin: 0 -20px;
+  padding: 18px 20px 12px;
+  background: var(--c-bg);
+}
+:root[data-ui] .esc-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 115;
+  background: var(--c-velo);
+  animation: veloEntra 0.2s ease;
+}
+/* ── Ficha de un activo: panel lateral con la pagina detras ── */
+:root[data-ui][data-theme] body.es-escritorio .asset-detail {
+  left: auto;
+  right: 0;
+  width: min(600px, 92vw);
+  border-left: 1px solid var(--c-line);
+  box-shadow: var(--c-sombra-alta);
+}
+:root[data-ui] body.es-escritorio .ficha { padding-bottom: 0; }
+:root[data-ui] body.es-escritorio .ficha-pie {
+  position: sticky;
+  left: auto;
+  bottom: 0;
+  width: auto;
+  margin: auto -16px 0;
+  transform: none;
+}
+:root[data-ui] .esc-velo-ficha { display: none; }
+:root[data-ui] body.es-escritorio.detail-open .esc-velo-ficha { display: block; z-index: 175; }
+
+@keyframes ajustesEntra { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ── Tabla de posiciones ── */
+:root[data-ui] .desktop-only-toolbar { display: none; }
+:root[data-ui] .table-panel { padding: var(--tarjeta-pad) 0 6px; }
+:root[data-ui] .table-panel .panel-heading { padding: 0 var(--tarjeta-pad); margin-bottom: 6px; }
 :root[data-ui] .table-wrap { overflow-x: auto; }
 :root[data-ui] .table-wrap table {
   width: 100%;
@@ -21,58 +328,69 @@
 :root[data-ui] .table-wrap td {
   padding: 12px 14px;
   border-bottom: 1px solid var(--c-line);
-  text-align: left;
+  text-align: right;
   vertical-align: middle;
+  white-space: nowrap;
 }
-:root[data-ui] .table-wrap th { font-size: 0.75rem; font-weight: 500; color: var(--c-t2); white-space: nowrap; }
-:root[data-ui] .table-wrap :is(th, td):is(.col-price, .col-invested, .col-value, .col-pnl) { text-align: right; }
-:root[data-ui] .table-wrap .col-actions { text-align: right; }
+:root[data-ui] .table-wrap :is(th, td):first-child { padding-left: var(--tarjeta-pad); text-align: left; }
+:root[data-ui] .table-wrap :is(th, td):last-child { padding-right: var(--tarjeta-pad); }
+:root[data-ui] .table-wrap th {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--c-t2);
+}
+:root[data-ui] .table-wrap .th-shell { display: inline-flex; }
 :root[data-ui] .th-sort-btn {
   padding: 0;
   border: 0;
   background: none;
   color: inherit;
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
+  cursor: pointer;
 }
-:root[data-ui] .th-sort-btn.is-active { color: var(--c-ac); }
+:root[data-ui] .th-sort-btn:hover { color: var(--c-t1); }
+:root[data-ui] .th-sort-btn.is-active { color: var(--c-ac); font-weight: 600; }
+:root[data-ui] .th-sort-btn:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 2px; border-radius: 4px; }
 :root[data-ui] .portfolio-row { cursor: pointer; transition: background-color 0.15s ease; }
 :root[data-ui] .portfolio-row:hover { background: var(--c-s2); }
 :root[data-ui] .portfolio-row:focus-visible { outline: 2px solid var(--c-ac); outline-offset: -2px; }
-:root[data-ui] .asset-field { display: flex; align-items: center; gap: 10px; min-width: 0; }
+:root[data-ui] .asset-field { display: flex; align-items: center; gap: 12px; min-width: 0; }
+:root[data-ui] .asset-logo .logo-activo { width: 36px; height: 36px; font-size: 0.625rem; }
 :root[data-ui] .asset-id { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 :root[data-ui] .asset-id strong { font-size: 0.9375rem; font-weight: 600; }
 :root[data-ui] .asset-id small { font-size: 0.75rem; color: var(--c-t2); }
 :root[data-ui] .fav-dot { color: var(--c-ac); font-size: 0.75rem; }
 :root[data-ui] .stack-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-:root[data-ui] .stack-cell strong,
-:root[data-ui] .invested-col strong { font-size: 0.9375rem; font-weight: 600; }
-:root[data-ui] .stack-cell .numeric { font-size: 0.8125rem; }
-:root[data-ui] .stack-cell small { color: var(--c-t3); }
+:root[data-ui] .table-wrap td strong { font-size: 0.9375rem; font-weight: 600; }
+:root[data-ui] .table-wrap td .numeric { font-size: 0.8125rem; font-weight: 500; }
+:root[data-ui] .table-wrap .col-change .numeric { font-size: 0.875rem; font-weight: 600; }
 :root[data-ui] .quote-time { font-size: 0.6875rem; color: var(--c-t3); }
 :root[data-ui] .quote-time.is-stale { color: var(--c-warn); }
-:root[data-ui] .weight-chip {
-  padding: 1px 7px;
+:root[data-ui] .peso-celda { display: inline-flex; align-items: center; gap: 10px; }
+:root[data-ui] .peso-barra {
+  width: 64px;
+  height: 6px;
   border-radius: var(--r-pill);
   background: var(--c-s2);
+  overflow: hidden;
+}
+:root[data-ui] .peso-barra i { display: block; height: 100%; border-radius: inherit; background: var(--c-ac); }
+:root[data-ui] .peso-texto { min-width: 44px; color: var(--c-t2); font-size: 0.8125rem; }
+:root[data-ui] .row-actions { display: inline-flex; justify-content: flex-end; gap: 6px; }
+:root[data-ui] .boton-fila {
+  width: 34px;
+  height: 34px;
+  background: transparent;
+  box-shadow: none;
   color: var(--c-t2);
-  font-size: 0.6875rem;
 }
-:root[data-ui] .row-actions { display: flex; justify-content: flex-end; gap: 6px; }
-:root[data-ui] .icon-btn {
-  min-height: 34px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: var(--r-sm);
-  background: var(--c-s2);
-  color: var(--c-t1);
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-:root[data-ui] .icon-btn.ghost-icon { width: 34px; padding: 0; }
-:root[data-ui] .totals-row td { border-bottom: 0; border-top: 1px solid var(--c-line-2); font-weight: 600; }
-:root[data-ui] .totals-label-cell { font-size: 0.75rem; color: var(--c-t2); }
-:root[data-ui] .totals-inline-meta { display: block; font-size: 0.75rem; font-weight: 500; }
+:root[data-ui] .boton-fila:hover { background: var(--c-s2); color: var(--c-t1); }
+:root[data-ui] .boton-fila svg { width: 18px; height: 18px; }
+:root[data-ui] .totals-row td { border-bottom: 0; border-top: 1px solid var(--c-line-2); }
+:root[data-ui] .totals-label-cell { font-size: 0.8125rem; font-weight: 600; color: var(--c-t2); }
 :root[data-ui] .empty-state {
   display: flex;
   flex-direction: column;
@@ -80,5 +398,6 @@
   gap: 8px;
   padding: 24px;
   text-align: center;
+  white-space: normal;
 }
 :root[data-ui] .empty-state p { color: var(--c-t2); }

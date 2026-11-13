@@ -451,18 +451,9 @@
   background: var(--c-s2);
 }
 
-/* Tabla de escritorio: solo en pantallas anchas, donde ocupa el ancho de la
-   ventana (la app va centrada a 640 px) y sustituye a la lista. En movil y
-   tableta manda la lista nueva. */
-:root[data-ui] body[data-active-tab] .tab-section.seccion-escritorio { display: none; }
-@media (min-width: 1100px) {
-  :root[data-ui] body[data-active-tab="home"] .tab-section.seccion-escritorio {
-    display: flex;
-    width: min(1180px, calc(100vw - 48px));
-    margin: var(--bloque-gap) 0 0 calc((100% - min(1180px, calc(100vw - 48px))) / 2);
-  }
-  :root[data-ui] .bloque[data-bloque="activos"] { display: none; }
-}
+/* La tabla de posiciones (seccion-escritorio) solo se ve en la version de
+   escritorio, que la lleva a su sitio (escritorio.js / escritorio.css). */
+:root[data-ui] .tab-section.seccion-escritorio { display: none; }
 
 /* Punto de "en vivo": late despacio mientras llegan precios. */
 :root[data-ui] .live-dot { animation: latidoVivo 2s ease-in-out infinite; }

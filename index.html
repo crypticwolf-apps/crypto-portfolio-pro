@@ -107,6 +107,7 @@
     <script src="./js/billeteras.js" defer></script>
     <script src="./js/inicio.js" defer></script>
     <script src="./js/apariencia.js" defer></script>
+    <script src="./js/escritorio.js" defer></script>
     <script src="./js/arranque.js" defer></script>
 
     <script>
@@ -210,6 +211,31 @@
         </div>
       </div>
 
+      <!-- ═══ ESCRITORIO (desde 1100 px): toda la app en una pagina ═══
+           escritorio.js lleva aqui las tarjetas de Inicio, Analitica, Plan y
+           Noticias (y las devuelve a sus pestanas al estrechar la ventana). -->
+      <div class="escritorio" id="escritorio" hidden>
+        <div class="esc-cabecera" data-esc-hueco="cabecera"></div>
+        <!-- Saldo y grafico | resumen de hoy y rendimiento -->
+        <div class="esc-rejilla">
+          <div class="esc-saldo" data-esc-hueco="saldo"></div>
+          <div class="esc-pila" data-esc-hueco="lateral"></div>
+        </div>
+        <!-- Todos los activos -->
+        <div class="esc-banda" data-esc-hueco="posiciones"></div>
+        <!-- Analisis de los activos, en una linea -->
+        <div class="esc-analisis">
+          <div class="esc-pila esc-pila-1" data-esc-hueco="analisis1"></div>
+          <div class="esc-pila esc-pila-2" data-esc-hueco="analisis2"></div>
+          <div class="esc-pila esc-pila-3" data-esc-hueco="analisis3"></div>
+        </div>
+        <div class="esc-banda" data-esc-hueco="operaciones"></div>
+        <div class="esc-banda" data-esc-hueco="plan"></div>
+        <div class="esc-banda" data-esc-hueco="noticias"></div>
+      </div>
+      <div class="esc-velo" id="escVelo" hidden></div>
+      <div class="esc-velo esc-velo-ficha" id="escVeloFicha"></div>
+
       <!-- ═══ PESTAÑA INICIO ═══ -->
       <section class="tab-section inicio" data-tab="home">
         <header class="inicio-cabecera">
@@ -225,6 +251,10 @@
           </button>
           <button id="homeRefreshBtn" class="boton-icono" type="button" aria-label="Actualizar precios" data-i18n-aria-label="home.refresh">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
+          </button>
+          <!-- Escritorio: Ajustes no tiene pestana; se abre en un panel lateral. -->
+          <button id="escAjustesBtn" class="boton-icono solo-escritorio" type="button" aria-label="Ajustes" data-i18n-aria-label="nav.settings" aria-haspopup="dialog" aria-controls="ajustesSeccion" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.1 13.6a7.6 7.6 0 0 0 0-3.2L21 9l-1.9-3.3-2.2.9a7.5 7.5 0 0 0-2.8-1.6l-.4-2.5h-3.4l-.4 2.5a7.5 7.5 0 0 0-2.8 1.6l-2.2-.9L3 9l1.9 1.4a7.6 7.6 0 0 0 0 3.2L3 15l1.9 3.3 2.2-.9a7.5 7.5 0 0 0 2.8 1.6l.4 2.5h3.4l.4-2.5a7.5 7.5 0 0 0 2.8-1.6l2.2.9L21 15z"/></svg>
           </button>
         </header>
 
@@ -418,6 +448,8 @@
         <nav class="news-filters" id="newsFilters" role="tablist" aria-label="Filtrar noticias" data-i18n-aria-label="news.filterAria"></nav>
 
         <div id="newsList" class="news-list"></div>
+        <!-- Escritorio: la tarjeta muestra las que caben; este boton, todas. -->
+        <button type="button" class="esc-ver-mas solo-escritorio" id="escNoticiasMas" hidden></button>
       </section>
 
       <!-- ═══ PESTAÑA PLAN ═══ -->
@@ -436,10 +468,15 @@
       </section>
 
       <!-- ═══ PESTAÑA AJUSTES ═══ -->
-      <section class="tab-section" data-tab="more">
+      <section class="tab-section" data-tab="more" id="ajustesSeccion" aria-label="Ajustes" data-i18n-aria-label="nav.settings">
         <header class="home-header">
           <div class="home-header-main">
             <p class="portfolio-name-display" data-i18n="nav.settings">Ajustes</p>
+          </div>
+          <div class="home-header-actions solo-escritorio">
+            <button id="escAjustesCerrar" class="boton-icono" type="button" aria-label="Cerrar" data-i18n-aria-label="buttons.close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
           </div>
         </header>
 

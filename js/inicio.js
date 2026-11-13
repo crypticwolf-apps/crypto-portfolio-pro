@@ -233,7 +233,10 @@ function renderHomeChart(snapshot = null) {
     box.innerHTML = `<div class="grafico-vacio">${escapeHtml(t("inicio.graficoVacio"))}</div>`;
     return;
   }
-  box.innerHTML = areaChartSvg(points, chartWidthOf(box), { label: t("inicio.graficoAria"), id: "graficoRelleno" });
+  // En escritorio el grafico llena el alto de su tarjeta (el ResizeObserver
+  // de escritorio.js lo redibuja si cambia); en movil mide 150 px.
+  const height = modoEscritorio() ? Math.max(150, Math.round(box.clientHeight)) : 150;
+  box.innerHTML = areaChartSvg(points, chartWidthOf(box), { label: t("inicio.graficoAria"), id: "graficoRelleno", height });
 }
 
 // ── Resumen: hoy, invertido, mejor y peor de las ultimas 24 h ──
@@ -593,10 +596,14 @@ function applyHomeBlocks() {
     return;
   }
   normalizeHomeBlocks(state.prefs.homeBlocks).forEach(({ id, on }) => {
-    const section = box.querySelector(`[data-bloque="${id}"]`);
+    // En escritorio los bloques viven en su sitio de la pagina: se ocultan
+    // igual, pero el orden solo manda en la lista de Inicio del movil.
+    const section = document.querySelector(`[data-bloque="${id}"]`);
     if (section) {
-      box.appendChild(section);
       section.toggleAttribute("data-apagado", !on);
+      if (box.contains(section)) {
+        box.appendChild(section);
+      }
     }
   });
 }

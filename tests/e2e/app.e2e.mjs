@@ -197,8 +197,8 @@ function anotar(grupo, nombre, error) {
   console.log(`${error ? "FALLO" : "  ok "} [${grupo}] ${nombre}${error ? "\n        " + error : ""}`);
 }
 
-async function abrirApp(navegador, url, { ancho = 375, sembrar = true, proxyCaido = false } = {}) {
-  const ctx = await navegador.newContext({ viewport: { width: ancho, height: 780 }, isMobile: true, hasTouch: true, serviceWorkers: "block", acceptDownloads: true });
+async function abrirApp(navegador, url, { ancho = 375, alto = 780, movil = true, sembrar = true, proxyCaido = false } = {}) {
+  const ctx = await navegador.newContext({ viewport: { width: ancho, height: alto }, isMobile: movil, hasTouch: movil, serviceWorkers: "block", acceptDownloads: true });
   const { directas, billetera } = await simularRed(ctx, { proxyCaido });
   const page = await ctx.newPage();
   page.setDefaultTimeout(6000);
@@ -640,6 +640,91 @@ async function casosSueltos(navegador, url) {
   await vivo.ctx.close();
 }
 
+// ── Escritorio (desde 1100 px): toda la app en una pagina ──
+// Huecos: en cada fila de tarjetas todas acaban a la misma altura y en las
+// rejillas de bloques (activos del Plan, noticias) la ultima fila llega al
+// borde.
+const huecosEscritorio = (page) => page.evaluate(() => {
+  const out = [];
+  for (const fila of document.querySelectorAll(".esc-rejilla, .esc-analisis")) {
+    const grupos = new Map();
+    [...fila.children].filter((h) => h.getClientRects().length).forEach((h) => {
+      const k = Math.round(h.getBoundingClientRect().top);
+      grupos.set(k, [...(grupos.get(k) || []), h]);
+    });
+    grupos.forEach((grupo) => {
+      const fondos = grupo.map((h) => {
+        const ultimo = h.classList.contains("esc-pila") ? [...h.children].filter((x) => x.getClientRects().length).pop() || h : h;
+        return Math.round(ultimo.getBoundingClientRect().bottom);
+      });
+      if (Math.max(...fondos) - Math.min(...fondos) > 2) out.push(`${fila.className}: ${fondos.join("/")}`);
+    });
+  }
+  for (const caja of document.querySelectorAll(".escritorio .tp-activos, .escritorio .news-list")) {
+    const visibles = [...caja.children].filter((h) => h.getClientRects().length);
+    if (!visibles.length) continue;
+    const hueco = caja.getBoundingClientRect().right - visibles[visibles.length - 1].getBoundingClientRect().right;
+    if (hueco > 2) out.push(`${caja.className}: hueco de ${Math.round(hueco)}px al final`);
+  }
+  return out.join(" | ");
+});
+
+async function casosEscritorio(navegador, url) {
+  const g = "escritorio";
+  const app = await abrirApp(navegador, url, { ancho: 1440, alto: 900, movil: false });
+  const { page } = app;
+  await paso(g, "toda la app en una pagina, sin pestanas", app, async () => {
+    const r = await page.evaluate(() => {
+      const ve = (sel) => { const el = document.querySelector(sel); return Boolean(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden"); };
+      return {
+        barra: ve("#tabBar"), ajustes: ve("#ajustesSeccion"),
+        piezas: ["#mainValue", "#graficoSaldo", "#summaryGrid", "#analyticsSummaryGrid", "#tableBody tr[data-row-id]", "#analyticsDonut", "#insightsRankingsGrid", "[data-bloque='mercado']", "#analyticsCategory", "#analyticsCompare", "#analyticsActivityStats", "#planContent .tp-fold", "#newsList .news-card", ".esc-cabecera [data-quick='buy']"].filter((sel) => !ve(sel))
+      };
+    });
+    if (r.barra || r.ajustes || r.piezas.length) throw new Error(JSON.stringify(r));
+  });
+  for (const [ancho, alto] of [[1100, 760], [1440, 900], [1920, 1080]]) {
+    await paso(g, `${ancho}px: sin desbordes ni huecos`, app, async () => {
+      await page.setViewportSize({ width: ancho, height: alto }); await page.waitForTimeout(400);
+      const d = await desborde(page); if (d) throw new Error(d);
+      const h = await huecosEscritorio(page); if (h) throw new Error(h);
+    });
+  }
+  await paso(g, "Ajustes en panel lateral: el engranaje lo abre y Escape lo cierra", app, async () => {
+    await page.click("#escAjustesBtn"); await page.waitForTimeout(350);
+    const abierto = await page.evaluate(() => ({ visible: document.getElementById("ajustesSeccion").getClientRects().length > 0, foco: document.activeElement?.id, apariencia: document.getElementById("aparienciaPanel").getBoundingClientRect().height }));
+    await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+    const cerrado = await page.evaluate(() => ({ visible: document.getElementById("ajustesSeccion").getClientRects().length > 0, foco: document.activeElement?.id }));
+    if (!abierto.visible || abierto.foco !== "escAjustesCerrar" || abierto.apariencia < 100 || cerrado.visible || cerrado.foco !== "escAjustesBtn") throw new Error(JSON.stringify({ abierto, cerrado }));
+  });
+  await paso(g, "la ficha de un activo es un panel lateral y se cierra al pulsar fuera", app, async () => {
+    await page.click('#tableBody tr[data-row-id="r-btc"] td.col-value'); await page.waitForTimeout(450);
+    const r = await page.evaluate(() => { const f = document.getElementById("assetDetailScreen").getBoundingClientRect(); return { izquierda: Math.round(f.left), derecha: Math.round(f.right), ancho: innerWidth, velo: getComputedStyle(document.getElementById("escVeloFicha")).display }; });
+    await page.mouse.click(100, 400); await page.waitForTimeout(400);
+    const cerrada = await page.evaluate(() => document.getElementById("assetDetailScreen").hidden);
+    if (r.izquierda < 400 || r.derecha !== r.ancho || r.velo !== "block" || !cerrada) throw new Error(JSON.stringify({ ...r, cerrada }));
+  });
+  await paso(g, "precios en vivo: se mueven la tabla y el saldo", app, async () => {
+    const leer = () => page.evaluate(() => [document.querySelector('#tableBody tr[data-row-id="r-btc"] [data-role="rowPrice"]').textContent, document.getElementById("mainValue").textContent]);
+    const a = await leer(); await page.waitForTimeout(2200); const b = await leer();
+    if (a[0] === b[0] || a[1] === b[1]) throw new Error(JSON.stringify({ a, b }));
+  });
+  await paso(g, "noticias en bloques: dos filas y 'Ver todas'", app, async () => {
+    const r = await page.evaluate(() => { const lista = document.getElementById("newsList"); const vis = [...lista.querySelectorAll(".news-card")].filter((n) => !n.hidden).length; return { vis, total: lista.querySelectorAll(".news-card").length, cols: Number(lista.style.getPropertyValue("--cols")), boton: !document.getElementById("escNoticiasMas").hidden }; });
+    const esperadas = Math.min(r.total, r.cols * 2);
+    if (r.cols < 2 || r.vis !== esperadas || r.boton !== (r.total > esperadas)) throw new Error(JSON.stringify(r));
+  });
+  await paso(g, "al estrechar vuelve el movil con su pestana, y al ensanchar el escritorio", app, async () => {
+    await page.setViewportSize({ width: 375, height: 780 }); await page.waitForTimeout(500);
+    const movil = await page.evaluate(() => ({ barra: getComputedStyle(document.getElementById("tabBar")).display !== "none", escritorio: !document.getElementById("escritorio").hidden, saldo: !!document.querySelector('.tab-section[data-tab="home"] #mainValueCard'), acciones: !!document.querySelector('#inicioBloques [data-bloque="acciones"]'), ajustesRapido: document.getElementById("quickAddBtn").textContent.trim(), noticiasOcultas: document.querySelectorAll("#newsList .news-card[hidden]").length }));
+    const d = await desborde(page);
+    await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(500);
+    const vuelta = await page.evaluate(() => ({ escritorio: !document.getElementById("escritorio").hidden, saldo: !!document.querySelector(".esc-saldo #mainValueCard"), plan: !!document.querySelector('[data-esc-hueco="plan"] #planContent') }));
+    if (!movil.barra || movil.escritorio || !movil.saldo || !movil.acciones || movil.ajustesRapido !== "Ajustes" || movil.noticiasOcultas || d || !vuelta.escritorio || !vuelta.saldo || !vuelta.plan) throw new Error(JSON.stringify({ movil, d, vuelta }));
+  });
+  await app.ctx.close();
+}
+
 // ── Lector de billeteras ──
 const SEED = "abandon ability able about above absent absorb abstract absurd abuse access accident";
 const filasBilletera = (page) => page.evaluate(() => state.rows.filter((r) => r.walletId).map((r) => ({
@@ -881,6 +966,7 @@ const url = `http://127.0.0.1:${servidor.address().port}/index.html`;
 const navegador = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 try {
   await casosSueltos(navegador, url);
+  await casosEscritorio(navegador, url);
   for (const ancho of [375, 320]) await recorridoCompleto(navegador, url, ancho);
   for (const ancho of [375, 320]) await casosBilletera(navegador, url, ancho);
 } finally {

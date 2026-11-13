@@ -418,12 +418,15 @@ const DEFAULT_ROWS = [
 ];
 
 // Tabla simplificada de solo lectura: la edición vive en el editor-portal.
+// Tabla de posiciones de escritorio: una columna por dato, ordenable.
 const TABLE_COLUMNS = [
   { key: "asset", labelKey: "table.columns.asset", sortKey: "asset" },
   { key: "price", labelKey: "table.columns.priceCol", sortKey: "currentPrice" },
+  { key: "change", labelKey: "table.columns.change24h", sortKey: "change24h" },
   { key: "invested", labelKey: "table.columns.invested", sortKey: "investment" },
   { key: "value", labelKey: "table.columns.value", sortKey: "currentValue" },
-  { key: "pnl", labelKey: "table.columns.performance", sortKey: "pnlPct" },
+  { key: "pnl", labelKey: "table.columns.gain", sortKey: "pnlUsd" },
+  { key: "weight", labelKey: "table.columns.weight", sortKey: "weight" },
   { key: "actions", labelKey: "table.columns.actions", sortKey: null }
 ];
 

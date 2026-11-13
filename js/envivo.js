@@ -526,8 +526,7 @@ function updateRowPriceCells(rowId, direction) {
       flashNode(node, direction);
     });
     set("rowChange", (node) => {
-      const suffix = node.querySelector("small") ? "<small> 24h</small>" : "";
-      node.innerHTML = `${changeValue === null ? "--" : formatSignedPercent(changeValue)}${suffix}`;
+      setText(node, changeValue === null ? "--" : formatSignedPercent(changeValue));
       node.className = `numeric ${toneClass(changeValue || 0)}`;
     });
     set("rowValue", (node) => { setText(node, maskedCurrency(metrics.currentValue)); });
