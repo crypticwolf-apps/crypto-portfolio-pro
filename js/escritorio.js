@@ -3,25 +3,27 @@
 // pagina, sin pestanas, en bandas a todo el ancho:
 //   cabecera ............ saludo, nombre, acciones rapidas y botones (con Ajustes)
 //   saldo ............... saldo + grafico | resumen de hoy + rendimiento
+//   mercado ............. BTC, ETH, dominancia y miedo/codicia en una linea
 //   posiciones .......... todos los activos (la tabla)
-//   analisis ............ en una linea: distribucion y comparativa | mejores y
-//                         peores | mercado y categorias
+//   analisis ............ en una linea: distribucion | mejores y peores |
+//                         categorias y comparativa
 //   operaciones ......... compras y ventas
-//   plan ................ el plan de salida, repartido a lo ancho
+//   plan ................ el plan de salida en tabla, una fila por activo
 //   noticias ............ en bloques; las primeras filas y "Ver todas"
 // Ajustes se abre en un panel lateral. Al estrechar la ventana cada pieza
 // vuelve a su sitio de la version movil (una marca guarda donde estaba).
 // =============================================================================
 
 const ESC_FILAS_NOTICIAS = 2;  // filas de noticias a la vista antes de "Ver todas"
-const ESC_HUECO_BLOQUES = 12;  // separacion en las rejillas de bloques (px)
-const ESC_ANCHO_ACTIVO = 340;  // ancho minimo de un activo del Plan (px)
+const ESC_HUECO_BLOQUES = 12;  // separacion en la rejilla de noticias (px)
 const ESC_ANCHO_NOTICIA = 300; // ancho minimo de una noticia (px)
+const ESC_PLAN_VIVO_MS = 15000; // con precios en vivo, el Plan se repinta como mucho cada 15 s
 
 const escEstado = {
   activo: false,
   ajustesAbiertos: false,
   noticiasCompletas: false,
+  planPintadoEn: 0,
   marcas: new Map(),           // pieza -> comentario en su sitio de movil
   volverFoco: null,
   observador: null
@@ -59,12 +61,12 @@ function escPiezas() {
     [document.querySelector('[data-bloque="acciones"]'), "acciones"],
     [document.getElementById("summaryGrid"), "lateral"],
     [document.querySelector(".analytics-summary-panel"), "lateral"],
+    [document.querySelector('[data-bloque="mercado"]'), "mercado"],
     [document.querySelector(".seccion-escritorio .table-panel"), "posiciones"],
     [panel("analyticsDonut"), "analisis1"],
-    [panel("analyticsCompare"), "analisis1"],
     [panel("insightsRankingsGrid"), "analisis2"],
-    [document.querySelector('[data-bloque="mercado"]'), "analisis3"],
     [panel("analyticsCategory"), "analisis3"],
+    [panel("analyticsCompare"), "analisis3"],
     [panel("analyticsActivityStats"), "operaciones"],
     [document.querySelector('.tab-section[data-tab="plan"]'), "plan"],
     [document.querySelector('.tab-section[data-tab="news"]'), "noticias"]
@@ -110,10 +112,7 @@ function bindEscritorio() {
       return;
     }
     window.clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(() => {
-      escAjustarNoticias();
-      escAjustarPlan();
-    }, 150);
+    resizeTimer = window.setTimeout(() => escAjustarNoticias(), 150);
   });
 
   // El grafico del saldo llena el alto de su tarjeta: si cambia, se redibuja.
@@ -174,7 +173,9 @@ function desactivarEscritorio() {
   escEstado.activo = false;
   escAjustarNoticias();
   applyHomeBlocks();
-  renderHomeChart();
+  // Inicio (con su grafico a 150 px) se repinta cuando se vea: ahora puede
+  // estar oculto y su grafico no tendria ancho.
+  seccionesPendientes.add("home");
   setActiveTab(state.prefs.activeTab);
 }
 
@@ -191,19 +192,6 @@ function cambioDeAncho() {
 function escCabenPorFila(caja, minAncho) {
   const ancho = caja.clientWidth || 0;
   return Math.max(1, Math.floor((ancho + ESC_HUECO_BLOQUES) / (minAncho + ESC_HUECO_BLOQUES)));
-}
-
-// Activos del Plan: tantos por fila como para que las filas salgan parejas
-// (6 activos con sitio para 5 van 3 y 3, no 5 y 1).
-function escAjustarPlan() {
-  const caja = document.querySelector(".escritorio .tp-activos");
-  if (!escEstado.activo || !caja) {
-    return;
-  }
-  const n = caja.children.length;
-  const max = escCabenPorFila(caja, ESC_ANCHO_ACTIVO);
-  const filas = Math.max(1, Math.ceil(n / max));
-  caja.style.setProperty("--cols", String(Math.max(1, Math.ceil(n / filas))));
 }
 
 // Noticias en bloques: a la vista, las primeras filas (tantas noticias como
@@ -242,6 +230,15 @@ function escRepintarPlan() {
     return;
   }
   renderPlan();
+  escEstado.planPintadoEn = Date.now();
+}
+
+// Con precios en vivo cambian las distancias a cada TP: el Plan se repinta,
+// pero sin prisa (como mucho cada ESC_PLAN_VIVO_MS).
+function escRepintarPlanVivo() {
+  if (escEstado.activo && Date.now() - (escEstado.planPintadoEn || 0) > ESC_PLAN_VIVO_MS) {
+    escRepintarPlan();
+  }
 }
 
 // ── Ajustes en panel lateral ──

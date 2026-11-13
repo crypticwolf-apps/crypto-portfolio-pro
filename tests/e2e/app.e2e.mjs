@@ -678,7 +678,7 @@ async function casosEscritorio(navegador, url) {
       const ve = (sel) => { const el = document.querySelector(sel); return Boolean(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden"); };
       return {
         barra: ve("#tabBar"), ajustes: ve("#ajustesSeccion"),
-        piezas: ["#mainValue", "#graficoSaldo", "#summaryGrid", "#analyticsSummaryGrid", "#tableBody tr[data-row-id]", "#analyticsDonut", "#insightsRankingsGrid", "[data-bloque='mercado']", "#analyticsCategory", "#analyticsCompare", "#analyticsActivityStats", "#planContent .tp-fold", "#newsList .news-card", ".esc-cabecera [data-quick='buy']"].filter((sel) => !ve(sel))
+        piezas: ["#mainValue", "#graficoSaldo", "#summaryGrid", "#analyticsSummaryGrid", "#tableBody tr[data-row-id]", "#analyticsDonut", "#insightsRankingsGrid", "[data-bloque='mercado']", "#analyticsCategory", "#analyticsCompare", "#analyticsActivityStats", ".tp-tabla tbody tr.tp-fila", "#newsList .news-card", ".esc-cabecera [data-quick='buy']"].filter((sel) => !ve(sel))
       };
     });
     if (r.barra || r.ajustes || r.piezas.length) throw new Error(JSON.stringify(r));
@@ -708,6 +708,24 @@ async function casosEscritorio(navegador, url) {
     const leer = () => page.evaluate(() => [document.querySelector('#tableBody tr[data-row-id="r-btc"] [data-role="rowPrice"]').textContent, document.getElementById("mainValue").textContent]);
     const a = await leer(); await page.waitForTimeout(2200); const b = await leer();
     if (a[0] === b[0] || a[1] === b[1]) throw new Error(JSON.stringify({ a, b }));
+  });
+  await paso(g, "plan en tabla: una fila por activo con objetivos y se edita en la propia fila", app, async () => {
+    const leer = () => page.evaluate(() => ({
+      filas: [...document.querySelectorAll(".tp-tabla tbody tr.tp-fila")].map((tr) => tr.dataset.rowId),
+      columnas: [...document.querySelectorAll(".tp-tabla thead th.tp-col-tp")].map((th) => th.textContent.trim()),
+      btcTp1: document.querySelector('.tp-fila[data-row-id="r-btc"] .tp-col-tp small')?.textContent || "",
+      total: document.querySelector(".tp-totales .tp-col-prog strong")?.textContent || "",
+      plegables: document.querySelectorAll('[data-esc-hueco="plan"] details.tp-fold').length
+    }));
+    const a = await leer();
+    if (!a.filas.includes("r-btc") || a.columnas.join() !== "TP1,TP2,TP3" || a.plegables) throw new Error("tabla: " + JSON.stringify(a));
+    await page.click('.tp-tabla [data-plan-edit="r-btc"]'); await page.waitForTimeout(250);
+    const pct = page.locator('.tp-fila-editor [data-tp-field="p1"]');
+    await pct.fill("10"); await pct.press("Tab"); await page.waitForTimeout(300);
+    const b = await leer();
+    await page.click('.tp-tabla [data-plan-edit="r-btc"]'); await page.waitForTimeout(250);
+    const editorCerrado = await page.evaluate(() => !document.querySelector(".tp-fila-editor"));
+    if (!/vende 10%/.test(b.btcTp1) || b.total === a.total || b.filas.filter((id) => id === "r-btc").length !== 1 || !editorCerrado) throw new Error("edicion: " + JSON.stringify({ a, b, editorCerrado }));
   });
   await paso(g, "noticias en bloques: dos filas y 'Ver todas'", app, async () => {
     const r = await page.evaluate(() => { const lista = document.getElementById("newsList"); const vis = [...lista.querySelectorAll(".news-card")].filter((n) => !n.hidden).length; return { vis, total: lista.querySelectorAll(".news-card").length, cols: Number(lista.style.getPropertyValue("--cols")), boton: !document.getElementById("escNoticiasMas").hidden }; });

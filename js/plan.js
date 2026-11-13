@@ -211,12 +211,45 @@ function tpFold(key, cls, headHtml, bodyHtml) {
     </details>`;
 }
 
+// Precio y % de venta de cada TP de un activo (los TP con precio y un hueco
+// para anadir el siguiente). Lo usan las fichas del movil y la tabla de
+// escritorio; los cambios los recoge bindPlan.
+function tpConfigHtml(p) {
+  const cfg = getTpConfig(p.id);
+  const levelDefs = [
+    { key: "tp1", label: "TP1", raw: p.row.tp1, price: p.tp1, pctKey: "p1" },
+    { key: "tp2", label: "TP2", raw: p.row.tp2, price: p.tp2, pctKey: "p2" },
+    { key: "tp3", label: "TP3", raw: p.row.tp3, price: p.tp3, pctKey: "p3" }
+  ];
+  let addShown = false;
+  const display = [];
+  levelDefs.forEach((l) => {
+    if (l.price > 0) display.push({ ...l, isAdd: false });
+    else if (!addShown) { display.push({ ...l, isAdd: true }); addShown = true; }
+  });
+  const configRows = display.map((l) => `
+      <div class="tp-config-row${l.isAdd ? " is-add" : ""}">
+        <span class="tp-config-label">${l.label}</span>
+        <input class="tp-config-price" type="text" inputmode="decimal" data-tp-rowprice="${l.key}" data-row-id="${p.id}" value="${escapeHtml(l.raw || "")}" placeholder="${escapeHtml(t("tp.price"))}" aria-label="${escapeHtml(`${t("tp.price")} ${l.label}`)}" />
+        <span class="tp-config-pct"><input type="text" inputmode="decimal" data-tp-field="${l.pctKey}" data-row-id="${p.id}" value="${planClamp(Number(cfg[l.pctKey]) || 0, 0, 100)}" aria-label="${escapeHtml(`${t("tp.pctSell")} ${l.label}`)}" />%</span>
+        ${l.isAdd
+          ? `<span class="tp-config-del-spacer" aria-hidden="true"></span>`
+          : `<button class="tp-config-del" type="button" data-tp-del="${l.key}" data-row-id="${p.id}" aria-label="${escapeHtml(t("tp.deleteLevel"))}" title="${escapeHtml(t("tp.deleteLevel"))}">✕</button>`}
+      </div>`).join("");
+  return `<div class="tp-config"><div class="tp-config-legend"><span>${escapeHtml(t("tp.price"))}</span><span>${escapeHtml(t("tp.pctSell"))}</span></div>${configRows}</div>`;
+}
+
 function renderTpTool() {
   const box = document.getElementById("planContent");
   if (!box) return;
   const positions = getPlanPositions().filter((p) => p.tokens > 0);
   if (!positions.length) {
     box.innerHTML = `<div class="panel plan-empty detail-empty"><strong>${escapeHtml(t("tp.emptyTitle"))}</strong><p>${escapeHtml(t("tp.emptyText"))}</p></div>`;
+    return;
+  }
+  // Escritorio: el plan entero en una tabla, todo a la vista.
+  if (modoEscritorio()) {
+    renderTpEscritorio(box, positions);
     return;
   }
   const money = (v) => maskedCurrency(v);
@@ -338,31 +371,7 @@ function renderTpTool() {
   const perAsset = positions.map((p) => {
     const sim = computeTpProgressive(p);
     const fullA = computeTpFull(p);
-    const cfg = getTpConfig(p.id);
     const noData = !(p.price > 0);
-
-    // Solo TP1-TP3 (precio en la fila). Se muestran los TP con precio
-    // + un único slot vacío para añadir el siguiente.
-    const levelDefs = [
-      { key: "tp1", label: "TP1", raw: p.row.tp1, price: p.tp1, pctKey: "p1" },
-      { key: "tp2", label: "TP2", raw: p.row.tp2, price: p.tp2, pctKey: "p2" },
-      { key: "tp3", label: "TP3", raw: p.row.tp3, price: p.tp3, pctKey: "p3" }
-    ];
-    let addShown = false;
-    const display = [];
-    levelDefs.forEach((l) => {
-      if (l.price > 0) display.push({ ...l, isAdd: false });
-      else if (!addShown) { display.push({ ...l, isAdd: true }); addShown = true; }
-    });
-    const configRows = display.map((l) => `
-      <div class="tp-config-row${l.isAdd ? " is-add" : ""}">
-        <span class="tp-config-label">${l.label}</span>
-        <input class="tp-config-price" type="text" inputmode="decimal" data-tp-rowprice="${l.key}" data-row-id="${p.id}" value="${escapeHtml(l.raw || "")}" placeholder="${escapeHtml(t("tp.price"))}" aria-label="${escapeHtml(`${t("tp.price")} ${l.label}`)}" />
-        <span class="tp-config-pct"><input type="text" inputmode="decimal" data-tp-field="${l.pctKey}" data-row-id="${p.id}" value="${planClamp(Number(cfg[l.pctKey]) || 0, 0, 100)}" aria-label="${escapeHtml(`${t("tp.pctSell")} ${l.label}`)}" />%</span>
-        ${l.isAdd
-          ? `<span class="tp-config-del-spacer" aria-hidden="true"></span>`
-          : `<button class="tp-config-del" type="button" data-tp-del="${l.key}" data-row-id="${p.id}" aria-label="${escapeHtml(t("tp.deleteLevel"))}" title="${escapeHtml(t("tp.deleteLevel"))}">✕</button>`}
-      </div>`).join("");
 
     // Cabecera plegable: identidad del activo + su rendimiento estimado, para
     // poder comparar activos sin necesidad de desplegarlos.
@@ -371,7 +380,7 @@ function renderTpTool() {
       <span class="asset-avatar">${renderAssetAvatar(p.row)}</span>
       <span class="tp-fold-txt tp-card-id"><strong>${escapeHtml(p.name)}</strong><small>${state.prefs.hideBalance ? "••••" : formatNumber(p.tokens, p.tokens >= 1 ? 4 : 8)} · ${escapeHtml(t("tp.avg"))} ${p.avg > 0 ? maskedCurrency(p.avg, getPriceDigits(p.avg)) : "--"} · ${escapeHtml(t("tp.now"))} ${p.price > 0 ? formatCurrency(p.price, getPriceDigits(p.price)) : "--"}</small></span>
       ${sim.hasTp && !noData ? `<span class="tp-fold-badge ${sim.profit >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(sim.profit)}</span>` : ""}`;
-    const configBlock = `<div class="tp-config"><div class="tp-config-legend"><span>${escapeHtml(t("tp.price"))}</span><span>${escapeHtml(t("tp.pctSell"))}</span></div>${configRows}</div>`;
+    const configBlock = tpConfigHtml(p);
 
     if (noData) {
       return tpFold(foldKey, "tp-card", head, `${configBlock}<p class="plan-hint tp-warn">${escapeHtml(t("tp.noData"))}</p>`);
@@ -422,23 +431,163 @@ function renderTpTool() {
       </div>
     `);
 
-  // tp-globales y tp-activos solo agrupan: en movil no cambian nada (display:
-  // contents) y en escritorio reparten los bloques a lo ancho.
   box.innerHTML = `
-    <div class="tp-globales">
-      ${block1}
-      ${block2}
-      ${block3}
-    </div>
+    ${block1}
+    ${block2}
+    ${block3}
     <div class="tp-detail-head"><h2 class="home-section-title">${escapeHtml(t("tp.detailTitle"))}</h2></div>
-    <div class="tp-activos">${perAsset}</div>
+    ${perAsset}
     ${noTpNotice}
     ${quickBar}
     <p class="plan-disclaimer">${escapeHtml(PLAN_DISCLAIMER)}</p>
   `;
   updateFoldAllBtn();
-  // Escritorio: activos repartidos en filas parejas.
-  escAjustarPlan();
+}
+
+// ── Escritorio: el plan en una tabla, una fila por activo con objetivos ──
+// Todo a la vista y sin plegables. Cada objetivo (TP1-TP3) es una columna con
+// todo lo suyo: precio, lo que se vende en la salida progresiva (% e
+// ingreso), lo que se sacaria vendiendo el 100% ahi y si ya se alcanzo. Al
+// lado, la salida progresiva completa; abajo, los totales de la cartera. El
+// lapiz de una fila abre debajo sus precios y porcentajes (los mismos campos
+// que en el movil).
+let tpFilaEditando = null;
+
+function renderTpEscritorio(box, positions) {
+  const money = (v) => maskedCurrency(v);
+  const prog = computeTpGlobalProgressive();
+  const full = computeTpGlobalFull();
+  const niveles = [0, 1, 2].filter((k) => prog.levelUsed[k]);
+  const tono = (v) => (v >= 0 ? "positive" : "negative");
+  const precio = (v) => (v > 0 ? formatCurrency(v, getPriceDigits(v)) : "--");
+  const tokens = (p) => (state.prefs.hideBalance ? "••••" : formatNumber(p.tokens, p.tokens >= 1 ? 4 : 8));
+  const vacio = '<span class="tp-vacio">—</span>';
+
+  // Filas: los activos con objetivos y, si se esta editando, el elegido aunque
+  // aun no tenga ninguno.
+  const filas = prog.rows.map((r) => r.p);
+  const editado = positions.find((p) => p.id === tpFilaEditando);
+  if (editado && !filas.some((p) => p.id === editado.id)) {
+    filas.push(editado);
+  }
+  if (tpFilaEditando && !editado) {
+    tpFilaEditando = null;
+  }
+
+  const fila = (p) => {
+    const sim = computeTpProgressive(p);
+    const fullA = computeTpFull(p);
+    const tpCelda = (k) => {
+      const s = sim.steps.find((step) => step.idx === k);
+      const f = fullA.find((item) => item.idx === k);
+      if (!s || !f) return `<td class="tp-col-tp">${vacio}</td>`;
+      const dist = p.price > 0 ? ((s.price - p.price) / p.price) * 100 : null;
+      const estado = s.reached
+        ? `<small class="positive">✓ ${escapeHtml(t("tp.reachedTag"))}</small>`
+        : `<small>${dist === null ? "--" : escapeHtml(t("tp.falta", { pct: `${dist >= 0 ? "+" : ""}${dist.toFixed(1)}%` }))}</small>`;
+      return `<td class="tp-col-tp${s.reached ? " es-alcanzado" : ""}"><div class="stack-cell">
+        <strong>${precio(s.price)}</strong>
+        <small>${escapeHtml(t("tp.vende", { pct: s.pct.toFixed(0) }))} · ${money(s.income)}</small>
+        <small>${escapeHtml(t("tp.todo"))} ${money(f.income)} · <span class="${tono(f.roi)}">${formatPercent(f.roi)}</span></small>
+        ${estado}
+      </div></td>`;
+    };
+    const progresiva = sim.hasTp
+      ? `<div class="stack-cell">
+          <strong>${money(sim.totalOut)}</strong>
+          <small class="${tono(sim.profit)}">${maskedSignedCurrency(sim.profit)} · ${formatPercent(sim.roi)}</small>
+          ${sim.remainingValue > 0 ? `<small>${escapeHtml(t("tp.queda", { valor: money(sim.remainingValue) }))}</small>` : ""}
+        </div>`
+      : vacio;
+    const abierta = tpFilaEditando === p.id;
+    const columnas = 4 + niveles.length;
+    return `
+      <tr class="tp-fila${abierta ? " is-editando" : ""}" data-row-id="${p.id}">
+        <td class="tp-col-activo"><div class="asset-field">
+          <span class="asset-logo">${assetLogoHtml(p.row)}</span>
+          <div class="asset-id"><strong>${escapeHtml(p.symbol || p.name)}</strong><small>${tokens(p)} ${escapeHtml(p.symbol || "")}</small></div>
+        </div></td>
+        <td class="tp-col-precio"><div class="stack-cell">
+          <strong>${precio(p.price)}</strong>
+          <small>${escapeHtml(t("tp.avg"))} ${p.avg > 0 ? maskedCurrency(p.avg, getPriceDigits(p.avg)) : "--"}</small>
+        </div></td>
+        ${niveles.map(tpCelda).join("")}
+        <td class="tp-col-prog">${progresiva}</td>
+        <td class="tp-col-accion"><button class="boton-icono boton-fila" type="button" data-plan-edit="${p.id}" aria-expanded="${abierta ? "true" : "false"}" aria-label="${escapeHtml(t("tp.editarFila", { activo: p.symbol || p.name }))}" title="${escapeHtml(t("tp.editarFila", { activo: p.symbol || p.name }))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg></button></td>
+      </tr>
+      ${abierta ? `<tr class="tp-fila-editor"><td colspan="${columnas}"><div class="tp-editor">${tpConfigHtml(p)}<p class="plan-hint">${escapeHtml(t("tp.editarAyuda"))}</p></div></td></tr>` : ""}`;
+  };
+
+  const totales = `
+    <tr class="tp-totales">
+      <td class="tp-col-activo">${escapeHtml(t("tp.total"))}</td>
+      <td></td>
+      ${niveles.map((k) => {
+        const sc = full.find((item) => item.idx === k);
+        return `<td class="tp-col-tp"><div class="stack-cell">
+          <strong>${money(prog.phases[k])}</strong>
+          <small>${escapeHtml(t("tp.accumulated"))} ${money(prog.phaseAcc[k])}</small>
+          ${sc ? `<small>${escapeHtml(t("tp.todo"))} ${money(sc.total)} · <span class="${tono(sc.roi)}">${formatPercent(sc.roi)}</span></small>` : ""}
+        </div></td>`;
+      }).join("")}
+      <td class="tp-col-prog"><div class="stack-cell">
+        <strong>${money(prog.totalOut)}</strong>
+        <small class="${tono(prog.profit)}">${maskedSignedCurrency(prog.profit)} · ${formatPercent(prog.roi)}</small>
+        ${prog.remainingValue > 0 ? `<small>${escapeHtml(t("tp.queda", { valor: money(prog.remainingValue) }))}</small>` : ""}
+      </div></td>
+      <td></td>
+    </tr>`;
+
+  const tabla = filas.length && niveles.length
+    ? `
+      <div class="table-wrap tp-tabla-wrap">
+        <table class="tp-tabla" aria-label="${escapeHtml(t("tp.tablaAria"))}">
+          <thead>
+            <tr class="tp-grupos">
+              <th rowspan="2" class="tp-col-activo">${escapeHtml(t("table.columns.asset"))}</th>
+              <th rowspan="2" class="tp-col-precio">${escapeHtml(t("table.columns.priceCol"))}</th>
+              <th colspan="${niveles.length}" class="tp-grupo">${escapeHtml(t("tp.objetivos"))}<small>${escapeHtml(t("tp.objetivosSub"))}</small></th>
+              <th rowspan="2" class="tp-col-prog tp-grupo-prog">${escapeHtml(t("tp.progresiva"))}<small>${escapeHtml(t("tp.progresivaSub"))}</small></th>
+              <th rowspan="2" class="tp-col-accion"><span class="solo-lector">${escapeHtml(t("table.columns.actions"))}</span></th>
+            </tr>
+            <tr>
+              ${niveles.map((k) => `<th class="tp-col-tp">TP${k + 1}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>${filas.map(fila).join("")}</tbody>
+          <tfoot>${totales}</tfoot>
+        </table>
+      </div>`
+    : `<p class="plan-hint">${escapeHtml(t("tp.noneConfigured"))}</p>`;
+
+  // Activos sin objetivos: un boton por activo para anadirle los suyos.
+  const sinObjetivos = prog.noTp.filter((p) => p.id !== tpFilaEditando);
+  const sinTp = sinObjetivos.length
+    ? `<div class="tp-sin-objetivos">
+        <span>${escapeHtml(t("tp.noTpTitle"))}</span>
+        ${sinObjetivos.map((p) => `<button type="button" class="tp-chip" data-plan-edit="${p.id}">${escapeHtml(p.symbol || p.name)} <span aria-hidden="true">+</span><span class="solo-lector"> ${escapeHtml(t("tp.anadir"))}</span></button>`).join("")}
+      </div>`
+    : "";
+
+  // Porcentajes para todos, siempre a la vista.
+  const tpAll = state.plan.tpAll || { p1: 30, p2: 50, p3: 100 };
+  const rapido = `
+    <div class="tp-rapido">
+      <span class="tp-fold-txt"><strong>${escapeHtml(t("tp.applyAllTitle"))}</strong><small>${escapeHtml(t("tp.applyAllHint"))}</small></span>
+      <div class="tp-quick-row">
+        <label class="tp-quick-field">TP1<input type="text" inputmode="decimal" data-tp-all="p1" value="${planClamp(Number(tpAll.p1) || 0, 0, 100)}" />%</label>
+        <label class="tp-quick-field">TP2<input type="text" inputmode="decimal" data-tp-all="p2" value="${planClamp(Number(tpAll.p2) || 0, 0, 100)}" />%</label>
+        <label class="tp-quick-field">TP3<input type="text" inputmode="decimal" data-tp-all="p3" value="${planClamp(Number(tpAll.p3) || 0, 0, 100)}" />%</label>
+        <button class="primary-btn tp-quick-btn" type="button" data-plan-action="tpApplyAll">${escapeHtml(t("tp.applyAllBtn"))}</button>
+      </div>
+    </div>`;
+
+  box.innerHTML = `
+    ${tabla}
+    ${sinTp}
+    ${rapido}
+    <p class="plan-disclaimer">${escapeHtml(PLAN_DISCLAIMER)}</p>
+  `;
 }
 
 /* ── Bindings ── */
@@ -475,6 +624,17 @@ function bindPlan() {
     }
     const tpEdit = event.target.closest("[data-tp-edit]");
     if (tpEdit) { openPositionEditor(tpEdit.dataset.tpEdit); return; }
+    // Escritorio: el lapiz de una fila abre (o cierra) sus objetivos debajo.
+    const planEdit = event.target.closest("[data-plan-edit]");
+    if (planEdit) {
+      const id = planEdit.dataset.planEdit;
+      tpFilaEditando = tpFilaEditando === id ? null : id;
+      renderTpTool();
+      if (tpFilaEditando) {
+        box.querySelector(".tp-fila-editor input")?.focus({ preventScroll: true });
+      }
+      return;
+    }
     const action = event.target.closest("[data-plan-action]")?.dataset.planAction;
     if (action) handlePlanAction(action);
   });

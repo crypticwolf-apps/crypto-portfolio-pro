@@ -117,6 +117,8 @@ function renderDashboardOnly() {
   } else {
     seccionesPendientes.add("home");
   }
+  // Escritorio: el Plan tambien esta a la vista (se repinta sin prisa).
+  escRepintarPlanVivo();
   if (pestanaVisible("analytics")) {
     seccionesPendientes.delete("analytics");
     // getPortfolioInsights recorre el historico de precios de cada fila.

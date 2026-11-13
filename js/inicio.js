@@ -213,7 +213,8 @@ function areaChartSvg(points, width, { height = 150, label = "", id = "graficoRe
 }
 
 function chartWidthOf(box) {
-  return Math.round(box.clientWidth || Math.min(608, window.innerWidth - 32));
+  // Oculto no tiene ancho: se estima con la ventana (nunca menos de 120 px).
+  return Math.max(120, Math.round(box.clientWidth || Math.min(608, window.innerWidth - 32)));
 }
 
 function renderHomeChart(snapshot = null) {
