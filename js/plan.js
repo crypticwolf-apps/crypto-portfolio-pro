@@ -357,8 +357,8 @@ function renderTpTool() {
     const configRows = display.map((l) => `
       <div class="tp-config-row${l.isAdd ? " is-add" : ""}">
         <span class="tp-config-label">${l.label}</span>
-        <input class="tp-config-price" type="text" inputmode="decimal" data-tp-rowprice="${l.key}" data-row-id="${p.id}" value="${escapeHtml(l.raw || "")}" placeholder="${escapeHtml(t("tp.price"))}" />
-        <span class="tp-config-pct"><input type="text" inputmode="decimal" data-tp-field="${l.pctKey}" data-row-id="${p.id}" value="${planClamp(Number(cfg[l.pctKey]) || 0, 0, 100)}" />%</span>
+        <input class="tp-config-price" type="text" inputmode="decimal" data-tp-rowprice="${l.key}" data-row-id="${p.id}" value="${escapeHtml(l.raw || "")}" placeholder="${escapeHtml(t("tp.price"))}" aria-label="${escapeHtml(`${t("tp.price")} ${l.label}`)}" />
+        <span class="tp-config-pct"><input type="text" inputmode="decimal" data-tp-field="${l.pctKey}" data-row-id="${p.id}" value="${planClamp(Number(cfg[l.pctKey]) || 0, 0, 100)}" aria-label="${escapeHtml(`${t("tp.pctSell")} ${l.label}`)}" />%</span>
         ${l.isAdd
           ? `<span class="tp-config-del-spacer" aria-hidden="true"></span>`
           : `<button class="tp-config-del" type="button" data-tp-del="${l.key}" data-row-id="${p.id}" aria-label="${escapeHtml(t("tp.deleteLevel"))}" title="${escapeHtml(t("tp.deleteLevel"))}">✕</button>`}

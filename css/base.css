@@ -443,6 +443,25 @@ body.detail-open { overflow: hidden; }
 .toast.is-compact .toast-icon { width: 16px; height: 16px; }
 .toast-undo-btn { flex: 0 0 auto; padding: 0 12px; }
 
+/* fitAmount mide la cifra grande en una sola linea, sin encoger nada. Se
+   mide recortada: si sobresaliera, aunque fuera un instante, el navegador del
+   movil ensancharia la pagina y ya no la volveria a estrechar.
+   Es un estado de un instante y tiene que ganar a las reglas de la pieza
+   (que se cargan despues y la dejarian saltar de linea): de ahi !important. */
+:root[data-ui] .midiendo { white-space: nowrap !important; flex-wrap: nowrap !important; overflow: hidden !important; }
+:root[data-ui] .midiendo > * { flex-shrink: 0 !important; }
+
+/* Destello de un precio en vivo (flashNode): dos animaciones iguales por
+   sentido para que cambiar de una a otra la reinicie sin recalcular nada. */
+:root[data-ui] [data-destello="sube-a"] { animation: destelloSubeA 0.9s ease; }
+:root[data-ui] [data-destello="sube-b"] { animation: destelloSubeB 0.9s ease; }
+:root[data-ui] [data-destello="baja-a"] { animation: destelloBajaA 0.9s ease; }
+:root[data-ui] [data-destello="baja-b"] { animation: destelloBajaB 0.9s ease; }
+@keyframes destelloSubeA { 0% { color: var(--c-pos); } 100% { color: inherit; } }
+@keyframes destelloSubeB { 0% { color: var(--c-pos); } 100% { color: inherit; } }
+@keyframes destelloBajaA { 0% { color: var(--c-neg); } 100% { color: inherit; } }
+@keyframes destelloBajaB { 0% { color: var(--c-neg); } 100% { color: inherit; } }
+
 @keyframes veloEntra { from { opacity: 0; } to { opacity: 1; } }
 @keyframes veloSale { to { opacity: 0; } }
 @keyframes hojaAparece { from { transform: translateY(16px) scale(0.98); opacity: 0; } to { transform: none; opacity: 1; } }

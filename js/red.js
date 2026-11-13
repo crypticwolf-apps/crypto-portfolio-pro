@@ -272,7 +272,7 @@ function toCoinGeckoDate(isoDate) {
 }
 
 function readHistPriceCache() {
-  const parsed = safeParse(localStorage.getItem(HIST_PRICE_CACHE_KEY));
+  const parsed = readStored(HIST_PRICE_CACHE_KEY);
   return parsed && typeof parsed === "object" ? parsed : {};
 }
 
@@ -364,7 +364,7 @@ function getFxCacheKey(fromCurrency, toCurrency) {
 }
 
 function readFxRateCacheStore() {
-  const parsed = safeParse(localStorage.getItem(FX_RATE_CACHE_KEY));
+  const parsed = readStored(FX_RATE_CACHE_KEY);
   return parsed && typeof parsed === "object" ? parsed : {};
 }
 
@@ -406,7 +406,7 @@ function cacheCurrencyConversionRate(fromCurrency, toCurrency, rate) {
   const store = readFxRateCacheStore();
   store[directKey] = { at: now, rate: normalizedRate };
   store[inverseKey] = { at: now, rate: 1 / normalizedRate };
-  localStorage.setItem(FX_RATE_CACHE_KEY, JSON.stringify(store));
+  writeStored(FX_RATE_CACHE_KEY, JSON.stringify(store));
 }
 
 async function fetchCurrencyConversionRate(fromCurrency, toCurrency) {

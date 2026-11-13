@@ -79,6 +79,10 @@ function setActiveTab(tab) {
     renderWalletsPanel();
   }
 
+  // Lo que cambio mientras la pestana estaba oculta se pinta ahora, y la
+  // cifra del saldo se mide ya visible (oculta no tiene ancho).
+  pintarPendientes();
+  refitAmounts();
   savePreferences();
   updateStickyBarVisibility();
   const targetScroll = tabScrollPositions[nextTab] || 0;
@@ -486,6 +490,12 @@ function bindEnvironmentEvents() {
       setApiState("offline", t("status.offlineMeta"));
       stopLivePrices();
     });
+    // Al pasar a pantalla ancha aparece la tabla: se pinta si estaba pendiente.
+    if (MQ_ESCRITORIO?.addEventListener) {
+      MQ_ESCRITORIO.addEventListener("change", pintarPendientes);
+    } else if (MQ_ESCRITORIO?.addListener) {
+      MQ_ESCRITORIO.addListener(pintarPendientes);
+    }
 
   }
 }

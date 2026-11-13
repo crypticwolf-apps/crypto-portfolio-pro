@@ -306,9 +306,25 @@ function currencyFractionDigits(value, digits) {
   return digits;
 }
 
+// Crear un Intl.NumberFormat/DateTimeFormat es caro (cada importe de la app
+// creaba el suyo, cientos por segundo con precios en vivo): se crea una vez
+// por idioma y opciones y se reutiliza.
+const intlFormatters = new Map();
+function intlFormatter(kind, locale, options) {
+  const key = `${kind}|${locale}|${JSON.stringify(options)}`;
+  let formatter = intlFormatters.get(key);
+  if (!formatter) {
+    formatter = kind === "date"
+      ? new Intl.DateTimeFormat(locale, options)
+      : new Intl.NumberFormat(locale, options);
+    intlFormatters.set(key, formatter);
+  }
+  return formatter;
+}
+
 function currencyFormatter(digits) {
   const meta = CURRENCY_META[state.prefs.currency] || CURRENCY_META.usd;
-  return new Intl.NumberFormat(getUiLocale() || meta.locale, {
+  return intlFormatter("number", getUiLocale() || meta.locale, {
     style: "currency",
     currency: meta.code,
     minimumFractionDigits: digits,
@@ -344,7 +360,7 @@ function moneyParts(value, digits = 2) {
 
 function formatCompactCurrency(value) {
   const meta = CURRENCY_META[state.prefs.currency] || CURRENCY_META.usd;
-  return new Intl.NumberFormat(getUiLocale() || meta.locale, {
+  return intlFormatter("number", getUiLocale() || meta.locale, {
     style: "currency",
     currency: meta.code,
     notation: "compact",
@@ -372,7 +388,7 @@ function formatSignedPercent(value) {
 }
 
 function formatNumber(value, digits = 2) {
-  return new Intl.NumberFormat(getUiLocale(), {
+  return intlFormatter("number", getUiLocale(), {
     minimumFractionDigits: 0,
     maximumFractionDigits: digits
   }).format(value || 0);
@@ -400,15 +416,29 @@ function getPriceDigits(price) {
   return 8;
 }
 
-function formatClock(date) {
-  return new Intl.DateTimeFormat(getUiLocale(), {
+// Fecha valida o null (una fecha invalida hace fallar Intl.DateTimeFormat).
+function validDate(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatClock(value) {
+  const date = validDate(value);
+  if (!date) {
+    return "--";
+  }
+  return intlFormatter("date", getUiLocale(), {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
 }
 
-function formatDateTime(date) {
-  return new Intl.DateTimeFormat(getUiLocale(), {
+function formatDateTime(value) {
+  const date = validDate(value);
+  if (!date) {
+    return "--";
+  }
+  return intlFormatter("date", getUiLocale(), {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -510,6 +540,75 @@ function syncEditorOpenClass() {
   document.body.classList.toggle("editor-open", open);
 }
 
+// Destello de un precio que cambia: verde si sube, rojo si baja. Alterna entre
+// dos animaciones iguales (-a/-b) para reiniciarla en cada tick sin leer
+// offsetWidth, que obligaba al navegador a recalcular la pagina en cada fila.
+function flashNode(node, direction) {
+  if (!node || !direction) {
+    return;
+  }
+  const kind = direction > 0 ? "sube" : "baja";
+  node.dataset.destello = node.dataset.destello === `${kind}-a` ? `${kind}-b` : `${kind}-a`;
+}
+
+// Cifra grande (saldo de Inicio, precio de la ficha) en una sola linea: si no
+// cabe (una cartera enorme o un token basura valorado en billones) la letra
+// baja lo justo. Antes ensanchaba la pagina y la barra inferior se quedaba
+// fuera de la pantalla. Solo se mide cuando cambia el largo de la cifra, el
+// ancho, el tamano del texto o la letra cargada; si no, se reaplica lo medido.
+const encajesCifra = new Map();
+let fuentesCargadas = 0;
+// box: la caja cuyo ancho es el sitio disponible (la propia cifra si es un
+// bloque; su contenedor si la cifra comparte fila con otras piezas).
+function fitAmount(node, slot, box = node) {
+  if (!node || !box) {
+    return;
+  }
+  const key = `${node.textContent.length}|${document.documentElement.clientWidth}|${state.prefs.textSize}|${fuentesCargadas}`;
+  const cached = encajesCifra.get(slot);
+  if (cached && cached.key === key) {
+    node.style.fontSize = cached.size;
+    return;
+  }
+  node.style.removeProperty("font-size");
+  const available = box.clientWidth;
+  if (!available) {
+    return;
+  }
+  node.classList.add("midiendo");
+  const needed = node.scrollWidth;
+  node.classList.remove("midiendo");
+  let size = "";
+  if (needed > available + 1) {
+    const base = parseFloat(getComputedStyle(node).fontSize);
+    size = `${Math.max(14, Math.floor(base * (available / needed) * 0.98))}px`;
+    node.style.fontSize = size;
+  }
+  encajesCifra.set(slot, { key, size });
+}
+
+function refitAmounts() {
+  fitAmount(document.getElementById("mainValue"), "saldo");
+  fitAmount(document.querySelector("#assetDetailScreen [data-detail-role='price']"), "ficha");
+  const analytics = document.querySelector("#analyticsSummaryGrid .as-main");
+  fitAmount(analytics, "analitica", analytics?.parentElement);
+}
+
+// Al llegar la letra de la app (Inter) cambian los anchos: se vuelve a medir.
+if (typeof document !== "undefined" && document.fonts?.addEventListener) {
+  document.fonts.addEventListener("loadingdone", () => {
+    fuentesCargadas += 1;
+    refitAmounts();
+  });
+}
+
+// Escribe un texto solo si cambia: los ticks repiten muchas cifras iguales.
+function setText(node, text) {
+  if (node && node.textContent !== text) {
+    node.textContent = text;
+  }
+}
+
 function getCssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
@@ -521,6 +620,27 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+// Almacenamiento del dispositivo: puede estar lleno (QuotaExceededError) o
+// bloqueado (datos del sitio desactivados, algunos modos privados). Nunca debe
+// tumbar la app: si no se puede leer se arranca de cero y si no se puede
+// escribir se sigue con los datos en memoria.
+function readStored(key) {
+  try {
+    return safeParse(localStorage.getItem(key));
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function safeParse(value) {

@@ -197,6 +197,22 @@ function openTradeSheet(mode, preselectRowId = null) {
   dateInput?.addEventListener("change", applyPriceForDate);
   syncPrice();
 
+  bindTradeSheetOnce(sheet);
+  sheet.querySelector("form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    confirmTrade(sheet);
+  });
+}
+
+// La hoja (#tradeSheet) se reutiliza: sus escuchas se ponen una sola vez y
+// leen los campos de la apertura actual. Antes se anadian en cada apertura y
+// se acumulaban (cada tecla recalculaba la vista previa tantas veces como se
+// hubiera abierto la hoja).
+function bindTradeSheetOnce(sheet) {
+  if (sheet.dataset.escuchas) {
+    return;
+  }
+  sheet.dataset.escuchas = "1";
   sheet.addEventListener("click", (event) => {
     if (event.target.closest("[data-trade-close]")) {
       closeTradeSheet();
@@ -205,7 +221,9 @@ function openTradeSheet(mode, preselectRowId = null) {
     // Venta rápida: rellena el importe con un % del valor actual de la posición.
     const pctBtn = event.target.closest("[data-trade-pct]");
     if (pctBtn) {
-      const row = getRowById(select.value);
+      const select = sheet.querySelector("[data-trade-field='rowId']");
+      const priceInput = sheet.querySelector("[data-trade-field='price']");
+      const row = select ? getRowById(select.value) : null;
       const price = parseDecimal(priceInput?.value) || (row && row.currentPrice > 0 ? row.currentPrice : 0);
       const held = row ? parseDecimal(row.tokens) : 0;
       const pct = Number(pctBtn.dataset.tradePct) / 100;
@@ -217,10 +235,6 @@ function openTradeSheet(mode, preselectRowId = null) {
     }
   });
   sheet.addEventListener("input", () => updateTradePreview(sheet));
-  sheet.querySelector("form").addEventListener("submit", (event) => {
-    event.preventDefault();
-    confirmTrade(sheet);
-  });
 }
 
 function updateTradePreview(sheet) {
@@ -297,7 +311,7 @@ function getMonthlyTradeStats(monthsBack = 6) {
   const months = [];
   for (let i = monthsBack - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString(UI_LOCALES[state.prefs.language] || "es-ES", { month: "short", year: "2-digit" }), buys: 0, sells: 0, buyCount: 0, sellCount: 0 });
+    months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: intlFormatter("date", getUiLocale(), { month: "short", year: "2-digit" }).format(d), buys: 0, sells: 0, buyCount: 0, sellCount: 0 });
   }
   const byKey = new Map(months.map((m) => [m.key, m]));
   state.trades.forEach((tr) => {
@@ -462,7 +476,7 @@ function tradeLogItemHtml(trade) {
 
 function formatDateShort(date) {
   try {
-    return date.toLocaleDateString(UI_LOCALES[state.prefs.language] || "es-ES", { day: "2-digit", month: "short" });
+    return intlFormatter("date", getUiLocale(), { day: "2-digit", month: "short" }).format(date);
   } catch {
     return "--";
   }

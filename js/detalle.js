@@ -178,6 +178,7 @@ function renderAssetDetail() {
       </footer>
     </div>
   `;
+  fitAmount(screen.querySelector("[data-detail-role='price']"), "ficha");
   renderDetailChart(row);
 }
 
@@ -190,7 +191,7 @@ function detailPriceInner(row, metrics, name = row.resolvedName || assetDisplayN
   const price = metrics.currentPrice > 0
     ? (() => {
         const parts = moneyParts(metrics.currentPrice, getPriceDigits(metrics.currentPrice));
-        return `${escapeHtml(parts.main)}<span class="saldo-resto">${escapeHtml(parts.rest)}</span>`;
+        return `<span class="saldo-entero">${escapeHtml(parts.main)}</span><span class="saldo-resto">${escapeHtml(parts.rest)}</span>`;
       })()
     : "--";
   const source = metrics.currentPrice > 0 ? priceSourceLabel(row) : t("row.noPrice");
@@ -230,6 +231,7 @@ function refreshAssetDetailLive() {
       node.innerHTML = html();
     }
   });
+  fitAmount(screen.querySelector("[data-detail-role='price']"), "ficha");
   if (Date.now() - detailChartAt > DETAIL_CHART_LIVE_MS) {
     renderDetailChart(row);
   }

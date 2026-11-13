@@ -75,18 +75,56 @@ function renderActivityIfChanged() {
   renderActivity();
 }
 
+// ── Lo que se pinta y cuando ──
+// Con precios en vivo esto corre cada segundo. Solo se repinta lo que se ve:
+// la pestana abierta y la tabla de escritorio (desde 1100 px y en Inicio). Lo
+// oculto queda apuntado en seccionesPendientes y se pinta al aparecer, al
+// cambiar de pestana o de ancho (pintarPendientes).
+const MQ_ESCRITORIO = typeof window.matchMedia === "function" ? window.matchMedia("(min-width: 1100px)") : null;
+const seccionesPendientes = new Set();
+
+function pestanaVisible(tab) {
+  return state.prefs.activeTab === tab;
+}
+
+function tablaVisible() {
+  return Boolean(MQ_ESCRITORIO?.matches) && pestanaVisible("home");
+}
+
+function pintarPendientes() {
+  const tabla = seccionesPendientes.has("tabla") && tablaVisible();
+  if (tabla) {
+    renderTableBody();
+  }
+  if (tabla || seccionesPendientes.has(state.prefs.activeTab)) {
+    renderDashboardOnly();
+  }
+}
+
 function renderDashboardOnly() {
   const snapshot = buildSnapshot();
-  // getPortfolioInsights recorre el histórico de precios de cada fila; se
-  // calcula una sola vez por repintado y se comparte entre secciones.
-  const insights = getPortfolioInsights(snapshot);
-  renderSummary(snapshot, insights);
-  renderMarketSection();
-  renderAnalyticsSummary(snapshot);
-  renderInsights(insights);
-  renderTotalsRow(snapshot);
-  renderStickyBar(snapshot);
-  updateCharts(snapshot);
+  if (pestanaVisible("home")) {
+    seccionesPendientes.delete("home");
+    renderSummary(snapshot);
+    renderMarketSection();
+    renderStickyBar(snapshot);
+  } else {
+    seccionesPendientes.add("home");
+  }
+  if (pestanaVisible("analytics")) {
+    seccionesPendientes.delete("analytics");
+    // getPortfolioInsights recorre el historico de precios de cada fila.
+    renderAnalyticsSummary(snapshot);
+    renderInsights(getPortfolioInsights(snapshot));
+    updateCharts(snapshot);
+  } else {
+    seccionesPendientes.add("analytics");
+  }
+  if (tablaVisible()) {
+    renderTotalsRow(snapshot);
+  } else {
+    seccionesPendientes.add("tabla");
+  }
   renderStatusCards();
 }
 
@@ -159,6 +197,14 @@ function renderTableBody() {
     return row.crypto.trim() || metrics.investment > 0 || metrics.currentValue > 0;
   });
 
+  // La lista de Inicio siempre; la tabla de escritorio solo si se ve.
+  renderPortfolioMobile(meaningful.length ? rows : []);
+  if (!tablaVisible()) {
+    seccionesPendientes.add("tabla");
+    return;
+  }
+  seccionesPendientes.delete("tabla");
+
   if (!meaningful.length) {
     const emptyHtml = `
       <div class="empty-state empty-positions">
@@ -167,13 +213,11 @@ function renderTableBody() {
         <button class="primary-btn" type="button" data-action="empty-add">${escapeHtml(t("buttons.newPosition"))}</button>
       </div>`;
     dom.tableBody.innerHTML = `<tr><td colspan="${TABLE_COLUMNS.length}">${emptyHtml}</td></tr>`;
-    renderPortfolioMobile([]);
     applyPositionFilter();
     return;
   }
 
   dom.tableBody.innerHTML = rows.map((row) => renderRow(row, totalValue)).join("");
-  renderPortfolioMobile(rows);
   applyPositionFilter();
 }
 

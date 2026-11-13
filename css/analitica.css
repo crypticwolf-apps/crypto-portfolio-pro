@@ -20,6 +20,9 @@
   gap: 8px 10px;
 }
 :root[data-ui] .as-main {
+  /* Red de seguridad si no cabe (fitAmount la ajusta a una linea). */
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 2.125rem;
   font-weight: 600;
   letter-spacing: -0.03em;
@@ -113,7 +116,7 @@
 :root[data-ui] .dona-leyenda i { width: 8px; height: 8px; border-radius: 50%; }
 :root[data-ui] .dona-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-t1); }
 :root[data-ui] .dona-leyenda strong { font-weight: 600; }
-:root[data-ui] .dona-leyenda small { grid-column: 2 / 4; font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .dona-leyenda small { grid-column: 2 / 4; min-width: 0; overflow-wrap: anywhere; font-size: 0.75rem; color: var(--c-t2); }
 
 /* ── Por categoria ── */
 :root[data-ui] .category-block { display: flex; flex-direction: column; gap: 16px; }

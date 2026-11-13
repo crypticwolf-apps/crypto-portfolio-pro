@@ -63,7 +63,10 @@ function bindHome() {
 
   window.addEventListener("resize", () => {
     window.clearTimeout(graficoResizeTimer);
-    graficoResizeTimer = window.setTimeout(() => renderHomeChart(), 160);
+    graficoResizeTimer = window.setTimeout(() => {
+      renderHomeChart();
+      refitAmounts();
+    }, 160);
   });
 }
 
@@ -129,7 +132,7 @@ function homeRangeChange(snapshot) {
   const windowMs = RANGOS_INICIO[range];
   const startedLate = new Date(first.at).getTime() - (Date.now() - windowMs) > windowMs * 0.1;
   const label = startedLate
-    ? t("inicio.desdeFecha", { fecha: new Intl.DateTimeFormat(getUiLocale(), { day: "numeric", month: "short" }).format(new Date(first.at)) })
+    ? t("inicio.desdeFecha", { fecha: intlFormatter("date", getUiLocale(), { day: "numeric", month: "short" }).format(new Date(first.at)) })
     : t(`inicio.etiqueta${range}`);
   const delta = total - base;
   return { delta, pct: (delta / base) * 100, label };
@@ -144,6 +147,7 @@ function renderMainValueCard(snapshot) {
   dom.mainValue.innerHTML = hidden
     ? '<span class="saldo-entero">••••••</span>'
     : `<span class="saldo-entero">${escapeHtml(parts.main)}</span><span class="saldo-resto">${escapeHtml(parts.rest)}</span>`;
+  fitAmount(dom.mainValue, "saldo");
 
   const change = homeRangeChange(snapshot);
   if (dom.saldoCambio && dom.saldoCambioValor) {
@@ -426,7 +430,7 @@ function assetRowHtml(row) {
 // Cantidad de tokens para la lista: las enormes en formato corto (10 M).
 function formatTokenAmount(tokens) {
   if (tokens >= 1e6) {
-    return new Intl.NumberFormat(getUiLocale(), { notation: "compact", maximumFractionDigits: 2 }).format(tokens);
+    return intlFormatter("number", getUiLocale(), { notation: "compact", maximumFractionDigits: 2 }).format(tokens);
   }
   return formatNumber(tokens, tokens >= 1 ? 4 : 8);
 }
@@ -501,21 +505,14 @@ function updateAssetRowLive(rowId, direction) {
   const metrics = computeRowMetrics(row);
   const value = node.querySelector("[data-role='rowValue']");
   if (value) {
-    value.textContent = maskedCurrency(metrics.currentValue);
-    if (direction) {
-      value.classList.remove("price-flash-up", "price-flash-down");
-      void value.offsetWidth;
-      value.classList.add(direction > 0 ? "price-flash-up" : "price-flash-down");
-    }
+    setText(value, maskedCurrency(metrics.currentValue));
+    flashNode(value, direction);
   }
   const metricNode = node.querySelector("[data-role='rowMetric']");
   if (metricNode) {
     const metric = listMetricOf(row, metrics);
-    metricNode.textContent = metric.text;
-    metricNode.classList.remove("positive", "negative", "neutral");
-    if (metric.tone) {
-      metricNode.classList.add(metric.tone);
-    }
+    setText(metricNode, metric.text);
+    ["positive", "negative", "neutral"].forEach((tone) => metricNode.classList.toggle(tone, metric.tone === tone));
   }
   // Fila dentro de "Saldos pequenos": su total tambien cambia.
   const group = node.closest("#grupoPequenosLista");
@@ -526,7 +523,7 @@ function updateAssetRowLive(rowId, direction) {
         const groupRow = getRowById(item.dataset.cardRow);
         return sum + (groupRow ? computeRowMetrics(groupRow).currentValue : 0);
       }, 0);
-    groupValue.textContent = maskedCurrency(total);
+    setText(groupValue, maskedCurrency(total));
   }
   return true;
 }

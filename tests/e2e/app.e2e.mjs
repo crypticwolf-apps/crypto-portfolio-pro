@@ -229,6 +229,10 @@ async function paso(grupo, nombre, app, fn) {
 // elemento visible que se salga del borde. Lo segundo hace falta porque un
 // elemento fijo (el dock, una hoja) que no cabe no genera scroll: se corta.
 const desborde = (page) => page.evaluate(() => {
+  // En un movil, lo que no cabe no siempre da scroll lateral: el navegador
+  // ensancha la pagina entera y la aleja (la barra inferior queda fuera).
+  const pantalla = window.visualViewport ? Math.round(window.visualViewport.width * window.visualViewport.scale) : window.innerWidth;
+  if (window.innerWidth > pantalla + 1) return `la pagina se ensancha a ${window.innerWidth}px en una pantalla de ${pantalla}px`;
   const ancho = document.documentElement.clientWidth;
   const scroll = document.documentElement.scrollWidth - ancho;
   if (scroll > 0) return `scroll lateral de ${scroll}px`;
@@ -428,9 +432,12 @@ async function recorridoCompleto(navegador, url, ancho) {
     for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowDown");
   });
   await paso(g, "apariencia: sin decimales y precio como dato de la lista", app, async () => {
+    // Inicio esta oculto mientras se cambia el ajuste: se pinta al volver.
     await page.click('[data-ajuste="decimals"]'); await page.waitForTimeout(200);
+    await page.click('[data-tab-target="home"]'); await page.waitForTimeout(300);
     const sin = await page.evaluate(() => document.getElementById("mainValue").textContent);
     if (/,\d\d/.test(sin)) throw new Error("con decimales: " + sin);
+    await page.click('[data-tab-target="more"]'); await page.waitForTimeout(300);
     await page.click('[data-ajuste="decimals"]');
     await page.click('[data-metrica-set="precio"]'); await page.waitForTimeout(200);
     const dato = await page.evaluate(() => document.querySelector('#portfolioMobileList [data-role="rowMetric"]').textContent);
@@ -471,6 +478,7 @@ async function recorridoCompleto(navegador, url, ancho) {
     await page.click('[data-tab-target="more"]'); await page.waitForTimeout(300);
     await page.evaluate(() => { document.querySelector(".more-settings-panel").open = true; });
     await page.selectOption("#currencySelect", "eur"); await page.waitForTimeout(2500);
+    await page.click('[data-tab-target="home"]'); await page.waitForTimeout(300);
     const total = await page.evaluate(() => document.getElementById("mainValue").textContent);
     if (!/€/.test(total)) throw new Error(`total sin euros: ${total}`);
   });
@@ -546,6 +554,18 @@ async function casosSueltos(navegador, url) {
       throw new Error(JSON.stringify({ ficha, editor, hoja, libre }));
     }
   });
+  await paso(g, "la hoja de compra no acumula escuchas al reabrirla", virgen, async (page) => {
+    const n = await page.evaluate(async () => {
+      for (let k = 0; k < 6; k++) { openTradeSheet("buy"); closeTradeSheet(); await new Promise((r) => setTimeout(r, 230)); }
+      openTradeSheet("buy"); await new Promise((r) => setTimeout(r, 50));
+      let veces = 0; const original = window.updateTradePreview;
+      window.updateTradePreview = function (...args) { veces += 1; return original.apply(this, args); };
+      document.querySelector("#tradeSheet [data-trade-field='amount']").dispatchEvent(new Event("input", { bubbles: true }));
+      window.updateTradePreview = original; closeTradeSheet(); await new Promise((r) => setTimeout(r, 230));
+      return veces;
+    });
+    if (n !== 1) throw new Error(`una tecla recalcula la vista previa ${n} veces`);
+  });
   await paso(g, "un aviso no se queda con el toque de lo que tiene debajo", virgen, async (page) => {
     const r = await page.evaluate(() => {
       showToast("Prueba", "Aviso encima de la lista", "positive");
@@ -554,6 +574,24 @@ async function casosSueltos(navegador, url) {
       return debajo?.closest(".toast") ? "el aviso" : "ok";
     });
     if (r !== "ok") throw new Error("el toque lo recibe " + r);
+  });
+  await paso(g, "saldo enorme (token basura valorado en billones): cabe y la barra se pulsa", virgen, async (page) => {
+    await page.evaluate(() => {
+      state.rows.push(createRow({ id: "basura", crypto: "basura", symbol: "SCAM", tokens: "1000000000", investment: "0", currentPrice: 98765432.1, priceStatus: "success" }));
+      renderAll();
+      openAssetDetail("basura");
+    });
+    await page.waitForTimeout(500);
+    const ficha = await desborde(page);
+    await page.evaluate(() => closeAssetDetail()); await page.waitForTimeout(350);
+    const inicio = await desborde(page);
+    const r = await page.evaluate(() => { const v = document.getElementById("mainValue"); return { lineas: Math.round(v.getBoundingClientRect().height / parseFloat(getComputedStyle(v).fontSize)), texto: v.textContent }; });
+    // Analitica: la cifra de Rendimiento y la leyenda del anillo.
+    await page.click('[data-tab-target="analytics"]', { timeout: 2000 }); await page.waitForTimeout(400);
+    const analitica = await desborde(page);
+    await page.click('[data-tab-target="home"]', { timeout: 2000 });
+    await page.evaluate(() => { state.rows = state.rows.filter((row) => row.id !== "basura"); renderAll(); });
+    if (ficha || inicio || analitica || r.lineas > 1) throw new Error(JSON.stringify({ ficha, inicio, analitica, ...r }));
   });
   await paso(g, "ocultar saldos al abrir: la app arranca en privado", virgen, async (page) => {
     await page.evaluate(() => { state.prefs.hideOnOpen = true; state.prefs.hideBalance = false; savePreferences(); });
@@ -572,6 +610,34 @@ async function casosSueltos(navegador, url) {
     if (!/[1-9]/.test(valor)) throw new Error(`sin precio: "${valor}"`);
   });
   await caido.ctx.close();
+
+  // Lo que no se ve no se repinta con cada precio: se pinta al aparecer.
+  const vivo = await abrirApp(navegador, url);
+  await paso(g, "precios en vivo con Analitica oculta: al abrirla esta al dia", vivo, async (page) => {
+    await page.waitForTimeout(1500);
+    const pendiente = await page.evaluate(() => seccionesPendientes.has("analytics"));
+    if (!pendiente) throw new Error("Analitica se repinta estando oculta");
+    await page.evaluate(() => stopLivePrices()); await page.waitForTimeout(1300);
+    await page.click('[data-tab-target="analytics"]'); await page.waitForTimeout(300);
+    const r = await page.evaluate(() => ({ esperado: maskedCurrency(buildSnapshot().totals.currentValue), pintado: document.getElementById("analyticsSummaryGrid").textContent }));
+    if (!r.pintado.includes(r.esperado)) throw new Error(`Analitica no muestra ${r.esperado}`);
+  });
+  await paso(g, "tabla de escritorio: se pinta al ensanchar y sigue los precios", vivo, async (page) => {
+    await page.click('[data-tab-target="home"]'); await page.evaluate(() => startLivePrices());
+    await page.waitForTimeout(1500);
+    if (await page.evaluate(() => !seccionesPendientes.has("tabla"))) throw new Error("la tabla se repinta estando oculta");
+    await page.setViewportSize({ width: 1280, height: 800 }); await page.waitForTimeout(400);
+    const leer = () => page.evaluate(() => {
+      const fila = document.querySelector('#tableBody tr[data-row-id="r-btc"]');
+      return { filas: document.querySelectorAll("#tableBody tr[data-row-id]").length, precio: fila?.querySelector("[data-role='rowPrice']")?.textContent, esperado: formatCurrency(getRowById("r-btc").currentPrice, getPriceDigits(getRowById("r-btc").currentPrice)) };
+    });
+    const a = await leer();
+    if (a.filas < 2 || a.precio !== a.esperado) throw new Error("al ensanchar: " + JSON.stringify(a));
+    await page.waitForTimeout(1600);
+    const b = await leer();
+    if (b.precio === a.precio || b.precio !== b.esperado) throw new Error("con precios en vivo: " + JSON.stringify({ a, b }));
+  });
+  await vivo.ctx.close();
 }
 
 // ── Lector de billeteras ──
@@ -795,6 +861,19 @@ async function casosBilletera(navegador, url, ancho) {
 const desfases = comprobarVersionesCdn();
 if (desfases.length) anotar("versiones", "librerias del CDN alineadas con package.json", desfases.join(" | "));
 else anotar("versiones", "librerias del CDN alineadas con package.json", null);
+
+// Sin conexion la app sale de la cache del service worker: todo lo que carga
+// index.html (estilos, scripts, iconos, manifest) tiene que estar en APP_SHELL.
+{
+  const html = fs.readFileSync(path.join(RAIZ, "index.html"), "utf8");
+  const sw = fs.readFileSync(path.join(RAIZ, "sw.js"), "utf8");
+  const shell = new Set(sw.match(/APP_SHELL\s*=\s*\[([\s\S]*?)\]/)[1].match(/"([^"]+)"/g).map((x) => x.slice(1, -1).replace(/^\.\//, "")));
+  const locales = [...html.matchAll(/(?:src|href)="\.\/([^"#?]+)"/g)].map((m) => m[1]);
+  const faltan = [...new Set(locales)].filter((u) => !shell.has(u));
+  const rotos = [...shell].filter((u) => u && !fs.existsSync(path.join(RAIZ, u)));
+  anotar("version", "el service worker guarda todo lo que carga la pagina", faltan.length || rotos.length
+    ? `faltan en APP_SHELL: ${faltan.join(", ") || "-"} · no existen: ${rotos.join(", ") || "-"}` : null);
+}
 
 const servidor = await arrancarServidor();
 const url = `http://127.0.0.1:${servidor.address().port}/index.html`;

@@ -17,7 +17,7 @@ async function ensureJsPdf() {
 }
 
 function formatGeneratedDate(date) {
-  return new Intl.DateTimeFormat(getUiLocale(), {
+  return intlFormatter("date", getUiLocale(), {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

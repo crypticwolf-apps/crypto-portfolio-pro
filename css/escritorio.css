@@ -82,7 +82,3 @@
   text-align: center;
 }
 :root[data-ui] .empty-state p { color: var(--c-t2); }
-
-/* Destello del precio en vivo en la tabla */
-:root[data-ui] .price-up { animation: filaSube 0.9s ease; }
-:root[data-ui] .price-down { animation: filaBaja 0.9s ease; }

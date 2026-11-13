@@ -56,7 +56,7 @@ function liveConversionRate() {
 }
 
 function readLivePairsCache() {
-  const parsed = safeParse(localStorage.getItem(LIVE_PAIRS_CACHE_KEY));
+  const parsed = readStored(LIVE_PAIRS_CACHE_KEY);
   if (!parsed || !Array.isArray(parsed.pairs)) {
     return null;
   }
@@ -496,9 +496,14 @@ function updateRowPriceCells(rowId, direction) {
   const metrics = computeRowMetrics(row);
   // Lista de Inicio: valor y dato de la derecha, con destello en el valor.
   const inList = updateAssetRowLive(rowId, direction);
-  const containers = [
-    dom.tableBody?.querySelector(`tr[data-row-id="${rowId}"]`)
-  ].filter(Boolean);
+  // Tabla de escritorio: solo si se ve; si no, se repinta entera al aparecer.
+  const visible = tablaVisible();
+  if (!visible) {
+    seccionesPendientes.add("tabla");
+  }
+  const containers = visible
+    ? [dom.tableBody?.querySelector(`tr[data-row-id="${rowId}"]`)].filter(Boolean)
+    : [];
   if (!containers.length && !inList) {
     scheduleDashboardRefresh();
     return;
@@ -517,15 +522,15 @@ function updateRowPriceCells(rowId, direction) {
       }
     };
     set("rowPrice", (node) => {
-      node.textContent = priceText;
-      flashPriceNode(node, direction);
+      setText(node, priceText);
+      flashNode(node, direction);
     });
     set("rowChange", (node) => {
       const suffix = node.querySelector("small") ? "<small> 24h</small>" : "";
       node.innerHTML = `${changeValue === null ? "--" : formatSignedPercent(changeValue)}${suffix}`;
       node.className = `numeric ${toneClass(changeValue || 0)}`;
     });
-    set("rowValue", (node) => { node.textContent = maskedCurrency(metrics.currentValue); });
+    set("rowValue", (node) => { setText(node, maskedCurrency(metrics.currentValue)); });
     set("rowPnlAbs", (node) => {
       node.textContent = maskedSignedCurrency(metrics.pnlUsd);
       node.className = `money ${toneClass(metrics.pnlUsd)}`;
@@ -543,18 +548,6 @@ function updateRowPriceCells(rowId, direction) {
   if (state.detailRowId === rowId) {
     refreshAssetDetailLive();
   }
-}
-
-// Destello corto en la celda de precio: verde si sube, rojo si baja. Se
-// reinicia la animacion en cada tick sin acumular clases ni listeners.
-function flashPriceNode(node, direction) {
-  if (!direction) {
-    return;
-  }
-  node.classList.remove("price-up", "price-down");
-  // Forzar reflow reinicia la animacion cuando los ticks se encadenan.
-  void node.offsetWidth;
-  node.classList.add(direction > 0 ? "price-up" : "price-down");
 }
 
 // Estado del feed en vivo en una linea, para el panel de diagnostico.
@@ -629,7 +622,7 @@ function renderLiveIndicator() {
    ═══════════════════════════════════════════════════════ */
 
 function readDexContractCache() {
-  const parsed = safeParse(localStorage.getItem(DEX_CONTRACT_CACHE_KEY));
+  const parsed = readStored(DEX_CONTRACT_CACHE_KEY);
   return parsed && typeof parsed === "object" ? parsed : {};
 }
 

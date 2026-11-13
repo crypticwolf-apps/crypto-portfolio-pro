@@ -9,7 +9,7 @@
    ═══════════════════════════════════════════════════════ */
 
 function loadNewsCache() {
-  const c = safeParse(localStorage.getItem(NEWS_CACHE_KEY));
+  const c = readStored(NEWS_CACHE_KEY);
   if (c && Array.isArray(c.items)) {
     state.news = c.items;
     state.newsAt = Number(c.at) || 0;

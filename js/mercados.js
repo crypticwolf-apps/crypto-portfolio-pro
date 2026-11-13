@@ -118,7 +118,7 @@ function persistMarketsList() {
 }
 
 function loadMarketsListCache() {
-  const cached = safeParse(localStorage.getItem(MARKETS_LIST_KEY));
+  const cached = readStored(MARKETS_LIST_KEY);
   if (cached && Array.isArray(cached.coins) && cached.currency === state.prefs.currency) {
     state.marketsList = cached.coins;
     state.marketsListAt = Number(cached.at) || 0;

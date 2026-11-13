@@ -341,6 +341,8 @@ function renderAnalyticsSummary(snapshot) {
         ${secondary.map((s) => `<div class="as-sec ${s.muted ? "muted" : ""}"${s.hint ? ` title="${escapeHtml(s.hint)}"` : ""}><span>${escapeHtml(s.label)}</span><b class="${s.tone || ""}">${escapeHtml(String(s.value))}</b></div>`).join("")}
       </div>
     </div>`;
+  const main = box.querySelector(".as-main");
+  fitAmount(main, "analitica", main?.parentElement);
 
   renderAnalyticsExtras(snapshot);
 }

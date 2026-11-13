@@ -46,7 +46,11 @@
   background: var(--c-s2);
   color: var(--c-t2);
   white-space: nowrap;
+  max-width: 100%;
 }
+/* Una variacion enorme salta de linea dentro de la pildora en vez de
+   ensanchar la pagina. */
+:root[data-ui] .chip-cambio > span { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 :root[data-ui] .chip-cambio svg { width: 12px; height: 12px; flex: 0 0 auto; }
 :root[data-ui] .chip-cambio.positive { background: var(--c-pos-suave); color: var(--c-pos); }
 :root[data-ui] .chip-cambio.negative { background: var(--c-neg-suave); color: var(--c-neg); }
@@ -276,6 +280,9 @@
 :root[data-ui] .sticky-bar.is-visible { transform: translate(-50%, 0); }
 :root[data-ui] .sticky-bar .sticky-bar-title {
   display: block;
+  /* El nombre cede el sitio; importe y porcentaje no encogen (un encogido
+     de una fraccion de pixel ya los cortaria con "..."), pero con cifras
+     enormes tienen un tope y se cortan ellos en vez de salirse. */
   flex: 1 1 auto;
   min-width: 0;
   max-width: none;
@@ -285,8 +292,8 @@
   text-transform: none;
   color: var(--c-t1);
 }
-:root[data-ui] .sticky-bar .sticky-bar-value { flex: 0 0 auto; font-size: 0.9375rem; font-weight: 600; color: var(--c-t1); }
-:root[data-ui] .sticky-bar .sticky-bar-pnl { flex: 0 0 auto; font-weight: 600; white-space: nowrap; }
+:root[data-ui] .sticky-bar .sticky-bar-value { flex: 0 0 auto; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9375rem; font-weight: 600; color: var(--c-t1); }
+:root[data-ui] .sticky-bar .sticky-bar-pnl { flex: 0 0 auto; max-width: 34%; overflow: hidden; text-overflow: ellipsis; font-weight: 600; white-space: nowrap; }
 :root[data-ui] .sticky-bar .sticky-bar-sep,
 :root[data-ui] .sticky-bar .sticky-bar-right { display: none; }
 

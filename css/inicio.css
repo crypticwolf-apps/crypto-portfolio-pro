@@ -81,6 +81,12 @@
   line-height: 1.05;
   color: var(--c-t1);
 }
+:root[data-ui] .saldo-valor > .saldo-entero {
+  /* Red de seguridad: si la cifra aun no cabe (antes de medirla, fitAmount),
+     salta de linea en vez de ensanchar la pagina. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 :root[data-ui] .saldo-valor .saldo-resto {
   font-size: 0.565em;
   font-weight: 500;
@@ -336,11 +342,6 @@
 }
 :root[data-ui] .fila-activo-cambio.positive { color: var(--c-pos); }
 :root[data-ui] .fila-activo-cambio.negative { color: var(--c-neg); }
-/* Destello del precio en vivo sobre el valor de la fila. */
-:root[data-ui] .fila-activo-valor.price-flash-up { animation: filaSube 0.9s ease; }
-:root[data-ui] .fila-activo-valor.price-flash-down { animation: filaBaja 0.9s ease; }
-@keyframes filaSube { 0% { color: var(--c-pos); } 100% { color: inherit; } }
-@keyframes filaBaja { 0% { color: var(--c-neg); } 100% { color: inherit; } }
 
 :root[data-ui] .lista-vacia {
   display: flex;

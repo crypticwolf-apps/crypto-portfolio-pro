@@ -22,16 +22,37 @@ function migrateStoredPayload(payload) {
 }
 
 function loadState() {
-  const payload = migrateStoredPayload(safeParse(localStorage.getItem(STORAGE_KEY)));
-  const prefs = safeParse(localStorage.getItem(PREFS_KEY));
-  const history = safeParse(localStorage.getItem(HISTORY_KEY));
+  const payload = migrateStoredPayload(readStored(STORAGE_KEY));
+  const prefs = readStored(PREFS_KEY);
+  const history = readStored(HISTORY_KEY);
 
-  state.rows = Array.isArray(payload?.rows) && payload.rows.length
-    ? payload.rows.map((row) => createRow(row))
-    : DEFAULT_ROWS.map((row) => createRow(row));
+  // Datos guardados que no tienen la forma esperada (editados a mano, copia
+  // a medias, version futura) se descartan uno a uno en vez de dejar la app
+  // en blanco. La cartera de demostracion es solo para el primer arranque.
+  const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  const storedRows = Array.isArray(payload?.rows) ? payload.rows.filter(isRecord) : null;
+  if (!storedRows) {
+    state.rows = DEFAULT_ROWS.map((row) => createRow(row));
+  } else {
+    const seenIds = new Set();
+    state.rows = storedRows.map((raw) => {
+      // Ids repetidos o vacios: cada fila necesita el suyo (getRowById).
+      const row = createRow(seenIds.has(String(raw.id)) ? { ...raw, id: null } : raw);
+      seenIds.add(row.id);
+      return row;
+    });
+    if (!state.rows.length) {
+      state.rows.push(createRow());
+    }
+  }
 
-  state.activity = Array.isArray(payload?.activity) ? payload.activity.slice(0, MAX_ACTIVITY_ITEMS) : [];
-  state.trades = Array.isArray(payload?.trades) ? payload.trades.slice(0, MAX_TRADES) : [];
+  state.activity = Array.isArray(payload?.activity) ? payload.activity.filter(isRecord).slice(0, MAX_ACTIVITY_ITEMS) : [];
+  state.trades = Array.isArray(payload?.trades)
+    ? payload.trades
+        .filter((trade) => isRecord(trade) && (trade.type === "buy" || trade.type === "sell"))
+        .slice(0, MAX_TRADES)
+        .map((trade, index) => ({ ...trade, id: String(trade.id || `trade-${index}-${Date.now()}`), at: Number(trade.at) || 0 }))
+    : [];
   state.alerts = Array.isArray(payload?.alerts) ? payload.alerts.slice(0, MAX_ALERTS).map(normalizeAlert).filter(Boolean) : [];
   state.wallets = Array.isArray(payload?.wallets) ? payload.wallets.slice(0, MAX_WALLETS).map(normalizeWallet).filter(Boolean) : [];
   // Una fila que apunta a una billetera que ya no existe pasa a ser manual.
@@ -54,6 +75,12 @@ function loadState() {
   normalizeAppearancePrefs(state.prefs, Boolean(prefs && typeof prefs === "object" && prefs.theme));
   if (!TRANSLATIONS[state.prefs.language]) {
     state.prefs.language = DEFAULT_PREFS.language;
+  }
+  if (!CURRENCY_META[state.prefs.currency]) {
+    state.prefs.currency = DEFAULT_PREFS.currency;
+  }
+  if (!Array.isArray(state.prefs.hiddenColumns)) {
+    state.prefs.hiddenColumns = [];
   }
   if (!AUTO_REFRESH_OPTIONS.includes(state.prefs.autoRefreshSec)) {
     // Migración: los intervalos antiguos de 15s/1m pasan a 5 minutos; el
@@ -121,7 +148,7 @@ function loadState() {
 }
 
 function loadMarketCache() {
-  const cached = safeParse(localStorage.getItem(MARKET_CACHE_KEY));
+  const cached = readStored(MARKET_CACHE_KEY);
   if (!cached || typeof cached !== "object") {
     return;
   }
@@ -232,11 +259,20 @@ async function handleBaseCurrencyChange(nextCurrency) {
   }
 }
 
+// Fecha guardada en ISO, o null si falta o no es una fecha.
+function isoDateOrNull(value) {
+  if (!value) {
+    return null;
+  }
+  const date = validDate(value);
+  return date ? date.toISOString() : null;
+}
+
 function createRow(partial = {}) {
   state.rowCounter += 1;
 
   const row = {
-    id: partial.id || `row-${Date.now()}-${state.rowCounter}`,
+    id: partial.id ? String(partial.id) : `row-${Date.now()}-${state.rowCounter}`,
     crypto: String(partial.crypto || ""),
     coinId: String(partial.coinId || ""),
     resolvedName: String(partial.resolvedName || ""),
@@ -252,14 +288,14 @@ function createRow(partial = {}) {
     priceChange24h: typeof partial.priceChange24h === "number" ? partial.priceChange24h : null,
     priceStatus: partial.priceStatus || "idle",
     priceMessage: partial.priceMessage || "",
-    lastPriceAt: partial.lastPriceAt || null,
+    lastPriceAt: isoDateOrNull(partial.lastPriceAt),
     priceHistory: compactRowPriceHistory(Array.isArray(partial.priceHistory) ? partial.priceHistory : []),
     favorite: Boolean(partial.favorite),
     pinned: Boolean(partial.pinned),
     derivedField: TRIAD_FIELDS.includes(partial.derivedField) ? partial.derivedField : "",
     marketCap: Number.isFinite(partial.marketCap) ? partial.marketCap : null,
     marketCapRank: Number.isFinite(partial.marketCapRank) ? partial.marketCapRank : null,
-    marketCapUpdatedAt: partial.marketCapUpdatedAt || null,
+    marketCapUpdatedAt: isoDateOrNull(partial.marketCapUpdatedAt),
     // Extremos y volumen del dia + de que fuente salio el ultimo precio.
     high24h: Number.isFinite(partial.high24h) ? partial.high24h : null,
     low24h: Number.isFinite(partial.low24h) ? partial.low24h : null,
@@ -268,7 +304,7 @@ function createRow(partial = {}) {
     // Token DEX: red + contrato, para no confundir simbolos repetidos.
     dexNetwork: partial.dexNetwork || null,
     dexAddress: partial.dexAddress || null,
-    dexCheckedAt: partial.dexCheckedAt || null,
+    dexCheckedAt: isoDateOrNull(partial.dexCheckedAt),
     // Posicion leida de una billetera: la cantidad la marca la blockchain.
     // walletKey identifica el activo dentro de la billetera (id de CoinGecko
     // o red + contrato) y walletParts guarda el desglose por red.
@@ -641,22 +677,32 @@ function normalizeWallet(raw) {
   };
 }
 
+// Cada fecha se interpreta una sola vez (antes se hacia en cada comparacion
+// del orden: era lo mas lento del arranque con muchos activos).
+function timedPoints(points, accept) {
+  const out = [];
+  (Array.isArray(points) ? points : []).forEach((point) => {
+    if (!point || !point.at || !accept(point)) {
+      return;
+    }
+    const time = new Date(point.at).getTime();
+    if (Number.isFinite(time)) {
+      out.push({ time, point });
+    }
+  });
+  return out.sort((a, b) => a.time - b.time);
+}
+
 function compactRowPriceHistory(points) {
   const now = Date.now();
-  const normalized = points
-    .filter((point) => point && Number.isFinite(point.price) && point.at && Number.isFinite(new Date(point.at).getTime()))
-    .map((point) => ({
-      at: new Date(point.at).toISOString(),
-      price: Number(point.price)
-    }))
-    .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  const normalized = timedPoints(points, (point) => Number.isFinite(point.price));
 
   const keep = [];
   const seenBuckets = new Set();
 
   for (let index = normalized.length - 1; index >= 0; index -= 1) {
-    const point = normalized[index];
-    const pointAt = new Date(point.at).getTime();
+    const { time: pointAt, point: raw } = normalized[index];
+    const point = { at: new Date(pointAt).toISOString(), price: Number(raw.price) };
     const age = now - pointAt;
     let bucketSize = 5 * 60 * 1000;
 
@@ -744,21 +790,18 @@ function appendRowPriceHistory(row) {
 
 function compactHistoryPoints(points) {
   const now = Date.now();
-  const normalized = points
-    .filter((point) => point && point.at && Number.isFinite(new Date(point.at).getTime()))
-    .map((point) => ({
-      at: new Date(point.at).toISOString(),
-      currency: point.currency || state.prefs.currency,
-      total: Number(point.total || 0)
-    }))
-    .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  const normalized = timedPoints(points, () => true);
 
   const keep = [];
   const seenBuckets = new Set();
 
   for (let index = normalized.length - 1; index >= 0; index -= 1) {
-    const point = normalized[index];
-    const pointAt = new Date(point.at).getTime();
+    const { time: pointAt, point: raw } = normalized[index];
+    const point = {
+      at: new Date(pointAt).toISOString(),
+      currency: raw.currency || state.prefs.currency,
+      total: Number(raw.total || 0)
+    };
     const age = now - pointAt;
     let bucketSize = 60 * 1000;
 
@@ -928,7 +971,7 @@ function normalizeHomeBlocks(list) {
 }
 
 function savePreferences() {
-  localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs));
+  writeStored(PREFS_KEY, JSON.stringify(state.prefs));
 }
 
 // History payload can reach ~480 KB; stringify+setItem is synchronous and was
