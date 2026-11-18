@@ -65,7 +65,6 @@ function translateStaticContent() {
   }
 
   renderPortfolioIdentity();
-  renderChartRangeControl();
 }
 
 // "hace X" / "en X" para etiquetas de frescura de datos.
@@ -607,10 +606,6 @@ function setText(node, text) {
   if (node && node.textContent !== text) {
     node.textContent = text;
   }
-}
-
-function getCssVar(name) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
 function escapeHtml(value) {

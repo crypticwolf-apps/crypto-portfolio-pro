@@ -414,7 +414,6 @@
 @keyframes ajustesEntra { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* ── Tabla de posiciones ── */
-:root[data-ui] .desktop-only-toolbar { display: none; }
 :root[data-ui] .table-panel { padding: var(--tarjeta-pad) 0 6px; }
 :root[data-ui] .table-panel .panel-heading { padding: 0 var(--tarjeta-pad); margin-bottom: 6px; }
 /* position: relative: lo que va posicionado dentro (textos solo para lectores

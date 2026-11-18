@@ -777,10 +777,7 @@ function removeWallet(walletId) {
   // Las alertas de esas posiciones se quedarian sin activo: fuera tambien.
   state.alerts = state.alerts.filter((alert) => !(alert.scope === "asset" && removed.has(alert.rowId)));
   state.wallets = state.wallets.filter((item) => item.id !== walletId);
-  removed.forEach((rowId) => {
-    clearTimersForRow(rowId);
-    state.expandedCards.delete(rowId);
-  });
+  removed.forEach((rowId) => clearTimersForRow(rowId));
   if (removed.has(state.detailRowId)) {
     closeAssetDetail();
   }

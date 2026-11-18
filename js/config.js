@@ -113,9 +113,8 @@ const MAX_ROW_HISTORY_POINTS = 240;
 const AUTO_REFRESH_OPTIONS = [300, 1800, 3600, 86400];
 // Datos de mercado globales (widgets de Inicio)
 const MARKET_CACHE_KEY = "crypto-dashboard-market-v1";
-const MARKETS_LIST_KEY = "crypto-dashboard-markets-list-v4";
-const MARKETS_LIST_TTL = 5 * 60 * 1000;
-const MARKETS_PAGE_SIZE = 25;
+// Cache del antiguo ranking de Mercados: se borra al arrancar.
+const OBSOLETE_MARKETS_LIST_KEY = "crypto-dashboard-markets-list-v4";
 const DOMINANCE_TTL = 60 * 1000;
 const FNG_TTL = 45 * 60 * 1000;
 const FNG_URL = "https://api.alternative.me/fng/?limit=1";
@@ -195,8 +194,6 @@ const LIVE_SYMBOL_ALIASES = { MIOTA: "IOTA", XBT: "BTC" };
 // se hereda el desplazamiento de la pestaña anterior. (Debe declararse antes
 // de la llamada a init(): las const de módulo no se izan.)
 const tabScrollPositions = {};
-// Umbrales de capitalización del deslizador de filtros (0 = cualquiera).
-const CAP_STEPS = [0, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12];
 // Aviso obligatorio del Plan (const antes de init() para evitar TDZ).
 const PLAN_DISCLAIMER = "Propuesta basada en tu estrategia y distribucion objetivo. No constituye asesoramiento financiero.";
 // Estado del editor-portal (declarado antes de init() para evitar TDZ).
@@ -282,17 +279,6 @@ function getAssetSector(row) {
   return "otros";
 }
 
-const CHART_RANGE_WINDOWS = {
-  "1m": 60 * 1000,
-  "1h": 60 * 60 * 1000,
-  "1d": 24 * 60 * 60 * 1000,
-  "1w": 7 * 24 * 60 * 60 * 1000,
-  "1mo": 30 * 24 * 60 * 60 * 1000,
-  "6mo": 180 * 24 * 60 * 60 * 1000,
-  "1y": 365 * 24 * 60 * 60 * 1000,
-  total: Infinity
-};
-
 const CURRENCY_META = {
   usd: { code: "USD", label: "USD", locale: "en-US" },
   eur: { code: "EUR", label: "EUR", locale: "es-ES" }
@@ -308,14 +294,10 @@ const DEFAULT_PREFS = {
   portfolioName: "",
   autoRefreshSec: 1800,
   livePrices: true,
-  showCharts: true,
-  chartRange: "total",
   sortBy: "marketCap",
   sortDir: "desc",
-  hiddenColumns: [],
   hideBalance: false,
   activeTab: "home",
-  filters: null,
   plan: null,
   // Apariencia (rediseno). theme admite "auto": sigue al sistema.
   accent: "esmeralda",
@@ -327,6 +309,9 @@ const DEFAULT_PREFS = {
   homeRange: "1m",
   homeBlocks: null
 };
+
+// Ajustes guardados por versiones anteriores que ya no se usan.
+const OBSOLETE_PREFS = ["filters", "showCharts", "chartRange", "hiddenColumns"];
 
 // Opciones de Apariencia. El primer valor de cada lista es el predeterminado.
 const APARIENCIA = {
@@ -449,7 +434,6 @@ const state = {
   blurTimers: new Map(),
   searchCache: new Map(),
   priceCache: new Map(),
-  charts: { pie: null, line: null },
   syncing: false,
   apiStatus: "idle",
   apiMeta: "Sincroniza manualmente para cargar precios.",
@@ -458,7 +442,6 @@ const state = {
   portfolioNameTimer: null,
   rowCounter: 0,
   dashboardFrame: null,
-  hiddenColumns: new Set(),
   pendingFetches: new Map(),
   fxRateCache: new Map(),
   // Feed de precios en vivo (WebSocket). "provider" es el que esta sirviendo.
@@ -483,8 +466,6 @@ const state = {
   },
   refreshRequestId: 0,
   currencySwitchId: 0,
-  filterQuery: "",
-  filters: { category: "all", performance: "all", weightMin: 0, capMin: 0, favorites: false, alerts: false },
   plan: { tp: {}, tpAll: { p1: 30, p2: 50, p3: 100 } },
   heroVisible: true,
   editorRowId: null,
@@ -501,21 +482,6 @@ const state = {
   newsLoading: false,
   newsError: null,
   newsOpen: {},
-  marketsList: [],
-  marketsListAt: 0,
-  marketsQuery: "",
-  marketsPage: 1,
-  marketsLoading: false,
-  // Orden de la tabla de mercado (columna + dirección).
-  marketsSort: { key: "marketCap", dir: "desc" },
-  // Nº de tarjetas visibles en la lista móvil de mercado ("Cargar más").
-  marketsMobileLimit: 20,
-  // Ids de tarjetas de activo desplegadas en la vista móvil del portafolio.
-  expandedCards: new Set(),
-  // Ids de tarjetas de mercado desplegadas en la vista móvil.
-  expandedMarket: new Set(),
-  // Última posición eliminada (para "Deshacer").
-  lastDeleted: null,
   lastRefreshAt: 0,
   market: {
     btc: null,
@@ -543,19 +509,11 @@ const dom = {
   tableHead: document.getElementById("tableHead"),
   tableBody: document.getElementById("tableBody"),
   totalsFoot: document.getElementById("totalsFoot"),
-  addRowBtn: document.getElementById("addRowBtn"),
-  refreshPricesBtn: document.getElementById("refreshPricesBtn"),
-  saveBtn: document.getElementById("saveBtn"),
   clearBtn: document.getElementById("clearBtn"),
   downloadPdfBtn: document.getElementById("downloadPdfBtn"),
   exportBtn: document.getElementById("exportBtn"),
   importBtn: document.getElementById("importBtn"),
   importFileInput: document.getElementById("importFileInput"),
-  toggleChartsBtn: document.getElementById("toggleChartsBtn"),
-  chartsPanel: document.getElementById("chartsPanel"),
-  portfolioLineChart: document.getElementById("portfolioLineChart"),
-  lineRangeControl: document.getElementById("lineRangeControl"),
-  activityList: document.getElementById("activityList"),
   portfolioNameInput: document.getElementById("portfolioNameInput"),
   portfolioNameDisplay: document.getElementById("portfolioNameDisplay"),
   currencySelect: document.getElementById("currencySelect"),
@@ -567,7 +525,6 @@ const dom = {
   appLoader: document.getElementById("appLoader"),
   loaderText: document.getElementById("loaderText"),
   toastStack: document.getElementById("toastStack"),
-  positionFilterInput: document.getElementById("positionFilterInput"),
   mobileSortSelect: document.getElementById("mobileSortSelect"),
   mobileSortDirBtn: document.getElementById("mobileSortDirBtn"),
   mainValue: document.getElementById("mainValue"),
@@ -588,6 +545,5 @@ const dom = {
   marketGrid: document.getElementById("marketGrid"),
   autoRefreshMeta: document.getElementById("autoRefreshMeta"),
   installCard: document.getElementById("installCard"),
-  sharePdfBtn: document.getElementById("sharePdfBtn"),
-  sheetBackdrop: document.getElementById("sheetBackdrop")
+  sharePdfBtn: document.getElementById("sharePdfBtn")
 };

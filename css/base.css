@@ -31,7 +31,6 @@ code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 /* Oculto es oculto, aunque una regla de la pieza le ponga display. */
 [hidden],
 .hidden { display: none !important; }
-.sr-only,
 .solo-lector {
   position: absolute;
   width: 1px;
@@ -441,7 +440,6 @@ body.detail-open { overflow: hidden; }
 .toast strong { display: block; }
 .toast.is-compact { width: fit-content; max-width: 100%; }
 .toast.is-compact .toast-icon { width: 16px; height: 16px; }
-.toast-undo-btn { flex: 0 0 auto; padding: 0 12px; }
 
 /* fitAmount mide la cifra grande en una sola linea, sin encoger nada. Se
    mide recortada: si sobresaliera, aunque fuera un instante, el navegador del

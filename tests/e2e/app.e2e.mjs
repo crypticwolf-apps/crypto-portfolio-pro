@@ -246,7 +246,7 @@ const desborde = (page) => page.evaluate(() => {
     const r = el.getBoundingClientRect();
     if (!r.width || !r.height || (r.left >= -1 && r.right <= ancho + 1)) continue;
     const cs = getComputedStyle(el);
-    if (cs.visibility === "hidden" || cs.opacity === "0" || el.closest("[hidden], [aria-hidden='true'], .sr-only")) continue;
+    if (cs.visibility === "hidden" || cs.opacity === "0" || el.closest("[hidden], [aria-hidden='true'], .solo-lector")) continue;
     if (recortaEnX(el)) continue;
     const nombre = el.id ? "#" + el.id : el.tagName.toLowerCase() + (el.classList[0] ? "." + el.classList[0] : "");
     return `${nombre} se sale del borde (${Math.round(r.left)}..${Math.round(r.right)} en ${ancho}px)`;

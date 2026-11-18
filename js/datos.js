@@ -79,9 +79,6 @@ function loadState() {
   if (!CURRENCY_META[state.prefs.currency]) {
     state.prefs.currency = DEFAULT_PREFS.currency;
   }
-  if (!Array.isArray(state.prefs.hiddenColumns)) {
-    state.prefs.hiddenColumns = [];
-  }
   if (!AUTO_REFRESH_OPTIONS.includes(state.prefs.autoRefreshSec)) {
     // Migración: los intervalos antiguos de 15s/1m pasan a 5 minutos; el
     // resto de valores desconocidos caen al predeterminado (30 minutos).
@@ -92,11 +89,16 @@ function loadState() {
   }
   // "Ocultar saldos al abrir": cada arranque empieza en modo privado.
   state.prefs.hideBalance = Boolean(state.prefs.hideBalance) || state.prefs.hideOnOpen;
-  // El panel de filtros se retiró de Posiciones: los filtros guardados de
-  // versiones anteriores se descartan para que nunca oculten posiciones sin
-  // que exista una forma de restablecerlos. La búsqueda rápida sigue activa.
-  if (state.prefs.filters) {
-    state.prefs.filters = null;
+  // Ajustes de piezas que ya no existen (filtros de Posiciones, grafico de
+  // evolucion, columnas ocultables): se descartan de lo guardado.
+  OBSOLETE_PREFS.forEach((key) => {
+    delete state.prefs[key];
+  });
+  // Lo mismo con la cache del antiguo ranking de Mercados.
+  try {
+    localStorage.removeItem(OBSOLETE_MARKETS_LIST_KEY);
+  } catch {
+    // Almacenamiento no disponible: no hay nada que limpiar.
   }
   if (state.prefs.plan && typeof state.prefs.plan === "object") {
     // Solo se conservan los datos del simulador TP (el rebalanceo se retiró).
@@ -119,7 +121,6 @@ function loadState() {
   // en vivo activado, que es el comportamiento por defecto.
   state.prefs.livePrices = state.prefs.livePrices !== false;
   state.prefs.portfolioName = sanitizePortfolioNameInput(state.prefs.portfolioName);
-  state.prefs.chartRange = resolveChartRange(state.prefs.chartRange);
 
   dom.currencySelect.value = state.prefs.currency;
   if (dom.livePricesSelect) {
@@ -144,7 +145,6 @@ function loadState() {
   }
 
   loadMarketCache();
-  loadMarketsListCache();
 }
 
 function loadMarketCache() {
@@ -218,10 +218,6 @@ async function handleBaseCurrencyChange(nextCurrency) {
       state.market.eth = { ...state.market.eth, price: convertNumericAmount(state.market.eth.price, conversionRate) };
     }
 
-    // El ranking de mercado está en la moneda anterior: se invalida para que
-    // se vuelva a pedir en la nueva al abrir Mercados.
-    state.marketsList = [];
-    state.marketsListAt = 0;
     state.prefs.currency = normalizedNextCurrency;
     dom.currencySelect.value = normalizedNextCurrency;
     persistMarketCache();
@@ -1012,6 +1008,5 @@ function pushActivity(title, detail, tone = "neutral") {
     at: new Date().toISOString()
   });
   state.activity = state.activity.slice(0, MAX_ACTIVITY_ITEMS);
-  renderActivityIfChanged();
   scheduleAutosave();
 }

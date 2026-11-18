@@ -488,11 +488,9 @@
   top: max(12px, env(safe-area-inset-top));
   bottom: auto;
 }
-/* Un aviso no se toca (solo su boton Deshacer): no debe robar el toque a lo
-   que tenga debajo. */
+/* Un aviso no se toca: no debe robar el toque a lo que tenga debajo. */
 :root[data-ui][data-theme] .toast-stack,
 :root[data-ui][data-theme] .toast { pointer-events: none; }
-:root[data-ui][data-theme] .toast-undo-btn { pointer-events: auto; }
 :root[data-ui][data-theme] .toast {
   align-items: center;
   gap: 12px;
@@ -526,17 +524,6 @@
   border-radius: var(--r-pill);
 }
 :root[data-ui][data-theme] .toast.is-compact .toast-content strong { margin: 0; font-size: 0.875rem; }
-:root[data-ui][data-theme] .toast-undo-btn {
-  min-height: 40px;
-  border: 0;
-  border-radius: var(--r-sm);
-  background: transparent;
-  color: var(--c-ac);
-  font-family: var(--fuente);
-  font-size: 0.9375rem;
-  font-weight: 700;
-}
-:root[data-ui][data-theme="light"] .toast-undo-btn { color: #3DDC97; }
 @keyframes avisoEntra {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }

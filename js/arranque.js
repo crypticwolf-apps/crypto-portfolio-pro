@@ -272,27 +272,22 @@ async function copyWalletAddress(element) {
   showToast(t("wallet.copiedTitle"), t("wallet.copiedText", { label }), "positive");
 }
 
+// Botones "Actualizar" (Inicio y Ajustes): fuerza una lectura de precios.
+function refreshPricesManually() {
+  refreshAllPrices({ silentWhenEmpty: false, force: true, reason: "manual" });
+}
+
 function bindEvents() {
-  dom.addRowBtn.addEventListener("click", handleAddRow);
-  dom.refreshPricesBtn.addEventListener("click", () => {
-    refreshAllPrices({ silentWhenEmpty: false, force: true, reason: "manual" });
-  });
-  dom.saveBtn.addEventListener("click", () => {
-    persistState(true);
-    pushActivity(t("alerts.manualSaveTitle"), t("alerts.manualSaveText"), "neutral");
-  });
   dom.clearBtn.addEventListener("click", handleResetData);
   dom.downloadPdfBtn.addEventListener("click", handleDownloadPdf);
   dom.exportBtn.addEventListener("click", handleExportCsv);
   dom.importBtn.addEventListener("click", () => dom.importFileInput.click());
   dom.importFileInput.addEventListener("change", handleImportCsv);
-  dom.toggleChartsBtn.addEventListener("click", toggleCharts);
   bindAnalyticsSummary();
   bindNews();
   dom.portfolioNameInput.addEventListener("input", (event) => {
     savePortfolioName(event.target.value);
   });
-  dom.lineRangeControl?.addEventListener("click", handleChartRangeClick);
 
   dom.currencySelect.addEventListener("change", async (event) => {
     await handleBaseCurrencyChange(event.target.value);
@@ -315,10 +310,7 @@ function bindEvents() {
   bindPositionEditor();
   bindFab();
   bindAssetDetail();
-  bindMarkets();
-  bindFilters();
   bindPlan();
-  updateFiltersBadge();
 
   document.querySelectorAll("[data-copy-wallet]").forEach((button) => {
     button.addEventListener("click", () => copyWalletAddress(button));
@@ -326,7 +318,7 @@ function bindEvents() {
 
   const moreRefreshBtn = document.getElementById("moreRefreshBtn");
   if (moreRefreshBtn) {
-    moreRefreshBtn.addEventListener("click", () => dom.refreshPricesBtn.click());
+    moreRefreshBtn.addEventListener("click", refreshPricesManually);
   }
 
   const alertsList = document.getElementById("alertsList");
@@ -408,9 +400,9 @@ function bindEvents() {
     button.addEventListener("click", () => setActiveTab(button.dataset.tabTarget));
   });
 
-  // Inicio: actualizar (reutiliza el botón de Cartera) y ocultar saldo
+  // Inicio: actualizar y ocultar saldo
   if (dom.homeRefreshBtn) {
-    dom.homeRefreshBtn.addEventListener("click", () => dom.refreshPricesBtn.click());
+    dom.homeRefreshBtn.addEventListener("click", refreshPricesManually);
   }
   if (dom.toggleBalanceBtn) {
     dom.toggleBalanceBtn.addEventListener("click", () => {

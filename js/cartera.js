@@ -59,22 +59,9 @@ function renderAll() {
   renderTableHead();
   renderTableBody();
   renderDashboardOnly();
-  renderActivity();
   renderStatusCards();
-  renderChartsVisibility();
   // Escritorio: el Plan esta a la vista y sigue los cambios de la cartera.
   escRepintarPlan();
-}
-
-// Subscriber-style: only repaint activity when state.activity actually changes.
-let lastActivitySignature = null;
-function renderActivityIfChanged() {
-  const signature = state.activity.length
-    ? `${state.activity.length}:${state.activity[0]?.id || ""}`
-    : "0:empty";
-  if (signature === lastActivitySignature) return;
-  lastActivitySignature = signature;
-  renderActivity();
 }
 
 // ── Lo que se pinta y cuando ──
@@ -221,170 +208,10 @@ function renderTableBody() {
         <button class="primary-btn" type="button" data-action="empty-add">${escapeHtml(t("buttons.newPosition"))}</button>
       </div>`;
     dom.tableBody.innerHTML = `<tr><td colspan="${TABLE_COLUMNS.length}">${emptyHtml}</td></tr>`;
-    applyPositionFilter();
     return;
   }
 
   dom.tableBody.innerHTML = rows.map((row) => renderRow(row, totalValue)).join("");
-  applyPositionFilter();
-}
-
-// Filtro combinado: búsqueda + categoría + rentabilidad + peso/cap mínimos +
-// favoritos + objetivos TP. Solo muestra/oculta filas ya renderizadas.
-function applyPositionFilter() {
-  const query = normalizeSearchText(state.filterQuery || "");
-  const f = state.filters;
-  const totalValue = state.rows.reduce((sum, r) => {
-    const v = computeRowMetrics(r).currentValue;
-    return sum + (v > 0 ? v : 0);
-  }, 0);
-  const capMin = CAP_STEPS[f.capMin] || 0;
-
-  dom.tableBody.querySelectorAll("tr[data-row-id]").forEach((tr) => {
-    const row = getRowById(tr.dataset.rowId);
-    if (!row) {
-      return;
-    }
-    const metrics = computeRowMetrics(row);
-    const weight = totalValue > 0 && metrics.currentValue > 0 ? (metrics.currentValue / totalValue) * 100 : 0;
-
-    let match = true;
-    if (query) {
-      match = [row.crypto, row.resolvedName, row.symbol, row.coinId]
-        .some((value) => normalizeSearchText(String(value || "")).includes(query));
-    }
-    if (match && f.category !== "all") match = getAssetCategory(row) === f.category;
-    if (match && f.performance === "gaining") match = metrics.pnlUsd > 0;
-    if (match && f.performance === "losing") match = metrics.pnlUsd < 0;
-    if (match && f.favorites) match = Boolean(row.favorite);
-    if (match && f.alerts) match = [metrics.tp1, metrics.tp2, metrics.tp3].some((v) => v > 0);
-    if (match && f.weightMin > 0) match = weight >= f.weightMin;
-    if (match && capMin > 0) match = Number.isFinite(row.marketCap) && row.marketCap >= capMin;
-
-    tr.style.display = match ? "" : "none";
-  });
-}
-
-function countActiveFilters() {
-  const f = state.filters;
-  let n = 0;
-  if (f.category !== "all") n += 1;
-  if (f.performance !== "all") n += 1;
-  if (f.weightMin > 0) n += 1;
-  if (f.capMin > 0) n += 1;
-  if (f.favorites) n += 1;
-  if (f.alerts) n += 1;
-  return n;
-}
-
-function updateFiltersBadge() {
-  const badge = document.getElementById("filtersCount");
-  if (!badge) {
-    return;
-  }
-  const n = countActiveFilters();
-  badge.textContent = String(n);
-  badge.hidden = n === 0;
-}
-
-function capStepLabel(step) {
-  if (!step) {
-    return t("filters.any");
-  }
-  return formatCompactCurrency(CAP_STEPS[step] || 0);
-}
-
-function bindFilters() {
-  const drawer = document.getElementById("filtersDrawer");
-  const openBtn = document.getElementById("openFiltersBtn");
-  const search = document.getElementById("positionSearchInput");
-  if (search) {
-    search.addEventListener("input", (event) => {
-      state.filterQuery = event.target.value;
-      applyPositionFilter();
-    });
-  }
-  if (!drawer || !openBtn) {
-    return;
-  }
-
-  openBtn.addEventListener("click", () => {
-    syncFilterInputs();
-    drawer.hidden = false;
-    document.body.classList.add("filters-open");
-  });
-
-  const close = () => {
-    drawer.classList.add("is-closing");
-    window.setTimeout(() => {
-      drawer.hidden = true;
-      drawer.classList.remove("is-closing");
-      document.body.classList.remove("filters-open");
-    }, 200);
-  };
-
-  drawer.addEventListener("click", (event) => {
-    if (event.target.closest("[data-filters-close]")) {
-      close();
-    }
-    if (event.target.closest("[data-filters-reset]")) {
-      state.filters = { category: "all", performance: "all", weightMin: 0, capMin: 0, favorites: false, alerts: false };
-      syncFilterInputs();
-      commitFilters();
-    }
-  });
-
-  drawer.addEventListener("input", (event) => {
-    const control = event.target.closest("[data-filter]");
-    if (!control) {
-      return;
-    }
-    const key = control.dataset.filter;
-    if (control.type === "checkbox") {
-      state.filters[key] = control.checked;
-    } else if (control.type === "range") {
-      state.filters[key] = Number(control.value);
-    } else {
-      state.filters[key] = control.value;
-    }
-    // Etiquetas de los deslizadores.
-    if (key === "weightMin") {
-      const out = drawer.querySelector('[data-filter-out="weightMin"]');
-      if (out) out.textContent = `${state.filters.weightMin}%`;
-    }
-    if (key === "capMin") {
-      const out = drawer.querySelector('[data-filter-out="capMin"]');
-      if (out) out.textContent = capStepLabel(state.filters.capMin);
-    }
-    commitFilters();
-  });
-}
-
-function syncFilterInputs() {
-  const drawer = document.getElementById("filtersDrawer");
-  if (!drawer) {
-    return;
-  }
-  const f = state.filters;
-  drawer.querySelectorAll("[data-filter]").forEach((control) => {
-    const key = control.dataset.filter;
-    if (control.type === "checkbox") {
-      control.checked = Boolean(f[key]);
-    } else {
-      control.value = f[key];
-    }
-  });
-  const wOut = drawer.querySelector('[data-filter-out="weightMin"]');
-  if (wOut) wOut.textContent = `${f.weightMin}%`;
-  const cOut = drawer.querySelector('[data-filter-out="capMin"]');
-  if (cOut) cOut.textContent = capStepLabel(f.capMin);
-}
-
-function commitFilters() {
-  applyPositionFilter();
-  updateFiltersBadge();
-  state.prefs.filters = { ...state.filters };
-  savePreferences();
 }
 
 // Fila de solo lectura: toda la edición ocurre en el editor-portal.
@@ -556,8 +383,6 @@ function updateStickyBarVisibility() {
 }
 
 function renderTotalsRow(snapshot) {
-  renderCarteraSummary(snapshot);
-
   const totalPnl = snapshot.totals.currentValue - snapshot.totals.investment;
   const totalPnlPct = snapshot.totals.investment
     ? (totalPnl / snapshot.totals.investment) * 100
@@ -582,68 +407,6 @@ function renderTotalsRow(snapshot) {
       <td class="col-actions"></td>
     </tr>
   `;
-}
-
-// Tarjeta superior de Cartera: nº posiciones, valor, PnL total y 24h.
-function renderCarteraSummary(snapshot) {
-  const el = document.getElementById("carteraSummary");
-  if (!el) {
-    return;
-  }
-  const totalPnl = snapshot.totals.currentValue - snapshot.totals.investment;
-  const totalPnlPct = snapshot.totals.investment ? (totalPnl / snapshot.totals.investment) * 100 : 0;
-  const change = getPortfolio24hChange(snapshot);
-  const count = snapshot.items.filter(
-    (item) => item.metrics.investment > 0 || item.metrics.currentValue > 0 || item.row.crypto.trim()
-  ).length;
-  const stale = state.lastRefreshAt
-    ? t("home.updatedAgo", { time: formatRelativeTime(state.lastRefreshAt) })
-    : t("status.noSyncYet");
-
-  el.innerHTML = `
-    <div class="cartera-sum-main">
-      <div>
-        <span class="cartera-sum-label">${escapeHtml(t("home.totalValue"))}</span>
-        <strong class="cartera-sum-value">${maskedCurrency(snapshot.totals.currentValue)}</strong>
-      </div>
-      <div class="cartera-sum-pnl ${toneClass(totalPnl)}">
-        <strong>${maskedSignedCurrency(totalPnl)}</strong>
-        <span>${formatPercent(totalPnlPct)}</span>
-      </div>
-    </div>
-    <div class="cartera-sum-meta">
-      <span>${escapeHtml(t("cartera.positions", { count }))}</span>
-      <span class="${change ? toneClass(change.pct) : ""}">${escapeHtml(t("summary.change24h"))}: ${change ? formatSignedPercent(change.pct) : "--"}</span>
-      <span class="cartera-sum-updated">${escapeHtml(stale)}</span>
-    </div>
-  `;
-}
-
-function renderActivity() {
-  // El listado de actividad se retiró de la interfaz (pestaña "Actividad"
-  // eliminada). Se conserva el estado interno, pero no hay dónde pintarlo.
-  if (!dom.activityList) {
-    return;
-  }
-  if (!state.activity.length) {
-    dom.activityList.innerHTML = `
-      <div class="empty-state">${escapeHtml(t("activity.empty"))}</div>
-    `;
-    return;
-  }
-
-  dom.activityList.innerHTML = state.activity
-    .slice(0, 8)
-    .map(
-      (item) => `
-        <article class="activity-item">
-          <strong class="${escapeHtml(item.tone || "neutral")}">${escapeHtml(item.title)}</strong>
-          <p>${escapeHtml(item.detail)}</p>
-          <time>${escapeHtml(formatDateTime(new Date(item.at)))}</time>
-        </article>
-      `
-    )
-    .join("");
 }
 
 function renderStatusCards() {
@@ -899,75 +662,6 @@ function handleTableKeyDown(event) {
     event.preventDefault();
     openAssetDetail(rowElement.dataset.rowId);
   }
-}
-
-// Eliminar posición con confirmación + opción de deshacer.
-function deletePositionWithUndo(rowId) {
-  const row = getRowById(rowId);
-  if (!row) return;
-  if (!window.confirm(t("menu.deleteConfirm", { asset: assetDisplayName(row) }))) {
-    return;
-  }
-  const index = state.rows.findIndex((item) => item.id === rowId);
-  state.lastDeleted = { row: { ...row }, index };
-  state.rows = state.rows.filter((item) => item.id !== rowId);
-  // Borrar una posicion de billetera = no la quiero en la cartera: la
-  // siguiente lectura no la vuelve a proponer (deshacer lo revierte).
-  setWalletKeyIgnored(row, true);
-  clearTimersForRow(rowId);
-  if (state.detailRowId === rowId) {
-    closeAssetDetail();
-  }
-  // Mantiene al menos una fila editable si el portafolio queda vacío.
-  const addedPlaceholder = !state.rows.length;
-  if (addedPlaceholder) {
-    state.rows.push(createRow());
-    state.lastDeleted = null; // no hay deshacer limpio si se recreó placeholder
-  }
-  renderAll();
-  scheduleAutosave();
-  pushActivity(
-    t("alerts.rowDeletedTitle"),
-    t("alerts.rowDeletedText", { asset: assetDisplayName(row) }),
-    "negative"
-  );
-  if (state.lastDeleted) {
-    showUndoToast(t("alerts.rowDeletedText", { asset: assetDisplayName(row) }), () => undoDelete());
-  } else {
-    showToast(t("alerts.rowDeletedTitle"), t("alerts.rowDeletedText", { asset: assetDisplayName(row) }), "warning");
-  }
-}
-
-function undoDelete() {
-  if (!state.lastDeleted) return;
-  const { row, index } = state.lastDeleted;
-  state.rows.splice(Math.min(index, state.rows.length), 0, row);
-  setWalletKeyIgnored(row, false);
-  state.lastDeleted = null;
-  renderAll();
-  scheduleAutosave();
-  showToast(t("undo.restoredTitle"), t("undo.restoredText", { asset: assetDisplayName(row) }), "positive");
-}
-
-// Toast con acción "Deshacer" (temporizador más largo).
-function showUndoToast(detail, onUndo) {
-  if (!dom.toastStack) return;
-  const toast = document.createElement("article");
-  toast.className = "toast warning toast-undo";
-  toast.innerHTML = `
-    <div class="toast-content">
-      <strong>${escapeHtml(t("alerts.rowDeletedTitle"))}</strong>
-      <p>${escapeHtml(detail)}</p>
-    </div>
-    <button type="button" class="toast-undo-btn">${escapeHtml(t("undo.action"))}</button>
-  `;
-  const remove = () => { toast.style.opacity = "0"; window.setTimeout(() => toast.remove(), 200); };
-  toast.querySelector(".toast-undo-btn").addEventListener("click", () => {
-    onUndo();
-    remove();
-  });
-  dom.toastStack.appendChild(toast);
-  window.setTimeout(remove, 6500);
 }
 
 function handleAddRow() {
