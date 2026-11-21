@@ -1,33 +1,38 @@
 # Crypto Portfolio Pro
 
-Aplicación web (PWA instalable) para gestionar inversiones en criptomonedas: tabla editable de posiciones, precios en vivo desde CoinGecko, objetivos de take profit con señales y alertas, gráficos de distribución y evolución, y exportación CSV/PDF.
+Aplicación web (PWA instalable, y APK para Android) para seguir una cartera de criptomonedas: precios en vivo, billeteras leídas por su dirección pública, un plan de salida con objetivos, analítica, alertas, noticias y copia de seguridad.
+
+Web: https://cartera.cryptoatalaya.com/
 
 ## Características
 
-- Tabla avanzada: búsqueda asistida contra CoinGecko, favoritos, ordenación por columna, columnas mostrables/ocultables (persistidas).
-- Precios en vivo con auto-refresh configurable (15s – 24h), límite de peticiones y reintentos con backoff.
-- Señales de TP por fila y alertas al alcanzar objetivos (TP1/TP2/TP3).
-- Resumen e insights: PnL agregado, top/peores activos (actual y 24h), activo más volátil.
-- Barra fija al hacer scroll con valor total, PnL y estado de API/guardado.
-- Gráficos (Chart.js, carga diferida): dona de distribución y línea de evolución con rangos 1h–total.
-- Moneda base USD/EUR con conversión del portafolio, 3 idiomas (es/en/fr), tema claro, oscuro (negro puro) o automatico, 6 colores de acento, tamano de texto y pantalla de inicio personalizable.
-- Version de escritorio (desde 1100 px): toda la app en una pagina, en bandas a todo el ancho (saldo y grafico, mercado, posiciones, analisis, compras y ventas, el plan en una tabla y noticias), con Ajustes en un panel lateral.
-- Importación/exportación CSV y PDF con resumen, KPIs y gráfico de distribución.
-- Guardado automático en `localStorage`; funciona offline como PWA (service worker con cache del app shell).
+- **Inicio:** saldo total con su cambio en el periodo (1D, 1S, 1M, 3M, 1A, Todo) y un gráfico del saldo reconstruido con los precios pasados de cada moneda y lo que tenías en cada fecha (compras y ventas registradas y fecha de compra). El cambio del periodo no cuenta como ganancia el dinero metido o sacado. Lista de activos, resumen de hoy, reparto y datos de mercado (BTC, ETH, dominancia, miedo y codicia).
+- **Precios en vivo** por WebSocket (Binance y otros) y CoinGecko a través de un proxy propio con caché y límite de peticiones.
+- **Billeteras:** importa los tokens de una dirección pública (EVM, Solana, Bitcoin) y los mantiene al día.
+- **Compras y ventas:** registro de operaciones con coste medio y beneficio realizado.
+- **Plan:** objetivos TP1/TP2/TP3 por activo y salida progresiva (cuánto vender en cada objetivo y cuánto se saca).
+- **Analítica:** distribución, mejores y peores, categorías, comparativa y rendimiento por periodos.
+- **Alertas** de precio por activo, para todos o del valor total.
+- **Noticias** del canal de Crypto Atalaya.
+- **Copia de seguridad:** un archivo JSON con todo (posiciones, operaciones, alertas, billeteras, plan, historial y ajustes) para guardarlo o pasarlo a otro dispositivo; aviso en Inicio si hace más de 30 días de la última. La clave de CoinStats nunca va en la copia.
+- **Exportar:** PDF con resumen y gráfico, y CSV de posiciones (también importable).
+- **Apariencia:** tema claro, oscuro (negro puro) o automático, 6 colores de acento, tamaño de texto y bloques de Inicio ordenables. Moneda base USD o EUR.
+- **Versión de escritorio** (desde 1100 px): toda la app en una página, en bandas a todo el ancho (saldo y gráfico, mercado, posiciones, análisis, compras y ventas, el plan en una tabla y noticias), con Ajustes en un panel lateral.
+- Guardado automático en el dispositivo (`localStorage`) y funcionamiento sin conexión (service worker).
 
 ## Estructura
 
-- Carpeta raíz y `crypto-portfolio-pwa/`: la app (copias sincronizadas). `index.html`, `js/` (la app en 21 scripts por tema, cargados en orden), `css/` (estilos: sistema visual, base y una hoja por pantalla), `i18n.js`, `finance.js`, `sw.js`, `manifest.webmanifest`, iconos.
-- `wallet-core.js` y `api/wallet.js`: lector de billeteras (lógica pura en el navegador y servidor en Vercel). Con `COINSTATS_API_KEY` (recomendada) lee todos los tokens en 100+ redes; sin ella, usa Alchemy si hay `ALCHEMY_API_KEY`, y si no, los nodos públicos de cada red y mempool.space (solo moneda nativa y las ~500 principales en EVM).
+- `index.html` y `js/`: la app en 23 scripts clásicos por tema, cargados en orden (`config.js` el primero y `arranque.js` el último). `css/`: estilos (sistema visual, base y una hoja por pantalla). `i18n.js`: textos. `sw.js` y `manifest.webmanifest`: PWA.
+- `finance.js`: cálculos puros (compras, ventas, coste medio, saldo en el tiempo y rentabilidad del periodo), con pruebas.
+- `wallet-core.js` y `api/wallet.js`: lector de billeteras (lógica en el navegador y servidor en Vercel). Con `COINSTATS_API_KEY` lee todos los tokens en 100+ redes; sin ella, usa Alchemy si hay `ALCHEMY_API_KEY`, y si no, los nodos públicos de cada red y mempool.space.
+- `api/cg.js`: proxy de CoinGecko (clave en `COINGECKO_API_KEY`, solo rutas permitidas, caché). `api/historial.js`: precios pasados de varias monedas en una sola petición, sobre la misma rejilla de tiempo, para el gráfico del saldo.
 - `tests/`: pruebas de extremo a extremo en navegador (`npm run test:e2e`) y unitarias con Vitest (`finance.test.js`, `tests/*.test.js`). Se ejecutan solas en cada push (GitHub Actions).
-- `android-build/`: proyecto Capacitor para generar el APK (la web vive en `android-build/www`). Ver `crypto-portfolio-pwa/COMO-GENERAR-APK.md`.
+- `android-build/` (solo en local): proyecto Capacitor para generar el APK (la web vive en `android-build/www`).
 
-## Uso
+Las claves de las APIs viven solo en las variables de entorno de Vercel; el repositorio es público.
 
-1. Sirve la carpeta con un servidor estático y abre `http://localhost` (necesario para el service worker; desde `file://` la app funciona pero sin PWA).
-2. Añade o edita posiciones; los precios se sincronizan automáticamente.
-3. Usa «Actualizar precios» para forzar una sincronización completa.
+## Uso en local
 
-## Nota
-
-Si el navegador bloquea llamadas a la API desde `file://`, sirve la carpeta con un servidor estático local (por ejemplo `npx serve .`).
+1. `npm install` (solo para las pruebas).
+2. Sirve la carpeta con un servidor estático (por ejemplo `npx serve .`) y abre `http://localhost`. Desde `file://` la app funciona, pero sin service worker y llamando al proxy publicado.
+3. Pruebas: `npm run test:all`.

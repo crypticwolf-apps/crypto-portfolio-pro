@@ -413,6 +413,13 @@
 
 @keyframes ajustesEntra { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 
+/* ── Aviso de copia de seguridad: una linea bajo la cabecera ── */
+:root[data-ui] .esc-aviso:has(> .aviso-copia[hidden]),
+:root[data-ui] .esc-aviso:empty { display: none; }
+:root[data-ui] .escritorio .aviso-copia { margin-top: 0; flex-wrap: nowrap; }
+:root[data-ui] .escritorio .aviso-copia-acciones { flex: 0 0 auto; }
+:root[data-ui] .escritorio .aviso-copia-acciones > button { flex: 0 0 auto; padding: 0 18px; }
+
 /* ── Tabla de posiciones ── */
 :root[data-ui] .table-panel { padding: var(--tarjeta-pad) 0 6px; }
 :root[data-ui] .table-panel .panel-heading { padding: 0 var(--tarjeta-pad); margin-bottom: 6px; }

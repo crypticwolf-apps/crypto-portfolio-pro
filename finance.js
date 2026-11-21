@@ -204,8 +204,98 @@
     };
   }
 
+  // ── Saldo en el tiempo ──
+  // Una posicion para el historial:
+  //   { cantidad (la de hoy), desde (ms de la fecha de compra o null),
+  //     movimientos: [{ at, cantidad }] (compras +, ventas -),
+  //     precios: [n] sobre la rejilla (o null), precioActual }
+  // Lo que no explican las compras y ventas registradas (lo que ya se tenia)
+  // cuenta desde la fecha de compra; sin fecha, desde siempre.
+  function cantidadEn(pos, t) {
+    const movimientos = pos.movimientos || [];
+    let base = toNum(pos.cantidad);
+    for (const m of movimientos) base -= toNum(m.cantidad);
+    let q = pos.desde != null && t < pos.desde ? 0 : base;
+    for (const m of movimientos) {
+      if (m.at <= t) q += toNum(m.cantidad);
+    }
+    return q > 1e-12 ? q : 0;
+  }
+
+  function precioEnIndice(pos, i) {
+    const p = pos.precios && pos.precios[i];
+    if (typeof p === "number" && Number.isFinite(p) && p > 0) return p;
+    const actual = toNum(pos.precioActual);
+    return actual > 0 ? actual : 0;
+  }
+
+  // Saldo en cada instante de la rejilla (desde, desde+paso, ...) y, al
+  // final, el de ahora. Tambien devuelve el dinero que entro o salio
+  // (flujos: compras, ventas y posiciones que empiezan dentro del periodo),
+  // valorado al precio de ese momento, para no confundirlo con ganancias.
+  function serieSaldo(input) {
+    const desde = toNum(input.desde);
+    const paso = toNum(input.paso);
+    const n = Math.max(0, Math.floor(toNum(input.n)));
+    const posiciones = input.posiciones || [];
+    const ultimo = desde + paso * (n - 1);
+    const ahora = toNum(input.ahora) || ultimo;
+    const puntos = [];
+    for (let i = 0; i < n; i += 1) {
+      const t = desde + paso * i;
+      let valor = 0;
+      for (const pos of posiciones) {
+        const q = cantidadEn(pos, t);
+        if (q > 0) valor += q * precioEnIndice(pos, i);
+      }
+      puntos.push({ at: t, value: valor });
+    }
+    if (n && ahora > ultimo && Number.isFinite(input.valorAhora)) {
+      puntos.push({ at: ahora, value: input.valorAhora });
+    }
+    const flujos = [];
+    const precioHacia = (pos, at) => {
+      if (at > ultimo) return precioEnIndice(pos, n); // fuera de la rejilla: precio actual
+      return precioEnIndice(pos, Math.max(0, Math.min(n - 1, Math.floor((at - desde) / paso))));
+    };
+    for (const pos of posiciones) {
+      const movimientos = pos.movimientos || [];
+      let base = toNum(pos.cantidad);
+      for (const m of movimientos) base -= toNum(m.cantidad);
+      if (pos.desde != null && pos.desde > desde && pos.desde <= ahora && base > 0) {
+        flujos.push({ at: pos.desde, value: base * precioHacia(pos, pos.desde) });
+      }
+      for (const m of movimientos) {
+        if (m.at > desde && m.at <= ahora) {
+          flujos.push({ at: m.at, value: toNum(m.cantidad) * precioHacia(pos, m.at) });
+        }
+      }
+    }
+    return { puntos, flujos };
+  }
+
+  // Cambio del saldo en un periodo sin contar el dinero metido o sacado
+  // (metodo Dietz simple): ganancia = final - inicial - flujos; el % se
+  // mide sobre el capital medio que estuvo invertido en el periodo.
+  function rentabilidadPeriodo(puntos, flujos) {
+    if (!Array.isArray(puntos) || puntos.length < 2) return null;
+    const inicio = puntos[0];
+    const fin = puntos[puntos.length - 1];
+    const span = fin.at - inicio.at;
+    let total = 0;
+    let ponderado = 0;
+    for (const f of flujos || []) {
+      total += f.value;
+      ponderado += span > 0 ? f.value * ((fin.at - f.at) / span) : 0;
+    }
+    const delta = fin.value - inicio.value - total;
+    const capital = inicio.value + ponderado;
+    return { delta, pct: capital > 0 ? (delta / capital) * 100 : null };
+  }
+
   return {
     round, buy, sell, avgPrice, unrealized, roiPct,
-    circulatingSupply, capScenario, capPositionImpact, capNeededForPrice
+    circulatingSupply, capScenario, capPositionImpact, capNeededForPrice,
+    cantidadEn, serieSaldo, rentabilidadPeriodo
   };
 });

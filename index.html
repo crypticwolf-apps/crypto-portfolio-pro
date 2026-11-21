@@ -34,9 +34,9 @@
     </script>
     <meta
       name="description"
-      content="Gestiona tu portafolio de criptomonedas: precios en tiempo real, objetivos de TP, graficos y exportacion CSV/PDF."
+      content="Tu cartera de criptomonedas: precios en vivo, billeteras, plan de salida con objetivos, analitica, alertas, noticias y copia de seguridad."
     />
-    <title>Inversion Crypto Pro</title>
+    <title>Crypto Portfolio Pro</title>
 
     <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="./icons/icon-16.png" />
@@ -102,7 +102,9 @@
     <script src="./js/analitica.js" defer></script>
     <script src="./js/noticias.js" defer></script>
     <script src="./js/graficos.js" defer></script>
+    <script src="./js/historial.js" defer></script>
     <script src="./js/exportar.js" defer></script>
+    <script src="./js/copia.js" defer></script>
     <script src="./js/billeteras.js" defer></script>
     <script src="./js/inicio.js" defer></script>
     <script src="./js/apariencia.js" defer></script>
@@ -215,6 +217,7 @@
            Noticias (y las devuelve a sus pestanas al estrechar la ventana). -->
       <div class="escritorio" id="escritorio" hidden>
         <div class="esc-cabecera" data-esc-hueco="cabecera"></div>
+        <div class="esc-banda esc-aviso" data-esc-hueco="aviso"></div>
         <!-- Saldo y grafico | resumen de hoy y rendimiento -->
         <div class="esc-rejilla">
           <div class="esc-saldo" data-esc-hueco="saldo"></div>
@@ -258,6 +261,19 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.1 13.6a7.6 7.6 0 0 0 0-3.2L21 9l-1.9-3.3-2.2.9a7.5 7.5 0 0 0-2.8-1.6l-.4-2.5h-3.4l-.4 2.5a7.5 7.5 0 0 0-2.8 1.6l-2.2-.9L3 9l1.9 1.4a7.6 7.6 0 0 0 0 3.2L3 15l1.9 3.3 2.2-.9a7.5 7.5 0 0 0 2.8 1.6l.4 2.5h3.4l.4-2.5a7.5 7.5 0 0 0 2.8-1.6l2.2.9L21 15z"/></svg>
           </button>
         </header>
+
+        <!-- Aviso: hace mucho (o nunca) que no se guarda una copia de seguridad -->
+        <section class="panel aviso-copia" id="avisoCopia" hidden>
+          <div class="install-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.4 3 8.5 7 10 4-1.5 7-5.6 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
+          <div class="aviso-copia-texto">
+            <strong data-i18n="copia.avisoTitulo">Haz una copia de seguridad</strong>
+            <p id="avisoCopiaTexto"></p>
+          </div>
+          <div class="aviso-copia-acciones">
+            <button class="primary-btn" type="button" data-copia="guardar" data-i18n="copia.guardar">Guardar copia</button>
+            <button class="ghost-btn" type="button" data-copia="posponer" data-i18n="copia.posponer">Mas tarde</button>
+          </div>
+        </section>
 
         <section class="saldo" id="mainValueCard" aria-label="Valor total de la cartera" data-i18n-aria-label="home.totalValueAria">
           <span class="saldo-etiqueta" data-i18n="inicio.saldoTotal">Saldo total</span>
@@ -408,7 +424,7 @@
 
         <!-- Escritorio: tabla tradicional -->
         <div class="table-wrap portfolio-desktop-table">
-          <table aria-label="Tabla de inversion crypto" data-i18n-aria-label="table.ariaLabel">
+          <table aria-label="Tabla de posiciones" data-i18n-aria-label="table.ariaLabel">
             <thead id="tableHead"></thead>
             <tbody id="tableBody"></tbody>
             <tfoot id="totalsFoot"></tfoot>
@@ -611,8 +627,17 @@
       </details>
 
             <details class="panel more-data-panel more-fold">
-        <summary class="more-fold-sum"><span class="more-fold-txt"><small data-i18n="more.dataEyebrow">Datos</small><strong data-i18n="more.dataTitle">Exportar y compartir</strong></span><span class="more-fold-chev" aria-hidden="true">▾</span></summary>
+        <summary class="more-fold-sum"><span class="more-fold-txt"><small data-i18n="more.dataEyebrow">Datos</small><strong data-i18n="more.dataTitle">Copia de seguridad y exportar</strong></span><span class="more-fold-chev" aria-hidden="true">▾</span></summary>
         <div class="more-fold-body">
+          <div class="copia-bloque">
+            <p class="copia-titulo"><strong data-i18n="copia.titulo">Copia de seguridad</strong> <span class="copia-estado" id="copiaEstado"></span></p>
+            <p class="copia-nota" data-i18n="copia.nota">Un archivo con todo: posiciones, compras y ventas, alertas, billeteras, plan, historial y ajustes. Restauralo en otro movil u ordenador. La clave de CoinStats no se guarda.</p>
+            <div class="more-actions-grid">
+              <button id="copiaGuardarBtn" class="primary-btn" type="button" data-i18n="copia.guardar">Guardar copia</button>
+              <button id="copiaRestaurarBtn" class="ghost-btn" type="button" data-i18n="copia.restaurar">Restaurar copia</button>
+            </div>
+            <input id="copiaArchivo" type="file" accept=".json,application/json" hidden />
+          </div>
 <div class="more-actions-grid">
           <button id="sharePdfBtn" class="ghost-btn" type="button" data-i18n="fab.sharePdf">Compartir PDF</button>
           <button id="downloadPdfBtn" class="ghost-btn" type="button" data-i18n="buttons.downloadPdf">Descargar PDF</button>

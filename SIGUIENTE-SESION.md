@@ -10,15 +10,20 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 
 - **Carpeta:** `D:\Mega\Proyectos\Proyecto mixto\Portafolio Crypto`
 - **Qué es:** PWA de cartera de criptomonedas en JavaScript vanilla, **sin build**.
-  Ficheros: `index.html`, la app en **`js/`** (21 scripts por tema: `config.js`
+  Ficheros: `index.html`, la app en **`js/`** (23 scripts por tema: `config.js`
   primero, `arranque.js` el último), **`css/`** (estilos: `tokens.css` sistema visual, `base.css`,
-  `componentes.css` y una hoja por pantalla; la antigua `styles.css` ya no existe), `i18n.js`, `finance.js`
+  `componentes.css` y una hoja por pantalla: inicio, ajustes, hojas, detalle,
+  analitica, plan, noticias y escritorio), `i18n.js`, `finance.js`
   (cálculos puros + tests con Vitest), `wallet-core.js` (lógica pura de
   billeteras + tests), `sw.js`, `api/cg.js` (proxy de CoinGecko; clave en
-  `COINGECKO_API_KEY`) y `api/wallet.js` (lector de billeteras; clave en
-  `ALCHEMY_API_KEY`). Las claves solo en variables de entorno de Vercel.
+  `COINGECKO_API_KEY`), `api/historial.js` (precios pasados de todas las
+  monedas en una petición, para el gráfico del saldo; usa la misma clave) y
+  `api/wallet.js` (lector de billeteras; claves de CoinStats/Alchemy). Las
+  claves solo en variables de entorno de Vercel.
+- **Nombre:** **Crypto Portfolio Pro** en todas partes (manifest, título, PDF);
+  bajo el icono, "Crypto Pro".
 - **Scripts clásicos, no módulos ES:** la APK abre la app desde `file://` y ahí
-  `import`/`export` no cargan. Los 21 ficheros comparten el ámbito global y se
+  `import`/`export` no cargan. Los 23 ficheros comparten el ámbito global y se
   ejecutan en el orden de `index.html`. Reglas en la cabecera de `js/config.js`;
   un fichero nuevo va en `index.html` (antes de `arranque.js`) y en `APP_SHELL`
   de `sw.js`.
@@ -30,8 +35,9 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 ## Reglas de trabajo (importantes)
 
 1. **Tres copias:** la raíz es la fuente. Tras cada cambio hay que copiar los
-   ficheros tocados a `crypto-portfolio-pwa\` y `android-build\www\` (la
-   carpetas `js\` y `css\` enteras; el antiguo `app.js` ya no se usa).
+   ficheros tocados a `crypto-portfolio-pwa\` y `android-build\www\` (las
+   carpetas `js\` y `css\` enteras; el antiguo `app.js` ya no se usa). Al
+   terminar, dime siempre la lista de ficheros a copiar o borrar.
 2. **Subir al terminar cada bloque:** `git add` → `commit` → `git fetch` +
    `git rebase origin/main` → `push`. Nunca `--force`.
 3. **Verificar el despliegue:** Vercel publica su resultado en el commit de
@@ -40,7 +46,8 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 4. **Verificar en el navegador antes de dar nada por bueno**, comprobando
    **visibilidad real** (altura > 0), no solo que el HTML exista en el DOM.
 5. **Pruebas:** `npm install` y `npm run test:all` (Vitest + recorrido completo
-   en Chromium a 375 y 320 px con datos realistas, `tests/e2e/app.e2e.mjs`).
+   en Chromium a 375 y 320 px y en escritorio con datos realistas,
+   `tests/e2e/app.e2e.mjs`; la red está simulada, incluido `api/historial`).
    GitHub Actions las pasa solas en cada push: si sale una cruz roja en el
    commit, algo se ha roto. Vercel publica igualmente, no espera a las pruebas.
 
@@ -68,7 +75,14 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 - **Borrados en bloque:** limpiar por rangos ya se ha llevado por delante
   funciones y estilos vecinos dos veces. Tras cualquier limpieza, comprobar que
   las clases clave conservan estilos (`.tp-fold-sum`, `.more-fold-sum`,
-  `.theme-picker`, `.insight-item`, `.tab-bar` deben ser `flex`/`fixed`).
+  `.insight-item` deben ser `flex`; `.barra-inferior`, `fixed`).
+- **Escritorio mueve piezas:** desde 1100 px, `js/escritorio.js` saca tarjetas de
+  sus pestañas y las coloca en `#escritorio` (y las devuelve al estrechar).
+  Una tarjeta nueva de Inicio que deba verse en escritorio necesita su hueco
+  en `escPiezas()` y en el HTML de `#escritorio`.
+- **Service worker:** cada fichero nuevo que cargue `index.html` va en
+  `APP_SHELL` y hay que subir `VERSION` (la prueba e2e lo comprueba).
+  `/api/historial` va siempre a la red (no se cachea ahí).
 - **Entorno de vista previa:** el panel del navegador está oculto, así que **las
   transiciones CSS se congelan** y `getComputedStyle` devuelve el valor anterior.
   Para medir colores inyecta antes `*{transition:none !important}`. Las capturas
@@ -76,24 +90,45 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 
 ## Sistema visual ya consolidado (respetarlo)
 
-- Radios: **24px** contenedor · **14px** tarjeta · **10px** control.
-- Ritmo vertical **8px** en las cinco pestañas.
-- **Dos** tamaños de título: 15,2px sección y 13,76px cabecera plegable.
-- Tipografía en escala de 6 pasos (`0.62 / 0.72 / 0.82 / 0.95 / 1.05 / 1.3 rem`).
-  **Ninguna etiqueta por debajo de 0,6rem (9,6px).**
+- Todo sale de `css/tokens.css`: colores (`--c-*`), radios (`--r-xl` 24px
+  contenedor · `--r-md` 14px tarjeta · `--r-sm` 10px control · `--r-pill`),
+  espaciado (`--tarjeta-pad`, `--bloque-gap`) y letra **Inter**.
 - Todas las cifras con `font-variant-numeric: tabular-nums`.
-- Tres temas: claro / oscuro / **OLED** (negro puro, tokens `--glass-*` neutros).
+- Temas: claro / oscuro (**siempre negro puro**, sin opción OLED aparte) /
+  automático. 6 colores de acento y 3 tamaños de texto. La densidad es siempre
+  la cómoda (la opción se quitó). Contraste de texto ≥ 4,5:1.
 - Modo privacidad (botón del ojo): oculta importes propios; los precios de
   mercado y los objetivos de TP sí se ven.
 
 ## Estado actual
 
-Pestañas: **Noticias · Plan · Portafolio · Analítica · Ajustes**. Portafolio en el
-centro del menú inferior, destacado y sobresaliendo.
+Pestañas (móvil): **Noticias · Plan · Portafolio · Analítica · Ajustes**, con
+Portafolio en el centro del menú inferior.
 
-- **Acciones rápidas:** Ajustes ⚙ · Comprar · Vender · Activo +.
-- **Menú del engranaje:** Añadir alerta · Descargar PDF · Compartir PDF ·
-  Exportar CSV · Importar CSV.
+- **Inicio:** saldo con su cambio en el periodo (1D · 1S · 1M · 3M · 1A · Todo) y
+  gráfico del saldo **reconstruido con precios pasados** (`js/historial.js` +
+  `api/historial.js`): en cada fecha cuenta lo que tenías según las compras y
+  ventas registradas y la fecha de compra de cada posición (sin fecha, todo el
+  periodo). El % del periodo no cuenta como ganancia el dinero metido o sacado
+  (Dietz simple, `CryptoFinance.rentabilidadPeriodo`). 1D usa la variación 24 h
+  y Todo el resultado neto. Sin datos (o si CoinGecko corta la respuesta y lo
+  que falta pesa más del 10 %), el gráfico usa el historial guardado en el
+  dispositivo. Máximo un año (límite de CoinGecko sin plan de pago).
+- **Acciones rápidas:** Ajustes ⚙ · Comprar · Vender · Activo + (en escritorio,
+  "Más acciones" en lugar de ⚙, porque Ajustes tiene su engranaje).
+- **Menú de acciones:** Añadir alerta · Añadir billetera · PDF · Exportar CSV ·
+  Importar CSV.
+- **Copia de seguridad** (`js/copia.js`, Ajustes → Copia de seguridad y
+  exportar): un JSON con posiciones, operaciones, alertas, billeteras, plan,
+  historial y ajustes; restaurar reemplaza todo (con confirmación) y recarga.
+  **La clave de CoinStats nunca va en la copia.** Aviso en Inicio si la última
+  copia tiene más de 30 días (o nunca hubo y la app lleva una semana en uso);
+  "Más tarde" lo pospone una semana.
+- **Escritorio (desde 1100 px):** toda la app en una página, en bandas a todo el
+  ancho: cabecera fija · aviso de copia (si toca) · saldo y gráfico | resumen y
+  rendimiento · mercado · posiciones (tabla) · análisis · compras y ventas ·
+  plan (tabla, una fila por activo) · noticias. Ajustes en panel lateral y la
+  ficha de un activo también. Comprobar de 1100 a 2560 px.
 - **Precios en vivo:** WebSocket de Binance (Kraken de reserva), GeckoTerminal
   para tokens DEX por red + contrato, CoinGecko para el resto y para metadatos.
   Interruptor y estado en Ajustes → Preferencias y Diagnóstico.
@@ -147,8 +182,10 @@ centro del menú inferior, destacado y sobresaliendo.
 - **Alchemy (opcional):** si algún día se pone `ALCHEMY_API_KEY` en Vercel (+
   Redeploy), se usa para encontrar también tokens pequeños de EVM; si falla,
   se vuelve solo al modo sin cuenta.
-- **Clave de CoinGecko:** `COINGECKO_API_KEY` en Vercel sigue sin poner
-  (funciona sin ella, con menos límite y sin precio histórico por fecha).
+- **Clave de CoinGecko:** `COINGECKO_API_KEY` en Vercel (sin confirmar si ya
+  está puesta). Funciona sin ella, pero con menos llamadas por minuto: el
+  gráfico del saldo puede tardar en completarse con muchas monedas, y sin ella
+  no hay precio histórico por fecha de más de un año. La clave Demo es gratis.
 - **Billeteras, fase 2:** xpub de Bitcoin (Ledger/Trezor), escanear QR, coste
   estimado por fecha de llegada de cada token, más redes (Tron, TON, Sui).
 
@@ -160,7 +197,8 @@ centro del menú inferior, destacado y sobresaliendo.
 ## Cómo quiero que trabajes
 
 - Antes de cambios grandes, revisa el código afectado y dime qué has encontrado.
-- Verifica en el navegador a **375px y 320px**: visibilidad real, sin scroll
-  horizontal y consola sin errores.
+- Verifica en el navegador a **375px y 320px** y en escritorio (**1100 a
+  2560px**), en claro y oscuro: visibilidad real, sin scroll horizontal y
+  consola sin errores.
 - Sube cada bloque terminado y confírmame que el despliegue ha ido bien.
 - Si algo de lo que pido choca con lo que ya existe, **dímelo antes de hacerlo**.

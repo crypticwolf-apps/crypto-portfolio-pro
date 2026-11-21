@@ -176,3 +176,83 @@ describe("CryptoFinance.capNeededForPrice", () => {
     expect(F.capNeededForPrice({ targetPrice: 10, basePrice: 0, baseCap: 0 }).ok).toBe(false);
   });
 });
+
+describe("saldo en el tiempo", () => {
+  const H = 3600 * 1000;
+  // Rejilla de 5 horas: t = 0, 1h, 2h, 3h, 4h.
+  const rejilla = { desde: 0, paso: H, n: 5 };
+
+  it("cantidad: lo de hoy menos lo comprado despues, mas lo vendido despues", () => {
+    const pos = { cantidad: 3, desde: null, movimientos: [{ at: 2 * H, cantidad: 2 }, { at: 3 * H, cantidad: -1 }] };
+    // Antes de todo: 3 - 2 + 1 = 2; tras la compra: 4; tras la venta: 3.
+    expect(CryptoFinance.cantidadEn(pos, 0)).toBe(2);
+    expect(CryptoFinance.cantidadEn(pos, 2 * H)).toBe(4);
+    expect(CryptoFinance.cantidadEn(pos, 4 * H)).toBe(3);
+  });
+
+  it("cantidad: antes de la fecha de compra no cuenta", () => {
+    const pos = { cantidad: 1, desde: 2 * H, movimientos: [] };
+    expect(CryptoFinance.cantidadEn(pos, H)).toBe(0);
+    expect(CryptoFinance.cantidadEn(pos, 2 * H)).toBe(1);
+  });
+
+  it("cantidad: nunca negativa aunque falten compras por registrar", () => {
+    const pos = { cantidad: 0, desde: null, movimientos: [{ at: 2 * H, cantidad: -5 }] };
+    expect(CryptoFinance.cantidadEn(pos, H)).toBe(5);
+    expect(CryptoFinance.cantidadEn(pos, 3 * H)).toBe(0);
+  });
+
+  it("serie: cantidad de cada momento por el precio de ese momento", () => {
+    const pos = { cantidad: 2, desde: null, movimientos: [], precios: [10, 11, 12, 13, 14], precioActual: 15 };
+    const { puntos, flujos } = CryptoFinance.serieSaldo({ ...rejilla, posiciones: [pos], ahora: 5 * H, valorAhora: 30 });
+    expect(puntos.map((p) => p.value)).toEqual([20, 22, 24, 26, 28, 30]);
+    expect(puntos[5].at).toBe(5 * H);
+    expect(flujos).toEqual([]);
+  });
+
+  it("serie: sin precio pasado se usa el actual (valor constante)", () => {
+    const pos = { cantidad: 1, desde: null, movimientos: [], precios: null, precioActual: 7 };
+    const { puntos } = CryptoFinance.serieSaldo({ ...rejilla, posiciones: [pos] });
+    expect(puntos.map((p) => p.value)).toEqual([7, 7, 7, 7, 7]);
+  });
+
+  it("serie: una compra dentro del periodo es un flujo, no ganancia", () => {
+    const pos = { cantidad: 2, desde: null, movimientos: [{ at: 2 * H, cantidad: 1 }], precios: [10, 10, 10, 10, 10], precioActual: 10 };
+    const { puntos, flujos } = CryptoFinance.serieSaldo({ ...rejilla, posiciones: [pos], ahora: 4 * H });
+    expect(puntos.map((p) => p.value)).toEqual([10, 10, 20, 20, 20]);
+    expect(flujos).toEqual([{ at: 2 * H, value: 10 }]);
+    // El saldo se duplica, pero el precio no se ha movido: 0 % de ganancia.
+    const r = CryptoFinance.rentabilidadPeriodo(puntos, flujos);
+    expect(r.delta).toBeCloseTo(0, 10);
+    expect(r.pct).toBeCloseTo(0, 10);
+  });
+
+  it("serie: una posicion con fecha de compra dentro del periodo entra como flujo", () => {
+    const pos = { cantidad: 1, desde: 2 * H, movimientos: [], precios: [5, 5, 8, 9, 10], precioActual: 10 };
+    const { puntos, flujos } = CryptoFinance.serieSaldo({ ...rejilla, posiciones: [pos], ahora: 4 * H });
+    expect(puntos.map((p) => p.value)).toEqual([0, 0, 8, 9, 10]);
+    expect(flujos).toEqual([{ at: 2 * H, value: 8 }]);
+    const r = CryptoFinance.rentabilidadPeriodo(puntos, flujos);
+    // Entro con 8 y vale 10: gana 2 (25 % sobre lo que estuvo invertido la mitad del periodo).
+    expect(r.delta).toBeCloseTo(2, 10);
+    expect(r.pct).toBeCloseTo((2 / (8 * 0.5)) * 100, 10);
+  });
+
+  it("rentabilidad: sin flujos es el cambio simple", () => {
+    const r = CryptoFinance.rentabilidadPeriodo([{ at: 0, value: 100 }, { at: H, value: 110 }], []);
+    expect(r.delta).toBe(10);
+    expect(r.pct).toBeCloseTo(10, 10);
+  });
+
+  it("rentabilidad: una venta no cuenta como perdida", () => {
+    const pos = { cantidad: 1, desde: null, movimientos: [{ at: 2 * H, cantidad: -1 }], precios: [10, 10, 10, 10, 10], precioActual: 10 };
+    const { puntos, flujos } = CryptoFinance.serieSaldo({ ...rejilla, posiciones: [pos], ahora: 4 * H });
+    expect(puntos.map((p) => p.value)).toEqual([20, 20, 10, 10, 10]);
+    const r = CryptoFinance.rentabilidadPeriodo(puntos, flujos);
+    expect(r.delta).toBeCloseTo(0, 10);
+  });
+
+  it("rentabilidad: con menos de dos puntos no hay dato", () => {
+    expect(CryptoFinance.rentabilidadPeriodo([{ at: 0, value: 1 }], [])).toBe(null);
+  });
+});

@@ -15,10 +15,14 @@ import { chromium } from "playwright-core";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const MODULOS = path.join(RAIZ, "node_modules");
+// La rejilla de tiempo del historial, la misma que usa el servidor.
+const REJILLA = createRequire(import.meta.url)(path.join(RAIZ, "api/historial.js"))._internals.rejillaDe;
 
 // ── Servidor estatico minimo de la raiz del repositorio ──
 const TIPOS = {
@@ -108,10 +112,23 @@ function respuestaCoinGecko(ruta) {
   return {};
 }
 
-async function simularRed(ctx, { proxyCaido = false } = {}) {
+async function simularRed(ctx, { proxyCaido = false, historialCaido = false } = {}) {
   const json = (r, body) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   const directas = [];
   const billetera = { version: 1, llamadas: [], claves: [] };
+  // Precios pasados (api/historial.js): suben un 25 % a lo largo del periodo
+  // hasta el precio actual de cada moneda.
+  const historial = { pedidas: [] };
+  await ctx.route("**/api/historial?**", (r) => {
+    const u = new URL(r.request().url());
+    historial.pedidas.push(u.search);
+    if (historialCaido) return r.fulfill({ status: 503, contentType: "application/json", body: "{}" });
+    const ids = (u.searchParams.get("ids") || "").split(",");
+    const g = REJILLA(Number(u.searchParams.get("dias")));
+    const actual = Object.fromEntries(MERCADO.map((m) => [m.id, m.current_price]));
+    const precios = Object.fromEntries(ids.filter((id) => actual[id]).map((id) => [id, Array.from({ length: g.n }, (_, i) => actual[id] * (0.8 + 0.2 * i / (g.n - 1)))]));
+    return json(r, { desde: g.desde, paso: g.paso, n: g.n, precios, faltan: ids.filter((id) => !actual[id]), incompleto: false });
+  });
   await ctx.route("**/api/cg/**", (r) => proxyCaido ? r.abort()
     : json(r, respuestaCoinGecko(new URL(r.request().url()).pathname.replace(/^.*\/api\/cg\//, ""))));
   await ctx.route("**api.coingecko.com/**", (r) => {
@@ -141,7 +158,7 @@ async function simularRed(ctx, { proxyCaido = false } = {}) {
     await ctx.route(lib.patron, (r) => r.fulfill({ path: path.join(MODULOS, lib.paquete, lib.fichero), contentType: "application/javascript" }));
   }
   await ctx.route("**fonts.g*/**", (r) => r.abort());
-  return { directas, billetera };
+  return { directas, billetera, historial };
 }
 
 async function simularWebSockets(page) {
@@ -197,9 +214,9 @@ function anotar(grupo, nombre, error) {
   console.log(`${error ? "FALLO" : "  ok "} [${grupo}] ${nombre}${error ? "\n        " + error : ""}`);
 }
 
-async function abrirApp(navegador, url, { ancho = 375, alto = 780, movil = true, sembrar = true, proxyCaido = false } = {}) {
+async function abrirApp(navegador, url, { ancho = 375, alto = 780, movil = true, sembrar = true, proxyCaido = false, historialCaido = false } = {}) {
   const ctx = await navegador.newContext({ viewport: { width: ancho, height: alto }, isMobile: movil, hasTouch: movil, serviceWorkers: "block", acceptDownloads: true });
-  const { directas, billetera } = await simularRed(ctx, { proxyCaido });
+  const { directas, billetera, historial } = await simularRed(ctx, { proxyCaido, historialCaido });
   const page = await ctx.newPage();
   page.setDefaultTimeout(6000);
   const errores = [];
@@ -210,7 +227,7 @@ async function abrirApp(navegador, url, { ancho = 375, alto = 780, movil = true,
   if (sembrar) await page.addInitScript(sembrarCartera);
   await page.goto(url);
   await page.waitForTimeout(3500);
-  return { ctx, page, errores, directas, billetera };
+  return { ctx, page, errores, directas, billetera, historial };
 }
 
 async function paso(grupo, nombre, app, fn) {
@@ -961,6 +978,107 @@ async function casosBilletera(navegador, url, ancho) {
   await app.ctx.close();
 }
 
+// ── Saldo en el tiempo y copia de seguridad ──
+async function casosCopiaHistorial(navegador, url) {
+  const g = "historial y copia";
+  const app = await abrirApp(navegador, url);
+  await paso(g, "historial: una sola peticion con todas las monedas", app, async () => {
+    const q = new URLSearchParams(app.historial.pedidas[0] || "");
+    if (q.get("ids") !== "bitcoin,cardano,chainlink,ethereum,pepe,solana" || q.get("vs") !== "usd" || q.get("dias") !== "30") {
+      throw new Error(`peticion: ${app.historial.pedidas[0] || "ninguna"}`);
+    }
+  });
+  await paso(g, "historial: grafico y cambio del mes sin contar compras ni ventas", app, async (page) => {
+    const r = await page.evaluate(() => {
+      const s = serieSaldoDelRango("1m", buildSnapshot());
+      return {
+        puntos: s?.puntos.length,
+        flujos: s?.flujos.length,
+        pct: s ? CryptoFinance.rentabilidadPeriodo(s.puntos, s.flujos).pct : null,
+        chip: document.getElementById("saldoCambioValor").textContent,
+        grafico: Boolean(document.querySelector("#graficoSaldo path"))
+      };
+    });
+    if (!(r.puntos > 150) || !r.grafico) throw new Error(`serie de ${r.puntos} puntos, grafico ${r.grafico}`);
+    // Precios +25 % en el mes. La compra de BTC (hace 5 dias) y la venta de
+    // ETH (hace 3) son dinero que entra y sale, no ganancia ni perdida.
+    if (r.flujos !== 2 || !(r.pct > 20 && r.pct < 30)) throw new Error(`flujos ${r.flujos}, rentabilidad ${r.pct}`);
+    if (!/%/.test(r.chip)) throw new Error(`cambio: "${r.chip}"`);
+  });
+  await paso(g, "historial: cada rango pide sus dias y no se repite", app, async (page) => {
+    await page.click('#rangoSaldo [data-rango="1a"]');
+    await page.waitForTimeout(500);
+    const ultima = new URLSearchParams(app.historial.pedidas.at(-1)).get("dias");
+    if (ultima !== "364") throw new Error(`1A pidio ${ultima} dias`);
+    const n = app.historial.pedidas.length;
+    await page.click('#rangoSaldo [data-rango="1m"]');
+    await page.waitForTimeout(500);
+    if (app.historial.pedidas.length !== n) throw new Error("volvio a pedir el mes");
+  });
+  let archivo = null;
+  await paso(g, "copia: guarda todo y sin la clave de CoinStats", app, async (page) => {
+    await page.evaluate(() => localStorage.setItem("crypto-dashboard-coinstats-key-v1", "CLAVE-SECRETA-E2E"));
+    await page.click('#tabBar [data-tab-target="more"]');
+    await page.evaluate(() => { document.getElementById("copiaGuardarBtn").closest("details").open = true; });
+    const [descarga] = await Promise.all([page.waitForEvent("download"), page.click("#copiaGuardarBtn")]);
+    archivo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "copia-")), descarga.suggestedFilename());
+    await descarga.saveAs(archivo);
+    const texto = fs.readFileSync(archivo, "utf8");
+    const copia = JSON.parse(texto);
+    if (copia.formato !== "crypto-portfolio-pro-copia") throw new Error("formato");
+    const c = copia.datos.cartera;
+    if (c.rows.length !== 6 || c.trades.length !== 3 || c.alerts.length !== 4) throw new Error(`contenido: ${c.rows.length} filas, ${c.trades.length} operaciones, ${c.alerts.length} alertas`);
+    if (texto.includes("CLAVE-SECRETA")) throw new Error("la clave de CoinStats va en la copia");
+    if (!/hoy/.test(await page.textContent("#copiaEstado"))) throw new Error("no marca la copia como hecha");
+  });
+  await app.ctx.close();
+
+  const otro = await abrirApp(navegador, url, { sembrar: false });
+  await paso(g, "copia: un archivo que no es copia no cambia nada", otro, async (page) => {
+    const antes = await page.evaluate(() => state.rows.length);
+    const malo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "malo-")), "no.json");
+    fs.writeFileSync(malo, JSON.stringify({ hola: 1 }));
+    await page.setInputFiles("#copiaArchivo", malo);
+    await page.waitForTimeout(500);
+    const aviso = await page.evaluate(() => document.getElementById("toastStack").textContent);
+    if (!/no es una copia/i.test(aviso)) throw new Error(`aviso: "${aviso.trim()}"`);
+    if (await page.evaluate(() => state.rows.length) !== antes) throw new Error("cambio la cartera");
+  });
+  await paso(g, "copia: restaurar en otro dispositivo", otro, async (page) => {
+    if (!archivo) throw new Error("no hay copia que restaurar");
+    await Promise.all([page.waitForEvent("load"), page.setInputFiles("#copiaArchivo", archivo)]);
+    await page.waitForFunction(() => typeof state !== "undefined" && state.rows.length > 0);
+    const r = await page.evaluate(() => ({ filas: state.rows.length, ops: state.trades.length, alertas: state.alerts.length, copia: state.prefs.copiaUltima > 0 }));
+    if (r.filas !== 6 || r.ops !== 3 || r.alertas !== 4 || !r.copia) throw new Error(JSON.stringify(r));
+  });
+  await otro.ctx.close();
+
+  const caido = await abrirApp(navegador, url, { historialCaido: true });
+  await paso(g, "historial caido: el grafico sigue con lo guardado y no insiste", caido, async (page) => {
+    const n = caido.historial.pedidas.length;
+    const r = await page.evaluate(() => ({ serie: serieSaldoDelRango("1m", buildSnapshot()), grafico: document.getElementById("graficoSaldo").innerHTML.length > 0 }));
+    await page.evaluate(() => renderDashboardOnly());
+    await page.waitForTimeout(200);
+    if (!n || r.serie !== null || !r.grafico) throw new Error(`peticiones ${n}, serie ${r.serie}, grafico ${r.grafico}`);
+    if (caido.historial.pedidas.length !== n) throw new Error("reintenta en cada repintado");
+  });
+  await paso(g, "aviso de copia: tras una semana sin copia, y Mas tarde lo pospone", caido, async (page) => {
+    await page.evaluate(() => {
+      localStorage.setItem("crypto-dashboard-history-v2", JSON.stringify({ points: [{ at: new Date(Date.now() - 10 * 86400000).toISOString(), total: 5000, currency: "usd" }] }));
+    });
+    await page.reload();
+    await page.waitForTimeout(2500);
+    const visible = await page.evaluate(() => { const a = document.getElementById("avisoCopia"); return !a.hidden && a.getBoundingClientRect().height > 0; });
+    if (!visible) throw new Error("no aparece el aviso");
+    const lado = await desborde(page);
+    if (lado) throw new Error(lado);
+    await page.click('#avisoCopia [data-copia="posponer"]');
+    const oculto = await page.evaluate(() => document.getElementById("avisoCopia").hidden && state.prefs.copiaPospuesta > Date.now());
+    if (!oculto) throw new Error("Mas tarde no lo oculta");
+  });
+  await caido.ctx.close();
+}
+
 const desfases = comprobarVersionesCdn();
 if (desfases.length) anotar("versiones", "librerias del CDN alineadas con package.json", desfases.join(" | "));
 else anotar("versiones", "librerias del CDN alineadas con package.json", null);
@@ -985,6 +1103,7 @@ const navegador = await chromium.launch(process.env.CHROMIUM_PATH ? { executable
 try {
   await casosSueltos(navegador, url);
   await casosEscritorio(navegador, url);
+  await casosCopiaHistorial(navegador, url);
   for (const ancho of [375, 320]) await recorridoCompleto(navegador, url, ancho);
   for (const ancho of [375, 320]) await casosBilletera(navegador, url, ancho);
 } finally {

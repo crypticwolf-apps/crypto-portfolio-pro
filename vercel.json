@@ -3,6 +3,9 @@
   "functions": {
     "api/wallet.js": {
       "maxDuration": 30
+    },
+    "api/historial.js": {
+      "maxDuration": 30
     }
   },
   "rewrites": [

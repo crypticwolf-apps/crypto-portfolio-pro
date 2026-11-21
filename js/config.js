@@ -81,6 +81,14 @@ const WALLET_PROXY = typeof location !== "undefined"
   && (location.protocol === "https:" || location.protocol === "http:")
   ? "/api/wallet"
   : "https://crypto-portfolio-pro-omega.vercel.app/api/wallet";
+// Precios pasados de todas las monedas de una vez (api/historial.js), para
+// el grafico del saldo. Mismo criterio: relativo en la web, absoluto en la APK.
+const HISTORIAL_PROXY = typeof location !== "undefined"
+  && (location.protocol === "https:" || location.protocol === "http:")
+  ? "/api/historial"
+  : "https://crypto-portfolio-pro-omega.vercel.app/api/historial";
+// Ultimos precios pasados recibidos para el grafico del saldo (uno por rango).
+const HIST_SALDO_CACHE_KEY = "crypto-dashboard-saldo-hist-v1";
 const MAX_WALLETS = 20;
 // Clave de CoinStats del usuario (opcional). Va en su PROPIA clave de
 // localStorage, fuera de las preferencias: asi no viaja en ninguna
@@ -307,7 +315,10 @@ const DEFAULT_PREFS = {
   groupSmall: true,
   listMetric: "24h",
   homeRange: "1m",
-  homeBlocks: null
+  homeBlocks: null,
+  // Copia de seguridad: cuando se hizo la ultima y hasta cuando se pospuso el aviso.
+  copiaUltima: 0,
+  copiaPospuesta: 0
 };
 
 // Ajustes guardados por versiones anteriores que ya no se usan.
@@ -464,6 +475,8 @@ const state = {
     lastTickAt: 0,
     knownPairs: null
   },
+  // Restaurando una copia: no se guarda nada hasta recargar.
+  restaurando: false,
   refreshRequestId: 0,
   currencySwitchId: 0,
   plan: { tp: {}, tpAll: { p1: 30, p2: 50, p3: 100 } },

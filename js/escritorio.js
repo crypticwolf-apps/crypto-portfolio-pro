@@ -2,6 +2,7 @@
 // escritorio.js - Version de escritorio (desde 1100 px): toda la app en una
 // pagina, sin pestanas, en bandas a todo el ancho:
 //   cabecera ............ saludo, nombre, acciones rapidas y botones (con Ajustes)
+//   aviso ............... recordatorio de copia de seguridad (si toca)
 //   saldo ............... saldo + grafico | resumen de hoy + rendimiento
 //   mercado ............. BTC, ETH, dominancia y miedo/codicia en una linea
 //   posiciones .......... todos los activos (la tabla)
@@ -55,6 +56,7 @@ function escPiezas() {
   const panel = (id) => document.getElementById(id)?.closest(".panel");
   return [
     [document.querySelector(".inicio-cabecera"), "cabecera"],
+    [document.getElementById("avisoCopia"), "aviso"],
     [document.getElementById("mainValueCard"), "saldo"],
     [document.querySelector('[data-bloque="grafico"]'), "saldo"],
     // Acciones rapidas: en la cabecera fija, siempre a mano.

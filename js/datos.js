@@ -864,55 +864,63 @@ function scheduleAutosave() {
   }, AUTOSAVE_DELAY);
 }
 
-function persistState(manual) {
-  try {
-    const payload = {
-      // Versión de esquema: permite migrar datos antiguos si cambia la forma.
-      schema: DATA_SCHEMA_VERSION,
-      savedAt: Date.now(),
-      rows: state.rows.map((row) => ({
-        id: row.id,
-        crypto: row.crypto,
-        coinId: row.coinId,
-        resolvedName: row.resolvedName,
-        symbol: row.symbol,
-        image: row.image,
-        investment: row.investment,
-        tokens: row.tokens,
-        entryPrice: row.entryPrice,
-        tp1: row.tp1,
-        tp2: row.tp2,
-        tp3: row.tp3,
-        currentPrice: row.currentPrice,
-        priceChange24h: row.priceChange24h,
-        priceStatus: row.priceStatus,
-        priceMessage: row.priceMessage,
-        lastPriceAt: row.lastPriceAt,
-        priceHistory: row.priceHistory,
-        favorite: row.favorite,
-        pinned: row.pinned,
-        derivedField: row.derivedField,
-        marketCap: row.marketCap,
-        marketCapRank: row.marketCapRank,
-        marketCapUpdatedAt: row.marketCapUpdatedAt,
-        note: row.note,
-        purchaseDate: row.purchaseDate,
-        personalLabel: row.personalLabel,
-        alertsFired: row.alertsFired,
-        // Red + contrato: imprescindible en tokens que CoinGecko no lista,
-        // que solo se pueden valorar por contrato.
-        dexNetwork: row.dexNetwork,
-        dexAddress: row.dexAddress,
-        walletId: row.walletId,
-        walletKey: row.walletKey,
-        walletParts: row.walletParts
-      })),
-      activity: state.activity.slice(0, MAX_ACTIVITY_ITEMS),
-      trades: state.trades.slice(0, MAX_TRADES),
-      alerts: state.alerts.slice(0, MAX_ALERTS),
-      wallets: state.wallets.slice(0, MAX_WALLETS)
-    };
+// Lo que se guarda en el dispositivo (y va en la copia de seguridad).
+function datosParaGuardar() {
+  return {
+    // Versión de esquema: permite migrar datos antiguos si cambia la forma.
+    schema: DATA_SCHEMA_VERSION,
+    savedAt: Date.now(),
+    rows: state.rows.map((row) => ({
+      id: row.id,
+      crypto: row.crypto,
+      coinId: row.coinId,
+      resolvedName: row.resolvedName,
+      symbol: row.symbol,
+      image: row.image,
+      investment: row.investment,
+      tokens: row.tokens,
+      entryPrice: row.entryPrice,
+      tp1: row.tp1,
+      tp2: row.tp2,
+      tp3: row.tp3,
+      currentPrice: row.currentPrice,
+      priceChange24h: row.priceChange24h,
+      priceStatus: row.priceStatus,
+      priceMessage: row.priceMessage,
+      lastPriceAt: row.lastPriceAt,
+      priceHistory: row.priceHistory,
+      favorite: row.favorite,
+      pinned: row.pinned,
+      derivedField: row.derivedField,
+      marketCap: row.marketCap,
+      marketCapRank: row.marketCapRank,
+      marketCapUpdatedAt: row.marketCapUpdatedAt,
+      note: row.note,
+      purchaseDate: row.purchaseDate,
+      personalLabel: row.personalLabel,
+      alertsFired: row.alertsFired,
+      // Red + contrato: imprescindible en tokens que CoinGecko no lista,
+      // que solo se pueden valorar por contrato.
+      dexNetwork: row.dexNetwork,
+      dexAddress: row.dexAddress,
+      walletId: row.walletId,
+      walletKey: row.walletKey,
+      walletParts: row.walletParts
+    })),
+    activity: state.activity.slice(0, MAX_ACTIVITY_ITEMS),
+    trades: state.trades.slice(0, MAX_TRADES),
+    alerts: state.alerts.slice(0, MAX_ALERTS),
+    wallets: state.wallets.slice(0, MAX_WALLETS)
+  };
+}
 
+function persistState(manual) {
+  // Restaurando una copia: lo de memoria ya no vale y no debe pisarla.
+  if (state.restaurando) {
+    return;
+  }
+  try {
+    const payload = datosParaGuardar();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     savePreferences();
     persistHistory();
@@ -968,6 +976,9 @@ function normalizeHomeBlocks(list) {
 }
 
 function savePreferences() {
+  if (state.restaurando) {
+    return;
+  }
   writeStored(PREFS_KEY, JSON.stringify(state.prefs));
 }
 
@@ -988,6 +999,9 @@ function persistHistory() {
   if (historyWriteHandle != null) idleCancel(historyWriteHandle);
   historyWriteHandle = idleSchedule(() => {
     historyWriteHandle = null;
+    if (state.restaurando) {
+      return;
+    }
     try {
       localStorage.setItem(
         HISTORY_KEY,

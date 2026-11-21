@@ -5,7 +5,7 @@
 //  - APIs de precios .......... network-first; si la red falla se devuelve la
 //    última respuesta cacheada marcada con "X-SW-Fallback: 1" para que la app
 //    la etiquete como datos sin conexión (nunca como precio en tiempo real).
-const VERSION = "v28";
+const VERSION = "v29";
 const SHELL_CACHE = `crypto-portfolio-shell-${VERSION}`;
 const CDN_CACHE = `crypto-portfolio-cdn-${VERSION}`;
 const API_CACHE = `crypto-portfolio-api-${VERSION}`;
@@ -40,7 +40,9 @@ const APP_SHELL = [
   "./js/analitica.js",
   "./js/noticias.js",
   "./js/graficos.js",
+  "./js/historial.js",
   "./js/exportar.js",
+  "./js/copia.js",
   "./js/billeteras.js",
   "./js/inicio.js",
   "./js/apariencia.js",
@@ -214,6 +216,12 @@ self.addEventListener("fetch", (event) => {
   // (network-first con fallback marcado) y no la del app shell.
   if (url.pathname.startsWith("/api/cg/") || API_HOSTS.includes(url.hostname)) {
     event.respondWith(handleApiRequest(req));
+    return;
+  }
+
+  // Historial del saldo (api/historial.js): siempre a la red. La app guarda
+  // su propia copia; aqui se acumularia una entrada nueva cada hora.
+  if (url.pathname.startsWith("/api/historial")) {
     return;
   }
 

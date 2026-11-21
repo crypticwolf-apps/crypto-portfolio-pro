@@ -105,9 +105,21 @@ function homeHistoryPoints(range) {
     && new Date(point.at).getTime() >= cutoff);
 }
 
+// Etiqueta del periodo: si los datos empiezan bastante despues de su inicio
+// se dice desde cuando se mide en vez de prometer "este mes".
+function etiquetaPeriodo(range, primerMs) {
+  const windowMs = RANGOS_INICIO[range];
+  const startedLate = primerMs - (Date.now() - windowMs) > windowMs * 0.1;
+  return startedLate
+    ? t("inicio.desdeFecha", { fecha: intlFormatter("date", getUiLocale(), { day: "numeric", month: "short" }).format(new Date(primerMs)) })
+    : t(`inicio.etiqueta${range}`);
+}
+
 // Cambio del saldo en el periodo: 1D sale de la variacion 24 h de cada activo
 // (exacta aunque no haya historial); "Todo" es el resultado neto sobre lo
-// aportado (igual que Analitica); el resto, del historial guardado.
+// aportado (igual que Analitica); el resto, del saldo reconstruido con precios
+// pasados sin contar el dinero metido o sacado (historial.js) o, mientras
+// llega, del historial guardado.
 function homeRangeChange(snapshot) {
   const range = state.prefs.homeRange;
   const total = snapshot.totals.currentValue;
@@ -121,21 +133,19 @@ function homeRangeChange(snapshot) {
       ? { delta: change.delta, pct: change.pct, label: t("inicio.etiqueta1d") }
       : { delta: null, pct: null, label: t("inicio.etiqueta1d") };
   }
+  const serie = serieSaldoDelRango(range, snapshot);
+  const periodo = serie ? CryptoFinance.rentabilidadPeriodo(serie.puntos, serie.flujos) : null;
+  if (periodo) {
+    return { delta: periodo.delta, pct: periodo.pct, label: etiquetaPeriodo(range, serie.puntos[0].at) };
+  }
   const points = homeHistoryPoints(range);
   const first = points[0];
   const base = first ? Number(first.total) : 0;
   if (!(base > 0) || !(total > 0)) {
     return { delta: null, pct: null, label: t("inicio.sinHistorial") };
   }
-  // Si el historial empieza bastante despues del inicio del periodo, se dice
-  // desde cuando se mide en vez de prometer "este mes".
-  const windowMs = RANGOS_INICIO[range];
-  const startedLate = new Date(first.at).getTime() - (Date.now() - windowMs) > windowMs * 0.1;
-  const label = startedLate
-    ? t("inicio.desdeFecha", { fecha: intlFormatter("date", getUiLocale(), { day: "numeric", month: "short" }).format(new Date(first.at)) })
-    : t(`inicio.etiqueta${range}`);
   const delta = total - base;
-  return { delta, pct: (delta / base) * 100, label };
+  return { delta, pct: (delta / base) * 100, label: etiquetaPeriodo(range, new Date(first.at).getTime()) };
 }
 
 function renderMainValueCard(snapshot) {
@@ -222,12 +232,18 @@ function renderHomeChart(snapshot = null) {
   if (!box) {
     return;
   }
-  const current = (snapshot || buildSnapshot()).totals.currentValue;
-  const points = homeHistoryPoints(state.prefs.homeRange).map((point) => ({
-    at: new Date(point.at).getTime(),
-    value: Number(point.total)
-  }));
-  if (current > 0) {
+  const snap = snapshot || buildSnapshot();
+  const current = snap.totals.currentValue;
+  // El saldo reconstruido con precios pasados; si aun no ha llegado, el
+  // historial guardado en este dispositivo.
+  const serie = serieSaldoDelRango(state.prefs.homeRange, snap);
+  const points = serie
+    ? serie.puntos
+    : homeHistoryPoints(state.prefs.homeRange).map((point) => ({
+        at: new Date(point.at).getTime(),
+        value: Number(point.total)
+      }));
+  if (!serie && current > 0) {
     points.push({ at: Date.now(), value: current });
   }
   if (points.length < 3) {

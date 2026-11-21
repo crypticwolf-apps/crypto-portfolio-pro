@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Inversión Crypto Pro",
+  "name": "Crypto Portfolio Pro",
   "short_name": "Crypto Pro",
-  "description": "Gestiona tu portafolio de criptomonedas: tabla editable, precios en tiempo real (CoinGecko), objetivos de TP, gráficos y exportación CSV/PDF.",
+  "description": "Tu cartera de criptomonedas: precios en vivo, billeteras, plan de salida con objetivos, analitica, alertas, noticias y copia de seguridad.",
   "lang": "es",
   "dir": "ltr",
   "start_url": "./index.html",

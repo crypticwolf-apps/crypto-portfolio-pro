@@ -13,6 +13,7 @@ function init() {
   bindHome();
   bindAppearance();
   bindWallets();
+  bindCopia();
   bindEscritorio();
   bindEnvironmentEvents();
   applyBalanceVisibility();

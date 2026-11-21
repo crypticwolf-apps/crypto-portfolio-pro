@@ -458,3 +458,17 @@
 /* Punto de "en vivo": late despacio mientras llegan precios. */
 :root[data-ui] .live-dot { animation: latidoVivo 2s ease-in-out infinite; }
 @keyframes latidoVivo { 50% { opacity: 0.35; } }
+
+/* ── Aviso de copia de seguridad (copia.js) ── */
+:root[data-ui] .aviso-copia {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+  margin-top: 12px;
+}
+:root[data-ui] .aviso-copia-texto { flex: 1 1 200px; min-width: 0; }
+:root[data-ui] .aviso-copia-texto strong { display: block; font-size: 0.9375rem; font-weight: 600; }
+:root[data-ui] .aviso-copia-texto p { margin-top: 2px; font-size: 0.8125rem; line-height: 1.45; color: var(--c-t2); }
+:root[data-ui] .aviso-copia-acciones { display: flex; gap: 8px; flex: 1 1 100%; }
+:root[data-ui] .aviso-copia-acciones > button { flex: 1 1 0; min-height: 42px; }
