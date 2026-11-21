@@ -1,0 +1,76 @@
+/* =============================================================================
+   tablet.css - Tablet y movil en horizontal (700 a 1099 px): la app de movil
+   aprovechando el ancho, en dos columnas, en vez de una columna estrecha en
+   medio de la pantalla. Por debajo manda el movil y desde 1100 px la version
+   de escritorio (escritorio.css), asi que nada de esto les afecta.
+   - Inicio: saldo, grafico y acciones a todo el ancho; el resto de bloques
+     en dos columnas, en el orden elegido en Apariencia.
+   - Analitica: las tarjetas en dos columnas, cada una a su altura.
+   - Plan y Noticias: dos columnas; los titulos y avisos, a todo el ancho.
+   - Ajustes y la ficha de un activo: una columna centrada (como en un iPad),
+     para que abrir un apartado no mueva los demas.
+   ============================================================================= */
+
+@media (min-width: 700px) and (max-width: 1099px) {
+  :root[data-ui] .app-shell {
+    max-width: 1040px;
+    padding-left: max(24px, env(safe-area-inset-left));
+    padding-right: max(24px, env(safe-area-inset-right));
+  }
+
+  /* ── Inicio ── */
+  :root[data-ui] .inicio-bloques {
+    display: block;
+    column-count: 2;
+    column-gap: var(--bloque-gap);
+  }
+  :root[data-ui] .inicio-bloques > .bloque {
+    break-inside: avoid;
+    margin-bottom: var(--bloque-gap);
+  }
+  :root[data-ui] .inicio-bloques > [data-bloque="grafico"],
+  :root[data-ui] .inicio-bloques > [data-bloque="acciones"] { column-span: all; }
+
+  /* ── Analitica ── */
+  :root[data-ui] .analytics-view {
+    display: block;
+    column-count: 2;
+    column-gap: 16px;
+  }
+  :root[data-ui] .analytics-view > .panel {
+    break-inside: avoid;
+    margin-bottom: 16px;
+  }
+
+  /* ── Plan ── */
+  :root[data-ui] #planContent {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 12px;
+  }
+  :root[data-ui] #planContent > .tp-block-compare,
+  :root[data-ui] #planContent > .tp-detail-head,
+  :root[data-ui] #planContent > .plan-disclaimer,
+  :root[data-ui] #planContent > .plan-empty,
+  :root[data-ui] #planContent > :only-child { grid-column: 1 / -1; }
+
+  /* ── Noticias ── */
+  :root[data-ui] .news-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 12px;
+  }
+  :root[data-ui] .news-list > .news-dia,
+  :root[data-ui] .news-list > .news-stale,
+  :root[data-ui] .news-list > .news-empty { grid-column: 1 / -1; }
+  :root[data-ui] .news-list > .news-dia { margin: 8px 4px 0; }
+
+  /* ── Ajustes: una columna centrada ── */
+  :root[data-ui] #ajustesSeccion {
+    width: 100%;
+    max-width: 720px;
+    margin-inline: auto;
+  }
+}

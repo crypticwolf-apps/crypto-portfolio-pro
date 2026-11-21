@@ -173,25 +173,11 @@
   border-radius: var(--r-md);
   background: var(--c-bg);
 }
-:root[data-ui] .insight-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 10px;
-}
-:root[data-ui] .insight-card-head h3 { font-size: 0.9375rem; font-weight: 600; }
-:root[data-ui] .insight-card-head p { margin-top: 2px; font-size: 0.75rem; color: var(--c-t2); }
-:root[data-ui] .insight-chip {
-  flex: 0 0 auto;
-  padding: 3px 8px;
-  border-radius: var(--r-pill);
-  background: var(--c-s2);
-  color: var(--c-t2);
-  font-size: 0.6875rem;
-  font-weight: 600;
-}
-:root[data-ui] .insight-chip.positive { background: var(--c-pos-suave); color: var(--c-pos); }
-:root[data-ui] .insight-chip.negative { background: var(--c-neg-suave); color: var(--c-neg); }
+/* Selector "Desde la compra / Ultimas 24 h" sobre las dos listas. */
+:root[data-ui] .insights-modo { grid-column: 1 / -1; }
+/* Con texto grande en pantallas estrechas, la opcion pasa a dos lineas. */
+:root[data-ui] .insights-modo > button { white-space: normal; line-height: 1.2; overflow: visible; text-overflow: clip; height: auto; min-height: 36px; padding-block: 6px; }
+:root[data-ui] .insight-card-title { font-size: 0.9375rem; font-weight: 600; }
 :root[data-ui] .insight-list { display: flex; flex-direction: column; }
 :root[data-ui] .insight-item {
   display: flex;
@@ -237,22 +223,24 @@
 :root[data-ui] .acts-totals b { font-size: 0.875rem; font-weight: 600; overflow-wrap: anywhere; }
 :root[data-ui] .acts-totals b.positive { color: var(--c-pos); }
 :root[data-ui] .acts-totals b.negative { color: var(--c-neg); }
-:root[data-ui] .acts-months {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 6px;
-  padding-bottom: 2px;
-  border-bottom: 1px solid var(--c-line);
+/* Un mes por fila (solo los que tienen actividad): compras y ventas como
+   barras horizontales con su importe. */
+:root[data-ui] .acts-meses { display: flex; flex-direction: column; gap: 10px; }
+:root[data-ui] .acts-mes {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
 }
-:root[data-ui] .acts-month { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-:root[data-ui] .acts-bars { height: 48px; display: flex; align-items: flex-end; gap: 2px; }
-:root[data-ui] .acts-bar { width: 8px; border-radius: 4px 4px 0 0; }
-:root[data-ui] .acts-bar.buy,
+:root[data-ui] .acts-mes-nombre { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .acts-mes-barras { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+:root[data-ui] .acts-linea { display: flex; align-items: center; gap: 8px; min-width: 0; }
+:root[data-ui] .acts-barra { flex: 0 1 auto; height: 8px; min-width: 3px; border-radius: 0 4px 4px 0; }
+:root[data-ui] .acts-linea b { flex: 0 0 auto; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+:root[data-ui] .acts-linea.buy .acts-barra,
 :root[data-ui] .acts-legend i.buy { background: var(--serie-1); }
-:root[data-ui] .acts-bar.sell,
+:root[data-ui] .acts-linea.sell .acts-barra,
 :root[data-ui] .acts-legend i.sell { background: var(--serie-2); }
-:root[data-ui] .acts-month small { font-size: 0.6875rem; color: var(--c-t2); }
 :root[data-ui] .acts-legend {
   display: flex;
   gap: 16px;

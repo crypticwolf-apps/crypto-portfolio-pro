@@ -93,6 +93,25 @@ function newsImpactTone(v) {
   return "baja";
 }
 
+// Cabecera de cada dia en la lista: "Hoy", "Ayer" o "Lunes, 17 de noviembre".
+function etiquetaDiaNoticia(ts) {
+  if (!ts) {
+    return "";
+  }
+  const dia = new Date(ts);
+  const hoy = new Date();
+  const mismoDia = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (mismoDia(dia, hoy)) {
+    return t("news.hoy");
+  }
+  const ayer = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1);
+  if (mismoDia(dia, ayer)) {
+    return t("news.ayer");
+  }
+  const texto = intlFormatter("date", getUiLocale(), { weekday: "long", day: "numeric", month: "long" }).format(dia);
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 function renderNews() {
   // Escritorio: a la vista, las primeras filas de noticias.
   if (modoEscritorio()) {
@@ -148,16 +167,20 @@ function renderNews() {
     ? `<p class="news-stale">${escapeHtml(t("news.staleText", { time: state.newsAt ? formatRelativeTime(state.newsAt) : "--" }))}</p>`
     : "";
 
+  let diaAnterior = null;
   box.innerHTML = aviso + items.map((n) => {
     const abierta = Boolean(state.newsOpen[n.id]);
     const tono = newsImpactTone(n.impacto);
-    return `
+    const dia = etiquetaDiaNoticia(n.ts);
+    const cabecera = dia && dia !== diaAnterior ? `<h3 class="news-dia">${escapeHtml(dia)}</h3>` : "";
+    diaAnterior = dia;
+    return `${cabecera}
       <article class="news-card${abierta ? " is-open" : ""}" data-news-id="${escapeHtml(n.id)}">
         <button class="news-card-head" type="button" data-news-toggle="${escapeHtml(n.id)}" aria-expanded="${abierta ? "true" : "false"}">
           <span class="news-card-top">
             ${n.cat ? `<span class="news-cat">${escapeHtml(n.cat)}</span>` : ""}
             <span class="news-time">${escapeHtml(n.ts ? formatRelativeTime(n.ts) : "")}</span>
-            ${n.impacto != null ? `<span class="news-impact ${tono}" title="${escapeHtml(t("news.impact"))}">${n.impacto}</span>` : ""}
+            ${n.impacto != null ? `<span class="news-impact ${tono}" title="${escapeHtml(`${t("news.impact")}: ${n.impacto}`)}">${escapeHtml(t(`news.impacto.${tono}`))}</span>` : ""}
           </span>
           <span class="news-title">${escapeHtml(n.titulo)}</span>
         </button>

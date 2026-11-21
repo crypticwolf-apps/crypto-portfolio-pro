@@ -78,16 +78,23 @@
 :root[data-ui] .news-time { color: var(--c-t3); white-space: nowrap; }
 :root[data-ui] .news-impact {
   margin-left: auto;
-  min-width: 28px;
   padding: 3px 8px;
   border-radius: var(--r-pill);
-  font-weight: 700;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
 }
 :root[data-ui] .news-impact.baja { background: var(--c-s2); color: var(--c-t2); }
 :root[data-ui] .news-impact.media { background: var(--c-warn-suave); color: var(--c-warn); }
 :root[data-ui] .news-impact.alta { background: var(--c-neg-suave); color: var(--c-neg); }
+/* Cabecera de cada dia (Hoy, Ayer, Lunes...). En escritorio no: alli van en bloques. */
+:root[data-ui] .news-dia {
+  margin: 6px 4px -2px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--c-t2);
+}
+:root[data-ui] .news-dia:first-child { margin-top: 0; }
+:root[data-ui] .escritorio .news-dia { display: none; }
 :root[data-ui] .news-title {
   overflow-wrap: anywhere;
   font-size: 1rem;

@@ -341,6 +341,24 @@ function formatEditableNumber(value) {
   return Number(value.toFixed(digits)).toString();
 }
 
+// Decimales para un precio en una linea de resumen: sin centimos desde 100
+// y solo los que hacen falta en precios pequenos (0,0000123).
+function digitosPrecioCorto(price) {
+  if (!(price > 0)) {
+    return 2;
+  }
+  if (price >= 100) {
+    return 0;
+  }
+  if (price >= 1) {
+    return 2;
+  }
+  if (price >= 0.01) {
+    return 4;
+  }
+  return Math.min(10, Math.ceil(-Math.log10(price)) + 2);
+}
+
 function getPriceDigits(price) {
   if (price >= 1000) {
     return 2;

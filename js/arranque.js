@@ -282,6 +282,7 @@ function bindEvents() {
   dom.clearBtn.addEventListener("click", handleResetData);
   dom.downloadPdfBtn.addEventListener("click", handleDownloadPdf);
   bindAnalyticsSummary();
+  bindInsights();
   bindNews();
   dom.portfolioNameInput.addEventListener("input", (event) => {
     savePortfolioName(event.target.value);

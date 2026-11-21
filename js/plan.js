@@ -78,6 +78,31 @@ function getTpLevels(p) {
     .filter((l) => l.price > 0);
 }
 
+// Progreso hacia los objetivos, en la cabecera de cada activo del movil: una
+// barra del precio medio al objetivo mas alto, con una marca por TP (verde
+// si ya se alcanzo) y el siguiente objetivo con lo que le falta al precio.
+function tpProgresoHtml(p) {
+  const niveles = getTpLevels(p).slice().sort((a, b) => a.price - b.price);
+  const cur = p.price;
+  if (!niveles.length || !(cur > 0)) {
+    return "";
+  }
+  const base = p.avg > 0 ? Math.min(p.avg, cur, niveles[0].price) : Math.min(cur, niveles[0].price) * 0.8;
+  const tope = Math.max(niveles[niveles.length - 1].price, cur);
+  const span = tope - base || 1;
+  const pos = (v) => Math.max(0, Math.min(100, ((v - base) / span) * 100));
+  const siguiente = niveles.find((nivel) => nivel.price > cur);
+  const texto = siguiente
+    ? t("tp.siguiente", { tp: siguiente.label, pct: formatSignedPercent((siguiente.price / cur - 1) * 100) })
+    : t("tp.todosAlcanzados");
+  return `
+        <span class="tp-progreso" aria-hidden="true">
+          <span class="tp-progreso-relleno" style="width:${pos(cur).toFixed(1)}%"></span>
+          ${niveles.map((nivel) => `<span class="tp-progreso-marca${cur >= nivel.price ? " alcanzada" : ""}" style="left:${pos(nivel.price).toFixed(1)}%"></span>`).join("")}
+        </span>
+        <small class="tp-progreso-texto${siguiente ? "" : " positive"}">${escapeHtml(texto)}</small>`;
+}
+
 // Salida progresiva: cada porcentaje se aplica sobre lo que queda.
 function computeTpProgressive(p) {
   const levels = getTpLevels(p);
@@ -307,7 +332,7 @@ function renderTpTool() {
     `);
 
   // ── BLOQUE 3: tabla comparativa global por activo ──
-  const block3 = prog.count ? tpFold("compare", "",
+  const block3 = prog.count ? tpFold("compare", "tp-block-compare",
     `<span class="tp-fold-txt"><strong>${escapeHtml(t("tp.compareTitle"))}</strong></span>`,
     `
       <div class="tp-global-table tp-table-compare" style="--tp-cols:${usedLevels.length + 2}">
@@ -377,8 +402,12 @@ function renderTpTool() {
     // poder comparar activos sin necesidad de desplegarlos.
     const foldKey = "asset:" + p.id;
     const head = `
-      <span class="asset-avatar">${renderAssetAvatar(p.row)}</span>
-      <span class="tp-fold-txt tp-card-id"><strong>${escapeHtml(p.name)}</strong><small>${state.prefs.hideBalance ? "••••" : formatNumber(p.tokens, p.tokens >= 1 ? 4 : 8)} · ${escapeHtml(t("tp.avg"))} ${p.avg > 0 ? maskedCurrency(p.avg, getPriceDigits(p.avg)) : "--"} · ${escapeHtml(t("tp.now"))} ${p.price > 0 ? formatCurrency(p.price, getPriceDigits(p.price)) : "--"}</small></span>
+      ${assetLogoHtml(p.row)}
+      <span class="tp-fold-txt tp-card-id">
+        <strong>${escapeHtml(p.name)}</strong>
+        <small class="tp-card-datos">${state.prefs.hideBalance ? "••••" : escapeHtml(formatTokenAmount(p.tokens))} ${escapeHtml(p.symbol)} · ${escapeHtml(t("tp.avg"))} ${p.avg > 0 ? maskedCurrency(p.avg, digitosPrecioCorto(p.avg)) : "--"}</small>
+        ${tpProgresoHtml(p)}
+      </span>
       ${sim.hasTp && !noData ? `<span class="tp-fold-badge ${sim.profit >= 0 ? "positive" : "negative"}">${maskedSignedCurrency(sim.profit)}</span>` : ""}`;
     const configBlock = tpConfigHtml(p);
 

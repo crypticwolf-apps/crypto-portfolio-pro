@@ -188,7 +188,55 @@
 :root[data-ui] .tp-detail-head .home-section-title { font-size: 1.1875rem; letter-spacing: -0.015em; }
 
 /* ── Ficha de un activo ── */
-:root[data-ui] .tp-card .tp-fold-sum .asset-avatar { width: 36px; height: 36px; }
+:root[data-ui] .tp-card .tp-fold-sum .logo-activo { width: 36px; height: 36px; }
+/* Cabecera de cada activo: nombre y beneficio arriba; debajo, a todo el
+   ancho, sus datos, la barra hacia los objetivos y el siguiente objetivo. */
+:root[data-ui] .tp-card > .tp-fold-sum {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "logo nombre beneficio flecha"
+    "logo datos datos datos"
+    ". barra barra barra"
+    ". siguiente siguiente siguiente";
+  column-gap: 12px;
+  row-gap: 2px;
+}
+:root[data-ui] .tp-card > .tp-fold-sum > .logo-activo { grid-area: logo; }
+:root[data-ui] .tp-card .tp-card-id { display: contents; }
+:root[data-ui] .tp-card .tp-card-id > strong { grid-area: nombre; min-width: 0; }
+:root[data-ui] .tp-card .tp-card-datos { grid-area: datos; }
+:root[data-ui] .tp-card .tp-progreso { grid-area: barra; margin-right: 0; }
+:root[data-ui] .tp-card .tp-progreso-texto { grid-area: siguiente; }
+:root[data-ui] .tp-card .tp-fold-badge { grid-area: beneficio; }
+:root[data-ui] .tp-card .tp-fold-chev { grid-area: flecha; }
+
+/* Progreso hacia los objetivos (cabecera de cada activo) */
+:root[data-ui] .tp-progreso {
+  position: relative;
+  display: block;
+  height: 6px;
+  margin: 7px 6px 3px 0;
+  border-radius: var(--r-pill);
+  background: var(--c-s3);
+}
+:root[data-ui] .tp-progreso-relleno {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--c-ac);
+}
+:root[data-ui] .tp-progreso-marca {
+  position: absolute;
+  top: -3px;
+  width: 3px;
+  height: 12px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--c-t3);
+}
+:root[data-ui] .tp-progreso-marca.alcanzada { background: var(--c-pos); }
+:root[data-ui] .tp-fold-txt small.tp-progreso-texto.positive { color: var(--c-pos); }
 
 /* Linea de precio: medio, actual y cada TP */
 :root[data-ui] .tp-line { margin: 0; }

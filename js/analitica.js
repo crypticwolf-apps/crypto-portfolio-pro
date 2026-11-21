@@ -175,59 +175,57 @@ function renderInsightRankingItems(items, mode) {
 function renderRankingCard(config) {
   return `
     <article class="insight-card">
-      <div class="insight-card-head">
-        <div>
-          <h3>${escapeHtml(config.title)}</h3>
-          <p>${escapeHtml(config.subtitle)}</p>
-        </div>
-        <span class="insight-chip ${config.tone}">${escapeHtml(config.badge)}</span>
-      </div>
+      <h3 class="insight-card-title">${escapeHtml(config.title)}</h3>
       ${renderInsightRankingItems(config.items, config.mode)}
     </article>
   `;
+}
+
+// Mejores y peores en un solo bloque, con un selector: desde la compra
+// (rentabilidad) o en las ultimas 24 h. Si todos ganan, la lista de "peores"
+// se llama "los que menos ganan" (y al reves con "mejores"), para que no
+// salga "peores" con todo en verde.
+let insightsModo = "current";
+let ultimosInsights = null;
+
+function tituloRanking(items, mode, lado) {
+  const valores = items.map((item) => (mode === "24h" ? item.change24h : item.metrics.pnlPct)).filter(Number.isFinite);
+  if (lado === "mejores") {
+    const nadieGana = valores.length && valores.every((v) => v <= 0);
+    return t(nadieGana ? (mode === "24h" ? "insights.menosBajan" : "insights.menosPierden") : "insights.mejores");
+  }
+  const todosGanan = valores.length && valores.every((v) => v >= 0);
+  return t(todosGanan ? (mode === "24h" ? "insights.menosSuben" : "insights.menosGanan") : "insights.peores");
 }
 
 function renderInsights(insights) {
   if (!dom.insightsRankingsGrid) {
     return;
   }
+  ultimosInsights = insights;
+  const mode = insightsModo;
+  const mejores = mode === "24h" ? insights.top24h : insights.topPerformers;
+  const peores = mode === "24h" ? insights.worst24h : insights.worstPerformers;
+  const opcion = (valor, clave) => `<button type="button" data-insights-modo="${valor}" aria-pressed="${mode === valor ? "true" : "false"}">${escapeHtml(t(clave))}</button>`;
+  dom.insightsRankingsGrid.innerHTML = `
+    <div class="segmentado en-tarjeta insights-modo" role="group" aria-label="${escapeHtml(t("insights.modoAria"))}">
+      ${opcion("current", "insights.modoCompra")}${opcion("24h", "insights.modo24h")}
+    </div>
+    ${renderRankingCard({ title: tituloRanking(mejores, mode, "mejores"), items: mejores, mode })}
+    ${renderRankingCard({ title: tituloRanking(peores, mode, "peores"), items: peores, mode })}
+  `;
+}
 
-  const rankingCards = [
-    {
-      title: t("insights.topPerformers"),
-      subtitle: t("insights.byCurrentPerformance"),
-      badge: t("insights.liveLabel"),
-      items: insights.topPerformers,
-      mode: "current",
-      tone: "positive"
-    },
-    {
-      title: t("insights.worstPerformers"),
-      subtitle: t("insights.byCurrentPerformance"),
-      badge: t("insights.liveLabel"),
-      items: insights.worstPerformers,
-      mode: "current",
-      tone: "negative"
-    },
-    {
-      title: t("insights.top24h"),
-      subtitle: t("insights.by24hChange"),
-      badge: "24h",
-      items: insights.top24h,
-      mode: "24h",
-      tone: "positive"
-    },
-    {
-      title: t("insights.topWorst24h"),
-      subtitle: t("insights.by24hChange"),
-      badge: "24h",
-      items: insights.worst24h,
-      mode: "24h",
-      tone: "negative"
+function bindInsights() {
+  dom.insightsRankingsGrid?.addEventListener("click", (event) => {
+    const modo = event.target.closest("[data-insights-modo]")?.dataset.insightsModo;
+    if (modo && modo !== insightsModo) {
+      insightsModo = modo;
+      if (ultimosInsights) {
+        renderInsights(ultimosInsights);
+      }
     }
-  ];
-
-  dom.insightsRankingsGrid.innerHTML = rankingCards.map(renderRankingCard).join("");
+  });
 }
 
 // Resumen de Analítica: ROI, rentabilidad por periodos, drawdown,
@@ -363,7 +361,9 @@ function renderAnalyticsActivityStats() {
     box.innerHTML = `<p class="movers-empty">${escapeHtml(t("analytics.noTrades"))}</p>`;
     return;
   }
-  const months = getMonthlyTradeStats(6);
+  // Solo los meses con compras o ventas (los ultimos 6 de un ano), el mas
+  // reciente arriba, cada barra con su importe.
+  const months = getMonthlyTradeStats(12).filter((m) => m.buys > 0 || m.sells > 0).slice(-6).reverse();
   const totalBuys = state.trades.reduce((s, tr) => s + (tr.type === "buy" ? tr.amount || 0 : 0), 0);
   const totalSells = state.trades.reduce((s, tr) => s + (tr.type === "sell" ? tr.amount || 0 : 0), 0);
   const maxVal = Math.max(1, ...months.map((m) => Math.max(m.buys, m.sells)));
@@ -373,16 +373,19 @@ function renderAnalyticsActivityStats() {
       <div><span>${escapeHtml(t("analytics.totalSells"))}</span><b>${maskedCurrency(totalSells)}</b></div>
       <div><span>${escapeHtml(t("analytics.realizedPnl"))}</span><b class="${toneClass(getRealizedPnl())}">${maskedSignedCurrency(getRealizedPnl())}</b></div>
     </div>
-    <div class="acts-months">
+    ${months.length ? `<div class="acts-meses" role="list">
       ${months.map((m) => `
-        <div class="acts-month">
-          <div class="acts-bars">
-            <span class="acts-bar buy" style="height:${Math.max(2, (m.buys / maxVal) * 48)}px" title="${escapeHtml(t("analytics.buys"))}: ${formatCurrency(m.buys)}"></span>
-            <span class="acts-bar sell" style="height:${Math.max(2, (m.sells / maxVal) * 48)}px" title="${escapeHtml(t("analytics.sells"))}: ${formatCurrency(m.sells)}"></span>
+        <div class="acts-mes" role="listitem">
+          <span class="acts-mes-nombre">${escapeHtml(m.label)}</span>
+          <div class="acts-mes-barras">
+            ${[["buy", m.buys, "analytics.buys"], ["sell", m.sells, "analytics.sells"]].filter(([, valor]) => valor > 0).map(([tipo, valor, clave]) => `
+              <div class="acts-linea ${tipo}">
+                <span class="acts-barra" style="width:${Math.max(3, (valor / maxVal) * 100).toFixed(1)}%" aria-hidden="true"></span>
+                <b><span class="solo-lector">${escapeHtml(t(clave))}: </span>${maskedCurrency(valor)}</b>
+              </div>`).join("")}
           </div>
-          <small>${escapeHtml(m.label)}</small>
         </div>`).join("")}
-    </div>
+    </div>` : ""}
     <div class="acts-legend"><span><i class="buy" aria-hidden="true"></i>${escapeHtml(t("analytics.buys"))}</span><span><i class="sell" aria-hidden="true"></i>${escapeHtml(t("analytics.sells"))}</span></div>
   `;
 }

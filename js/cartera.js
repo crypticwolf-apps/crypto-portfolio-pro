@@ -673,12 +673,3 @@ function handleAddRow() {
   pushActivity(t("alerts.newPositionTitle"), t("alerts.newPositionText"), "neutral");
   openPositionEditor(row.id);
 }
-
-function renderAssetAvatar(row) {
-  if (row.image) {
-    return `<img src="${escapeHtml(row.image)}" alt="${escapeHtml(assetDisplayName(row))}" />`;
-  }
-
-  const label = String(row.symbol || row.crypto || "?").slice(0, 3).toUpperCase();
-  return `<span>${escapeHtml(label)}</span>`;
-}

@@ -13,7 +13,7 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
   Ficheros: `index.html`, la app en **`js/`** (23 scripts por tema: `config.js`
   primero, `arranque.js` el último), **`css/`** (estilos: `tokens.css` sistema visual, `base.css`,
   `componentes.css` y una hoja por pantalla: inicio, ajustes, hojas, detalle,
-  analitica, plan, noticias y escritorio), `i18n.js`, `finance.js`
+  analitica, plan, noticias, tablet y escritorio), `i18n.js`, `finance.js`
   (cálculos puros + tests con Vitest), `wallet-core.js` (lógica pura de
   billeteras + tests), `sw.js`, `api/cg.js` (proxy de CoinGecko; clave en
   `COINGECKO_API_KEY`), `api/historial.js` (precios pasados de todas las
@@ -132,6 +132,18 @@ Portafolio en el centro del menú inferior.
   **La clave de CoinStats nunca va en la copia.** Aviso en Inicio si la última
   copia tiene más de 30 días (o nunca hubo y la app lleva una semana en uso);
   "Más tarde" lo pospone una semana.
+- **Tablet y móvil en horizontal (700 a 1099 px, `css/tablet.css`):** la app de
+  móvil a dos columnas: Inicio (saldo, gráfico y acciones a todo el ancho; el
+  resto en columnas), Analítica, Plan y Noticias; Ajustes y la ficha, en una
+  columna centrada. Solo CSS: por debajo manda el móvil y desde 1100 px el
+  escritorio.
+- **Analítica:** mejores y peores en un bloque con selector "Desde la compra /
+  Últimas 24 h"; si todos ganan, la lista se llama "Los que menos ganan".
+  Compras y ventas: solo los meses con actividad, en barras con su importe.
+- **Plan (móvil):** cada activo con su logo, cantidad y precio medio cortos, y
+  una barra del precio medio al objetivo más alto con el siguiente objetivo.
+- **Noticias:** etiqueta "Impacto alto / medio / bajo" y separadores por día
+  (Hoy, Ayer...; en escritorio no).
 - **Escritorio (desde 1100 px):** toda la app en una página, en bandas a todo el
   ancho: cabecera fija · aviso de copia (si toca) · saldo y gráfico | resumen y
   rendimiento · mercado · posiciones (tabla) · análisis · compras y ventas ·
@@ -205,8 +217,8 @@ Portafolio en el centro del menú inferior.
 ## Cómo quiero que trabajes
 
 - Antes de cambios grandes, revisa el código afectado y dime qué has encontrado.
-- Verifica en el navegador a **375px y 320px** y en escritorio (**1100 a
-  2560px**), en claro y oscuro: visibilidad real, sin scroll horizontal y
+- Verifica en el navegador a **375px y 320px**, en tablet (**700 a 1099px**,
+  también en horizontal) y en escritorio (**1100 a 2560px**), en claro y oscuro: visibilidad real, sin scroll horizontal y
   consola sin errores.
 - Sube cada bloque terminado y confírmame que el despliegue ha ido bien.
 - Si algo de lo que pido choca con lo que ya existe, **dímelo antes de hacerlo**.
