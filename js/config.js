@@ -89,6 +89,8 @@ const HISTORIAL_PROXY = typeof location !== "undefined"
   : "https://crypto-portfolio-pro-omega.vercel.app/api/historial";
 // Ultimos precios pasados recibidos para el grafico del saldo (uno por rango).
 const HIST_SALDO_CACHE_KEY = "crypto-dashboard-saldo-hist-v1";
+// Precios pasados de cada moneda para el grafico de su ficha.
+const HIST_FICHA_CACHE_KEY = "crypto-dashboard-ficha-hist-v1";
 const MAX_WALLETS = 20;
 // Clave de CoinStats del usuario (opcional). Va en su PROPIA clave de
 // localStorage, fuera de las preferencias: asi no viaja en ninguna

@@ -7,6 +7,7 @@ Web: https://cartera.cryptoatalaya.com/
 ## Características
 
 - **Inicio:** saldo total con su cambio en el periodo (1D, 1S, 1M, 3M, 1A, Todo) y un gráfico del saldo reconstruido con los precios pasados de cada moneda y lo que tenías en cada fecha (compras y ventas registradas y fecha de compra). El cambio del periodo no cuenta como ganancia el dinero metido o sacado. Lista de activos, resumen de hoy, reparto y datos de mercado (BTC, ETH, dominancia, miedo y codicia).
+- **Gráficos táctiles:** en el saldo y en la ficha de cada moneda, al tocar y arrastrar (o pasar el ratón) se ven el valor y la fecha de cada momento. La ficha usa precios reales de CoinGecko y pinta la línea en verde o rojo según suba o baje el periodo.
 - **Precios en vivo** por WebSocket (Binance y otros) y CoinGecko a través de un proxy propio con caché y límite de peticiones.
 - **Billeteras:** importa los tokens de una dirección pública (EVM, Solana, Bitcoin) y los mantiene al día.
 - **Compras y ventas:** registro de operaciones con coste medio y beneficio realizado.

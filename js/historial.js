@@ -1,5 +1,6 @@
 // =============================================================================
-// historial.js - Saldo de la cartera en el tiempo para el grafico de Inicio.
+// historial.js - Saldo de la cartera en el tiempo para el grafico de Inicio
+// y precio de una moneda en el tiempo para el grafico de su ficha.
 //
 // Se reconstruye con los precios pasados de cada moneda (api/historial.js, una
 // peticion para todas) y lo que tenias en cada fecha: tus compras y ventas
@@ -213,4 +214,100 @@ function serieSaldoDelRango(range, snapshot) {
       };
   histSaldo.memo.set(snapshot, { clave, serie });
   return serie;
+}
+
+// ── Precio de una moneda en el tiempo (grafico de la ficha) ──
+// Mismo servicio (api/historial.js) con una sola moneda. Sin datos (sin
+// conexion, token sin CoinGecko), la ficha usa los precios que la app ha ido
+// guardando de esa posicion.
+const FICHA_DIAS = { "1d": 1, "1w": 7, "1mo": 30, "3mo": 91, "1y": 364 };
+const HIST_FICHA_MAX = 30; // monedas y rangos guardados como mucho
+
+const histFicha = { cache: null, pidiendo: new Set(), fallos: new Map() };
+
+// "Total": desde la fecha de compra o la primera operacion de la posicion
+// (como mucho un ano); sin ninguna, el ultimo ano.
+function diasDeFicha(row, rango) {
+  if (FICHA_DIAS[rango]) {
+    return FICHA_DIAS[rango];
+  }
+  const fechas = [
+    fechaCompraMs(row.purchaseDate),
+    ...state.trades.filter((trade) => trade.rowId === row.id).map((trade) => Number(trade.at))
+  ].filter((ms) => Number.isFinite(ms) && ms > 0);
+  if (!fechas.length) {
+    return 364;
+  }
+  const dias = Math.ceil((Date.now() - Math.min(...fechas)) / (24 * 60 * 60 * 1000)) + 1;
+  return Math.max(7, Math.min(364, Math.ceil(dias / 7) * 7));
+}
+
+function leerCacheFicha() {
+  if (!histFicha.cache) {
+    const guardado = readStored(HIST_FICHA_CACHE_KEY);
+    histFicha.cache = guardado && typeof guardado === "object" && !Array.isArray(guardado) ? guardado : {};
+  }
+  return histFicha.cache;
+}
+
+function guardarCacheFicha() {
+  const cache = leerCacheFicha();
+  // Solo las mas recientes: cada entrada son unos 180 precios.
+  const claves = Object.keys(cache).sort((a, b) => cache[b].at - cache[a].at);
+  claves.slice(HIST_FICHA_MAX).forEach((clave) => delete cache[clave]);
+  writeStored(HIST_FICHA_CACHE_KEY, JSON.stringify(cache));
+}
+
+function claveFicha(row, rango) {
+  const coinId = String(row.coinId || "").toLowerCase();
+  return coinId ? `${coinId}|${state.prefs.currency}|${diasDeFicha(row, rango)}` : "";
+}
+
+function pedirHistorialFicha(row, rango) {
+  const clave = claveFicha(row, rango);
+  if (!clave || isOffline()) {
+    return;
+  }
+  const [coinId, vs, dias] = clave.split("|");
+  const entrada = leerCacheFicha()[clave];
+  if (entrada && Date.now() - entrada.at < histSaldoTtl(Number(dias))) {
+    return;
+  }
+  if (histFicha.pidiendo.has(clave) || Date.now() - (histFicha.fallos.get(clave) || 0) < HIST_SALDO_REINTENTO_MS) {
+    return;
+  }
+  histFicha.pidiendo.add(clave);
+  const url = `${HISTORIAL_PROXY}?ids=${encodeURIComponent(coinId)}&vs=${encodeURIComponent(vs)}&dias=${dias}`;
+  fetchJsonDirect(url, 25000)
+    .then((data) => {
+      const precios = datosValidos(data) ? data.precios[coinId] : null;
+      if (!Array.isArray(precios) || precios.length !== data.n) {
+        throw new Error("sin precios");
+      }
+      leerCacheFicha()[clave] = { at: Date.now(), desde: data.desde, paso: data.paso, precios };
+      guardarCacheFicha();
+      histFicha.fallos.delete(clave);
+      if (state.detailRowId === row.id && claveFicha(row, state.detailRange) === clave) {
+        repintarFichaConHistorial();
+      }
+    })
+    .catch(() => {
+      histFicha.fallos.set(clave, Date.now());
+    })
+    .finally(() => {
+      histFicha.pidiendo.delete(clave);
+    });
+}
+
+// Precios del rango: [{ at, value }] o null si aun no han llegado.
+function serieFicha(row, rango) {
+  pedirHistorialFicha(row, rango);
+  const entrada = leerCacheFicha()[claveFicha(row, rango)];
+  if (!entrada || !Array.isArray(entrada.precios) || !Number.isFinite(entrada.desde) || !(entrada.paso > 0)) {
+    return null;
+  }
+  const puntos = entrada.precios
+    .map((value, i) => ({ at: entrada.desde + entrada.paso * i, value: Number(value) }))
+    .filter((point) => point.value > 0);
+  return puntos.length >= 2 ? puntos : null;
 }

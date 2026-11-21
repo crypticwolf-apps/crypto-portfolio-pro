@@ -186,7 +186,10 @@ function renderMainValueCard(snapshot) {
 
 // ── Grafico de area (SVG propio: ligero y nitido a cualquier ancho) ──
 // points: [{ at, value }] en orden. Se dibuja al ancho real del contenedor.
-function areaChartSvg(points, width, { height = 150, label = "", id = "graficoRelleno" } = {}) {
+// Devuelve el SVG y la geometria (puntos y su posicion) que usa la capa
+// tactil de graficos.js. tono: "sube" | "baja" pinta la linea en verde o rojo
+// (sin tono, el color de acento).
+function areaChartSvg(points, width, { height = 150, label = "", id = "graficoRelleno", tono = "" } = {}) {
   const sampled = downsampleHistoryPoints(points, 140);
   const top = 10;
   const bottom = 8;
@@ -208,8 +211,8 @@ function areaChartSvg(points, width, { height = 150, label = "", id = "graficoRe
   const line = xy.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
   const end = xy[xy.length - 1];
   const area = `${line} L${end[0].toFixed(1)} ${height} L${xy[0][0].toFixed(1)} ${height} Z`;
-  return `
-    <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${escapeHtml(label)}">
+  const html = `
+    <svg class="${tono ? `grafico-${tono}` : ""}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${escapeHtml(label)}">
       <defs>
         <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" class="grafico-stop-alto"></stop>
@@ -220,6 +223,7 @@ function areaChartSvg(points, width, { height = 150, label = "", id = "graficoRe
       <path class="grafico-linea" d="${line}" fill="none"></path>
       <circle class="grafico-punto" cx="${end[0].toFixed(1)}" cy="${end[1].toFixed(1)}" r="4.5"></circle>
     </svg>`;
+  return { html, puntos: sampled, xy, width, height };
 }
 
 function chartWidthOf(box) {
@@ -253,7 +257,11 @@ function renderHomeChart(snapshot = null) {
   // En escritorio el grafico llena el alto de su tarjeta (el ResizeObserver
   // de escritorio.js lo redibuja si cambia); en movil mide 150 px.
   const height = modoEscritorio() ? Math.max(150, Math.round(box.clientHeight)) : 150;
-  box.innerHTML = areaChartSvg(points, chartWidthOf(box), { label: t("inicio.graficoAria"), id: "graficoRelleno", height });
+  dibujarGrafico(box, areaChartSvg(points, chartWidthOf(box), { label: t("inicio.graficoAria"), id: "graficoRelleno", height }), {
+    // El saldo respeta el modo privado; sin % porque el saldo incluye lo que
+    // se mete y se saca.
+    valor: (punto) => maskedCurrency(punto.value)
+  });
 }
 
 // ── Resumen: hoy, invertido, mejor y peor de las ultimas 24 h ──

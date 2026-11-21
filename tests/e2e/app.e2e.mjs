@@ -755,7 +755,7 @@ async function casosEscritorio(navegador, url) {
     const d = await desborde(page);
     await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(500);
     const vuelta = await page.evaluate(() => ({ escritorio: !document.getElementById("escritorio").hidden, saldo: !!document.querySelector(".esc-saldo #mainValueCard"), plan: !!document.querySelector('[data-esc-hueco="plan"] #planContent') }));
-    if (!movil.barra || movil.escritorio || !movil.saldo || !movil.acciones || movil.ajustesRapido !== "Ajustes" || movil.noticiasOcultas || d || !vuelta.escritorio || !vuelta.saldo || !vuelta.plan) throw new Error(JSON.stringify({ movil, d, vuelta }));
+    if (!movil.barra || movil.escritorio || !movil.saldo || !movil.acciones || movil.ajustesRapido !== "Mas" || movil.noticiasOcultas || d || !vuelta.escritorio || !vuelta.saldo || !vuelta.plan) throw new Error(JSON.stringify({ movil, d, vuelta }));
   });
   await app.ctx.close();
 }
@@ -1014,6 +1014,38 @@ async function casosCopiaHistorial(navegador, url) {
     await page.click('#rangoSaldo [data-rango="1m"]');
     await page.waitForTimeout(500);
     if (app.historial.pedidas.length !== n) throw new Error("volvio a pedir el mes");
+  });
+  await paso(g, "grafico tactil: al tocar sale el valor y la fecha, y se va sola", app, async (page) => {
+    const tocar = (tipo, fx) => page.evaluate(([tipo, fx]) => {
+      const box = document.getElementById("graficoSaldo");
+      const r = box.getBoundingClientRect();
+      box.dispatchEvent(new PointerEvent(tipo, { pointerType: "touch", bubbles: true, isPrimary: true, clientX: r.left + r.width * fx, clientY: r.top + r.height / 2 }));
+    }, [tipo, fx]);
+    const etiqueta = () => page.evaluate(() => document.querySelector("#graficoSaldo .grafico-etiqueta")?.textContent.replace(/\s+/g, " ").trim() || null);
+    await tocar("pointerdown", 0.7);
+    await tocar("pointermove", 0.4);
+    const texto = await etiqueta();
+    if (!texto || !/US\$/.test(texto) || !/\d{1,2} \w+/.test(texto)) throw new Error(`etiqueta: ${texto}`);
+    if (!(await page.evaluate(() => document.querySelector("#graficoSaldo .grafico-cursor-linea")))) throw new Error("sin linea");
+    await tocar("pointerup", 0.4);
+    await page.waitForTimeout(2800);
+    if (await etiqueta()) throw new Error("no se quita al soltar");
+  });
+  await paso(g, "ficha: precios reales del rango, su cambio y linea verde o roja", app, async (page) => {
+    await page.click('#portfolioMobileList [data-card-row="r-btc"]');
+    await page.waitForTimeout(600);
+    await page.click('[data-detail-range="1mo"]');
+    await page.waitForTimeout(600);
+    const r = await page.evaluate(() => ({
+      chip: document.querySelector(".ficha-precio .chip-cambio").textContent.trim(),
+      texto: document.querySelector(".ficha-precio .saldo-cambio-texto").textContent.trim(),
+      sube: !!document.querySelector("#assetDetailScreen svg.grafico-sube")
+    }));
+    const pedida = app.historial.pedidas.some((s) => new URLSearchParams(s).get("ids") === "bitcoin" && new URLSearchParams(s).get("dias") === "30");
+    // Los precios simulados suben un 25 % en el periodo.
+    if (!pedida || !/\+2\d[.,]\d+%/.test(r.chip) || !/1 mes/.test(r.texto) || !r.sube) throw new Error(JSON.stringify({ pedida, ...r }));
+    await page.click("#assetDetailScreen [data-detail-close]");
+    await page.waitForTimeout(400);
   });
   await paso(g, "menu de acciones: Guardar copia y Restaurar copia (sin CSV)", app, async (page) => {
     await page.click("#quickAddBtn");

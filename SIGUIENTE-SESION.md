@@ -114,8 +114,15 @@ Portafolio en el centro del menú inferior.
   y Todo el resultado neto. Sin datos (o si CoinGecko corta la respuesta y lo
   que falta pesa más del 10 %), el gráfico usa el historial guardado en el
   dispositivo. Máximo un año (límite de CoinGecko sin plan de pago).
-- **Acciones rápidas:** Ajustes ⚙ · Comprar · Vender · Activo + (en escritorio,
-  "Más acciones" en lugar de ⚙, porque Ajustes tiene su engranaje).
+- **Gráficos táctiles** (`dibujarGrafico` en `js/graficos.js`): en Inicio y en la
+  ficha, tocar y arrastrar (o pasar el ratón, o las flechas) muestra una línea
+  con el valor y la fecha; en modo privado el saldo sale como ••••. Mientras se
+  mira, el gráfico no se redibuja (se aplica al soltar).
+- **Ficha de un activo:** gráfico con precios reales de CoinGecko por rango
+  (`serieFicha`, mismo `api/historial.js`), línea verde si el periodo sube y
+  roja si baja, y el cambio del rango en el chip (1D sigue siendo 24 h).
+- **Acciones rápidas:** Más ⋯ (abre el menú de acciones) · Comprar · Vender ·
+  Activo + (en escritorio, "Más acciones").
 - **Menú de acciones:** Añadir alerta · Añadir billetera · Descargar PDF ·
   Compartir PDF · Guardar copia · Restaurar copia. (El CSV se quitó: la copia
   de seguridad lo sustituye entero.)

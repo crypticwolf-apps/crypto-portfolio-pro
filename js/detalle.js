@@ -186,8 +186,26 @@ function renderDetailPrice(row, metrics, name) {
   return `<section class="ficha-precio" data-detail-body="precio">${detailPriceInner(row, metrics, name)}</section>`;
 }
 
+// Cambio del precio en el rango elegido (con precios pasados reales); en 1D,
+// o mientras no llegan, la variacion de 24 h.
+function cambioDelRangoFicha(row, metrics) {
+  if (state.detailRange === "1d" || !(metrics.currentPrice > 0)) {
+    return null;
+  }
+  const serie = serieFicha(row, state.detailRange);
+  if (!serie) {
+    return null;
+  }
+  const pct = (metrics.currentPrice / serie[0].value - 1) * 100;
+  const etiqueta = state.detailRange === "total"
+    ? t("ficha.desde", { fecha: intlFormatter("date", getUiLocale(), { day: "numeric", month: "short", year: "numeric" }).format(new Date(serie[0].at)) })
+    : t(`ficha.periodo.${state.detailRange}`);
+  return Number.isFinite(pct) ? { pct, etiqueta } : null;
+}
+
 function detailPriceInner(row, metrics, name = row.resolvedName || assetDisplayName(row)) {
-  const change = Number.isFinite(row.priceChange24h) ? row.priceChange24h : null;
+  const periodo = cambioDelRangoFicha(row, metrics);
+  const change = periodo ? periodo.pct : Number.isFinite(row.priceChange24h) ? row.priceChange24h : null;
   const price = metrics.currentPrice > 0
     ? (() => {
         const parts = moneyParts(metrics.currentPrice, getPriceDigits(metrics.currentPrice));
@@ -200,7 +218,9 @@ function detailPriceInner(row, metrics, name = row.resolvedName || assetDisplayN
     <strong class="saldo-valor" data-detail-role="price">${price}</strong>
     <div class="saldo-cambio">
       <span class="chip-cambio ${change === null ? "neutral" : toneClass(change)}">${ICONO_FLECHA_CAMBIO}<span>${change === null ? "--" : formatSignedPercent(change)}</span></span>
-      <span class="saldo-cambio-texto">${escapeHtml(t("ficha.hoyFuente", { fuente: source }))}</span>
+      <span class="saldo-cambio-texto">${escapeHtml(periodo
+        ? t("ficha.periodoFuente", { periodo: periodo.etiqueta, fuente: source })
+        : t("ficha.hoyFuente", { fuente: source }))}</span>
     </div>`;
 }
 
@@ -237,7 +257,24 @@ function refreshAssetDetailLive() {
   }
 }
 
-// Grafico del precio guardado de la posicion (mas el precio de ahora).
+// Al llegar los precios pasados del rango: grafico y cambio del periodo.
+function repintarFichaConHistorial() {
+  const screen = document.getElementById("assetDetailScreen");
+  const row = getRowById(state.detailRowId);
+  if (!screen || !row || screen.hidden) {
+    return;
+  }
+  const precio = screen.querySelector("[data-detail-body=\"precio\"]");
+  if (precio) {
+    precio.innerHTML = detailPriceInner(row, computeRowMetrics(row));
+    fitAmount(screen.querySelector("[data-detail-role=\"price\"]"), "ficha");
+  }
+  renderDetailChart(row);
+}
+
+// Grafico del precio: el de CoinGecko en el rango (historial.js) o, si no
+// esta, el que la app ha guardado de la posicion. Mas el precio de ahora.
+// La linea va en verde si el periodo sube y en rojo si baja.
 function renderDetailChart(row) {
   const box = document.querySelector("#assetDetailScreen [data-detail-role='chart']");
   if (!box || !row) {
@@ -246,10 +283,13 @@ function renderDetailChart(row) {
   detailChartAt = Date.now();
   const range = DETAIL_RANGES.find((r) => r.key === state.detailRange) || DETAIL_RANGES[0];
   const cutoff = Number.isFinite(range.ms) ? Date.now() - range.ms : 0;
-  const points = (row.priceHistory || [])
-    .map((point) => ({ at: new Date(point.at).getTime(), value: Number(point.price) }))
-    .filter((point) => Number.isFinite(point.value) && point.value > 0 && point.at >= cutoff)
-    .sort((a, b) => a.at - b.at);
+  const reales = serieFicha(row, range.key);
+  const points = reales
+    ? reales.slice()
+    : (row.priceHistory || [])
+        .map((point) => ({ at: new Date(point.at).getTime(), value: Number(point.price) }))
+        .filter((point) => Number.isFinite(point.value) && point.value > 0 && point.at >= cutoff)
+        .sort((a, b) => a.at - b.at);
   const current = computeRowMetrics(row).currentPrice;
   if (current > 0 && (!points.length || Date.now() - points[points.length - 1].at > 60 * 1000)) {
     points.push({ at: Date.now(), value: current });
@@ -258,7 +298,15 @@ function renderDetailChart(row) {
     box.innerHTML = `<div class="grafico-vacio">${escapeHtml(t("charts.emptyHistory"))}</div>`;
     return;
   }
-  box.innerHTML = areaChartSvg(points, chartWidthOf(box), { label: t("detail.evolution"), id: "graficoFicha" });
+  const tono = points[points.length - 1].value >= points[0].value ? "sube" : "baja";
+  dibujarGrafico(box, areaChartSvg(points, chartWidthOf(box), { label: t("detail.evolution"), id: "graficoFicha", tono }), {
+    // Precio de mercado: se ve tambien en modo privado.
+    valor: (punto) => formatCurrency(punto.value, getPriceDigits(punto.value)),
+    extra: (punto, primero) => {
+      const pct = (punto.value / primero.value - 1) * 100;
+      return Number.isFinite(pct) ? { texto: formatSignedPercent(pct), tono: toneClass(pct) } : null;
+    }
+  });
 }
 
 function detailCell(label, value, tone = "", sub = "") {

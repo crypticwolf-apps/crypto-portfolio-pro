@@ -269,8 +269,8 @@
 :root[data-ui] .trades-log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 :root[data-ui] .trade-item {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas: "tag main importe" "tag main acciones";
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "main importe" "main acciones";
   align-items: center;
   column-gap: 10px;
   row-gap: 4px;
@@ -279,8 +279,10 @@
 }
 :root[data-ui] .trade-item:first-child { border-top: 0; }
 :root[data-ui] .trade-item-tag {
-  grid-area: tag;
-  padding: 3px 8px;
+  display: inline-block;
+  margin-left: 4px;
+  vertical-align: 1px;
+  padding: 2px 7px;
   border-radius: var(--r-pill);
   background: var(--c-s2);
   color: var(--c-t2);
@@ -293,10 +295,10 @@
 :root[data-ui] .trade-item-main small {
   font-size: 0.75rem;
   color: var(--c-t2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
+/* Cantidad y precio: cada cifra entera en su linea si no caben juntas. */
+:root[data-ui] .trade-item-meta { display: flex; flex-wrap: wrap; column-gap: 4px; }
+:root[data-ui] .trade-item-meta > span { white-space: nowrap; }
 :root[data-ui] .trade-item-amount { grid-area: importe; justify-self: end; font-size: 0.875rem; font-weight: 600; }
 :root[data-ui] .trade-item-actions { grid-area: acciones; justify-self: end; display: flex; gap: 6px; }
 :root[data-ui][data-theme] .trade-item-actions .icon-circle-btn,

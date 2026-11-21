@@ -34,8 +34,8 @@ function modoEscritorio() {
   return escEstado.activo;
 }
 
-// En la cabecera de escritorio ya esta el engranaje de Ajustes: el atajo ⚙
-// del movil (que abre el menu de acciones) pasa a llamarse "Mas acciones".
+// En la cabecera de escritorio hay sitio: el atajo "Mas" del movil (que abre
+// el menu de acciones) pasa a llamarse "Mas acciones".
 const ESC_ICONO_MAS = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
 function escBotonMas(escritorio) {
   const boton = document.getElementById("quickAddBtn");

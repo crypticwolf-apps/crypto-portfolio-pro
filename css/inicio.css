@@ -472,3 +472,49 @@
 :root[data-ui] .aviso-copia-texto p { margin-top: 2px; font-size: 0.8125rem; line-height: 1.45; color: var(--c-t2); }
 :root[data-ui] .aviso-copia-acciones { display: flex; gap: 8px; flex: 1 1 100%; }
 :root[data-ui] .aviso-copia-acciones > button { flex: 1 1 0; min-height: 42px; }
+
+/* ── Grafico tactil (graficos.js): linea, punto y etiqueta al tocar ── */
+:root[data-ui] .grafico-saldo.es-tactil {
+  touch-action: pan-y;          /* deslizar en vertical sigue moviendo la pagina */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  cursor: crosshair;
+  outline: none;
+  border-radius: var(--r-sm);
+}
+:root[data-ui] .grafico-saldo.es-tactil:focus-visible { box-shadow: 0 0 0 2px var(--c-ac); }
+:root[data-ui] .grafico-cursor-linea { stroke: var(--c-t3); stroke-width: 1; stroke-dasharray: 3 3; }
+:root[data-ui] .grafico-cursor-punto { fill: var(--c-ac); stroke: var(--c-bg); stroke-width: 2.5; }
+:root[data-ui] .grafico-saldo.con-cursor .grafico-punto { opacity: 0; }
+:root[data-ui] .grafico-etiqueta {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  background: var(--c-s2);
+  box-shadow: var(--c-sombra-alta);
+  white-space: nowrap;
+  pointer-events: none;
+}
+:root[data-ui] .grafico-etiqueta strong { font-size: 0.875rem; font-weight: 600; color: var(--c-t1); font-variant-numeric: tabular-nums; }
+:root[data-ui] .grafico-etiqueta strong span { font-size: 0.75rem; font-weight: 600; }
+:root[data-ui] .grafico-etiqueta small { font-size: 0.6875rem; color: var(--c-t2); }
+:root[data-ui] .grafico-etiqueta .positive { color: var(--c-pos); }
+:root[data-ui] .grafico-etiqueta .negative { color: var(--c-neg); }
+
+/* Linea verde o roja segun suba o baje el periodo (ficha de un activo). */
+:root[data-ui] .grafico-sube .grafico-linea { stroke: var(--c-pos); }
+:root[data-ui] .grafico-sube .grafico-punto,
+:root[data-ui] .grafico-sube .grafico-cursor-punto { fill: var(--c-pos); }
+:root[data-ui] .grafico-sube .grafico-stop-alto,
+:root[data-ui] .grafico-sube .grafico-stop-bajo { stop-color: var(--c-pos); }
+:root[data-ui] .grafico-baja .grafico-linea { stroke: var(--c-neg); }
+:root[data-ui] .grafico-baja .grafico-punto,
+:root[data-ui] .grafico-baja .grafico-cursor-punto { fill: var(--c-neg); }
+:root[data-ui] .grafico-baja .grafico-stop-alto,
+:root[data-ui] .grafico-baja .grafico-stop-bajo { stop-color: var(--c-neg); }

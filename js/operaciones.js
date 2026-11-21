@@ -451,15 +451,16 @@ function tradeLogItemHtml(trade) {
   const nombre = row ? assetDisplayName(row) : (trade.symbol || "--");
   const fecha = new Date(trade.at);
   const tokens = Number.isFinite(trade.tokens) ? formatNumber(trade.tokens, trade.tokens >= 1 ? 4 : 8) : "--";
+  const simbolo = row?.symbol || trade.symbol || "";
   const precio = Number.isFinite(trade.price) && trade.price > 0
     ? formatCurrency(trade.price, getPriceDigits(trade.price))
     : "--";
   return `
     <li class="trade-item ${esCompra ? "is-buy" : "is-sell"}" data-trade-id="${escapeHtml(trade.id)}">
-      <span class="trade-item-tag">${escapeHtml(esCompra ? t("trades.buy") : t("trades.sell"))}</span>
       <span class="trade-item-main">
-        <strong>${escapeHtml(nombre)}</strong>
-        <small>${escapeHtml(tokens)} · ${escapeHtml(precio)} · ${escapeHtml(formatDateShort(fecha))}</small>
+        <strong>${escapeHtml(nombre)} <span class="trade-item-tag">${escapeHtml(esCompra ? t("trades.buy") : t("trades.sell"))}</span></strong>
+        <small class="trade-item-meta"><span>${escapeHtml(simbolo ? `${tokens} ${simbolo}` : tokens)}</span><span>${escapeHtml(t("trades.aPrecio", { precio }))}</span></small>
+        <small>${escapeHtml(formatDateShort(fecha))}</small>
       </span>
       <span class="trade-item-amount ${esCompra ? "" : "positive"}">${maskedCurrency(trade.amount || 0)}</span>
       <span class="trade-item-actions">
