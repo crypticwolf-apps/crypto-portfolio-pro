@@ -173,14 +173,14 @@
           <span class="fab-option-text"><strong data-i18n="fab.sharePdf">Compartir PDF</strong><small data-i18n="fab.sharePdfDesc">Enviarlo sin descargarlo</small></span>
           <span class="fab-option-chevron" aria-hidden="true">›</span>
         </button>
-        <button class="fab-option" type="button" data-fab-action="export">
-          <span class="fab-option-icon positive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>
-          <span class="fab-option-text"><strong data-i18n="fab.export">Exportar CSV</strong><small data-i18n="fab.exportDesc">Guardar tus posiciones en CSV</small></span>
+        <button class="fab-option" type="button" data-fab-action="copia">
+          <span class="fab-option-icon positive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.4 3 8.5 7 10 4-1.5 7-5.6 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg></span>
+          <span class="fab-option-text"><strong data-i18n="copia.guardar">Guardar copia</strong><small data-i18n="fab.copiaDesc">Todos tus datos en un archivo</small></span>
           <span class="fab-option-chevron" aria-hidden="true">›</span>
         </button>
-        <button class="fab-option" type="button" data-fab-action="import">
-          <span class="fab-option-icon accent2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>
-          <span class="fab-option-text"><strong data-i18n="fab.import">Importar CSV</strong><small data-i18n="fab.importDesc">Importar operaciones desde CSV</small></span>
+        <button class="fab-option" type="button" data-fab-action="restaurar">
+          <span class="fab-option-icon accent2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg></span>
+          <span class="fab-option-text"><strong data-i18n="copia.restaurar">Restaurar copia</strong><small data-i18n="fab.restaurarDesc">Recuperar tus datos desde una copia</small></span>
           <span class="fab-option-chevron" aria-hidden="true">›</span>
         </button>
         <button class="fab-cancel" type="button" data-fab-close data-i18n="buttons.cancel">Cancelar</button>
@@ -641,10 +641,7 @@
 <div class="more-actions-grid">
           <button id="sharePdfBtn" class="ghost-btn" type="button" data-i18n="fab.sharePdf">Compartir PDF</button>
           <button id="downloadPdfBtn" class="ghost-btn" type="button" data-i18n="buttons.downloadPdf">Descargar PDF</button>
-          <button id="exportBtn" class="ghost-btn" type="button" data-i18n="buttons.exportCsv">Exportar CSV</button>
-          <button id="importBtn" class="ghost-btn" type="button" data-i18n="buttons.importCsv">Importar CSV</button>
           <button id="clearBtn" class="danger-btn" type="button" data-i18n="buttons.resetData">Resetear datos</button>
-          <input id="importFileInput" type="file" accept=".csv,text/csv" hidden />
         </div>
 </div>
       </details>

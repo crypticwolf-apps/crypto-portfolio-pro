@@ -1,6 +1,6 @@
 // =============================================================================
 // utilidades.js - Piezas comunes sin estado propio: traduccion (t), formato de
-// numeros, monedas y fechas, parseo, escapeHtml, CSV, portapapeles, avisos
+// numeros, monedas y fechas, parseo, escapeHtml, portapapeles, avisos
 // (toasts) y carga de librerias externas del CDN.
 // =============================================================================
 
@@ -190,67 +190,6 @@ function showToast(title, detail, tone = "neutral") {
     toast.style.transition = "opacity 0.2s, transform 0.2s";
     window.setTimeout(() => toast.remove(), 200);
   }, breve ? 1600 : 4200);
-}
-
-function parseCsv(text) {
-  const rows = [];
-  let current = "";
-  let row = [];
-  let insideQuotes = false;
-
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text[index];
-    const next = text[index + 1];
-
-    if (character === "\"") {
-      if (insideQuotes && next === "\"") {
-        current += "\"";
-        index += 1;
-      } else {
-        insideQuotes = !insideQuotes;
-      }
-      continue;
-    }
-
-    if (character === "," && !insideQuotes) {
-      row.push(current);
-      current = "";
-      continue;
-    }
-
-    if ((character === "\n" || character === "\r") && !insideQuotes) {
-      if (character === "\r" && next === "\n") {
-        index += 1;
-      }
-      row.push(current);
-      current = "";
-      if (row.some((cell) => cell.trim() !== "")) {
-        rows.push(row);
-      }
-      row = [];
-      continue;
-    }
-
-    current += character;
-  }
-
-  if (current || row.length) {
-    row.push(current);
-    rows.push(row);
-  }
-
-  const [headers, ...dataRows] = rows;
-  if (!headers) {
-    return [];
-  }
-
-  return dataRows.map((cells) => {
-    const record = {};
-    headers.forEach((header, index) => {
-      record[String(header).trim()] = String(cells[index] ?? "").trim();
-    });
-    return record;
-  });
 }
 
 function downloadTextFile(filename, content, mimeType) {
@@ -494,14 +433,6 @@ function normalizeSearchText(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
-}
-
-function escapeCsvCell(value) {
-  const stringValue = String(value ?? "");
-  if (!/[",\n]/.test(stringValue)) {
-    return stringValue;
-  }
-  return `"${stringValue.replace(/"/g, '""')}"`;
 }
 
 // ── Capas superpuestas (ficha, editor, hojas y menu del engranaje) ──

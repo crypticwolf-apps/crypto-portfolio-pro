@@ -1015,6 +1015,22 @@ async function casosCopiaHistorial(navegador, url) {
     await page.waitForTimeout(500);
     if (app.historial.pedidas.length !== n) throw new Error("volvio a pedir el mes");
   });
+  await paso(g, "menu de acciones: Guardar copia y Restaurar copia (sin CSV)", app, async (page) => {
+    await page.click("#quickAddBtn");
+    await page.waitForSelector("#fabSheet:not([hidden])");
+    const acciones = await page.$$eval("#fabSheet [data-fab-action]", (els) => els.map((el) => el.dataset.fabAction));
+    if (!acciones.includes("copia") || !acciones.includes("restaurar") || acciones.some((a) => a === "export" || a === "import")) {
+      throw new Error(`opciones: ${acciones.join(", ")}`);
+    }
+    const [descarga] = await Promise.all([page.waitForEvent("download"), page.click('#fabSheet [data-fab-action="copia"]')]);
+    if (!/^crypto-portfolio-pro-copia-.*\.json$/.test(descarga.suggestedFilename())) throw new Error(descarga.suggestedFilename());
+    await page.waitForTimeout(300);
+    await page.click("#quickAddBtn");
+    await page.waitForSelector("#fabSheet:not([hidden])");
+    const [selector] = await Promise.all([page.waitForEvent("filechooser"), page.click('#fabSheet [data-fab-action="restaurar"]')]);
+    if (selector.isMultiple()) throw new Error("el selector de archivo admite varios");
+    if (await page.evaluate(() => document.querySelector("#exportBtn, #importBtn, #importFileInput") !== null)) throw new Error("quedan botones de CSV");
+  });
   let archivo = null;
   await paso(g, "copia: guarda todo y sin la clave de CoinStats", app, async (page) => {
     await page.evaluate(() => localStorage.setItem("crypto-dashboard-coinstats-key-v1", "CLAVE-SECRETA-E2E"));

@@ -1,6 +1,6 @@
 // =============================================================================
-// exportar.js - PDF de la cartera (jsPDF, descarga o compartir), exportar e
-// importar CSV y borrar todos los datos.
+// exportar.js - PDF de la cartera (jsPDF, descarga o compartir) y borrar
+// todos los datos. La copia de seguridad esta en copia.js.
 // =============================================================================
 
 async function ensureJsPdf() {
@@ -40,54 +40,6 @@ function handleResetData() {
   persistState(true);
   renderAll();
   showToast(t("alerts.resetDoneTitle"), t("alerts.resetDoneText"), "warning");
-}
-
-function handleExportCsv() {
-  const headers = [
-    "crypto",
-    "coinId",
-    "resolvedName",
-    "symbol",
-    "investment",
-    "tokens",
-    "entryPrice",
-    "tp1",
-    "tp2",
-    "tp3",
-    "favorite",
-    "pinned",
-    "derivedField",
-    "note",
-    "purchaseDate",
-    "personalLabel"
-  ];
-
-  const rows = state.rows.map((row) => [
-    row.crypto,
-    row.coinId,
-    row.resolvedName,
-    row.symbol,
-    row.investment,
-    row.tokens,
-    row.entryPrice,
-    row.tp1,
-    row.tp2,
-    row.tp3,
-    row.favorite ? "true" : "false",
-    row.pinned ? "true" : "false",
-    row.derivedField || "",
-    row.note || "",
-    row.purchaseDate || "",
-    row.personalLabel || ""
-  ]);
-
-  const csv = [headers, ...rows]
-    .map((line) => line.map(escapeCsvCell).join(","))
-    .join("\n");
-
-  const filename = `portfolio-${sanitizeFilenamePart(getPortfolioName())}-${formatFileDate(new Date())}.csv`;
-  downloadTextFile(filename, csv, "text/csv;charset=utf-8");
-  pushActivity(t("alerts.exportTitle"), t("alerts.exportText"), "neutral");
 }
 
 function sanitizePdfText(value) {
@@ -553,53 +505,5 @@ async function sharePdfFile(doc, filename, portfolioName) {
   } catch (error) {
     // Cancelar la hoja es una decision del usuario: no se descarga nada.
     return error?.name === "AbortError";
-  }
-}
-
-async function handleImportCsv(event) {
-  const file = event.target.files?.[0];
-  event.target.value = "";
-
-  if (!file) {
-    return;
-  }
-
-  try {
-    const text = await file.text();
-    const records = parseCsv(text);
-    if (!records.length) {
-      throw new Error(t("alerts.importFailedText"));
-    }
-
-    state.rows = records.map((record) => createRow({
-      crypto: record.crypto || record.symbol || "",
-      coinId: record.coinId || "",
-      resolvedName: record.resolvedName || "",
-      symbol: record.symbol || "",
-      investment: record.investment || "",
-      tokens: record.tokens || "",
-      entryPrice: record.entryPrice || "",
-      tp1: record.tp1 || "",
-      tp2: record.tp2 || "",
-      tp3: record.tp3 || "",
-      favorite: record.favorite === "true",
-      pinned: record.pinned === "true",
-      derivedField: record.derivedField || "",
-      note: record.note || "",
-      purchaseDate: record.purchaseDate || "",
-      personalLabel: record.personalLabel || ""
-    }));
-
-    renderAll();
-    scheduleAutosave();
-    pushActivity(
-      t("alerts.importTitle"),
-      t("alerts.importText", { count: state.rows.length, file: file.name }),
-      "positive"
-    );
-    showToast(t("alerts.importDoneTitle"), t("alerts.importDoneText", { count: state.rows.length }), "positive");
-    await refreshAllPrices({ silentWhenEmpty: true, force: true, reason: "import" });
-  } catch (error) {
-    showToast(t("alerts.importFailedTitle"), error.message || t("alerts.importFailedText"), "negative");
   }
 }

@@ -14,8 +14,8 @@ Web: https://cartera.cryptoatalaya.com/
 - **Analítica:** distribución, mejores y peores, categorías, comparativa y rendimiento por periodos.
 - **Alertas** de precio por activo, para todos o del valor total.
 - **Noticias** del canal de Crypto Atalaya.
-- **Copia de seguridad:** un archivo JSON con todo (posiciones, operaciones, alertas, billeteras, plan, historial y ajustes) para guardarlo o pasarlo a otro dispositivo; aviso en Inicio si hace más de 30 días de la última. La clave de CoinStats nunca va en la copia.
-- **Exportar:** PDF con resumen y gráfico, y CSV de posiciones (también importable).
+- **Copia de seguridad** (en Ajustes y en el menú de acciones rápidas): un archivo JSON con todo (posiciones, operaciones, alertas, billeteras, plan, historial y ajustes) para guardarlo o pasarlo a otro dispositivo; aviso en Inicio si hace más de 30 días de la última. La clave de CoinStats nunca va en la copia.
+- **PDF** de la cartera con resumen y gráfico, para descargar o compartir.
 - **Apariencia:** tema claro, oscuro (negro puro) o automático, 6 colores de acento, tamaño de texto y bloques de Inicio ordenables. Moneda base USD o EUR.
 - **Versión de escritorio** (desde 1100 px): toda la app en una página, en bandas a todo el ancho (saldo y gráfico, mercado, posiciones, análisis, compras y ventas, el plan en una tabla y noticias), con Ajustes en un panel lateral.
 - Guardado automático en el dispositivo (`localStorage`) y funcionamiento sin conexión (service worker).

@@ -208,8 +208,11 @@ function closeFabSheet() {
 
 function handleFabAction(action) {
   switch (action) {
-    case "import":
-      dom.importFileInput?.click();
+    case "copia":
+      guardarCopia();
+      break;
+    case "restaurar":
+      document.getElementById("copiaArchivo")?.click();
       break;
     case "new":
       setActiveTab("home");
@@ -232,9 +235,6 @@ function handleFabAction(action) {
     case "sharePdf":
       // Mismo informe, pero entregado a la hoja de compartir del sistema.
       handleDownloadPdf("share");
-      break;
-    case "export":
-      handleExportCsv();
       break;
     case "wallet":
       openWalletSheet();
@@ -281,9 +281,6 @@ function refreshPricesManually() {
 function bindEvents() {
   dom.clearBtn.addEventListener("click", handleResetData);
   dom.downloadPdfBtn.addEventListener("click", handleDownloadPdf);
-  dom.exportBtn.addEventListener("click", handleExportCsv);
-  dom.importBtn.addEventListener("click", () => dom.importFileInput.click());
-  dom.importFileInput.addEventListener("change", handleImportCsv);
   bindAnalyticsSummary();
   bindNews();
   dom.portfolioNameInput.addEventListener("input", (event) => {

@@ -116,8 +116,9 @@ Portafolio en el centro del menú inferior.
   dispositivo. Máximo un año (límite de CoinGecko sin plan de pago).
 - **Acciones rápidas:** Ajustes ⚙ · Comprar · Vender · Activo + (en escritorio,
   "Más acciones" en lugar de ⚙, porque Ajustes tiene su engranaje).
-- **Menú de acciones:** Añadir alerta · Añadir billetera · PDF · Exportar CSV ·
-  Importar CSV.
+- **Menú de acciones:** Añadir alerta · Añadir billetera · Descargar PDF ·
+  Compartir PDF · Guardar copia · Restaurar copia. (El CSV se quitó: la copia
+  de seguridad lo sustituye entero.)
 - **Copia de seguridad** (`js/copia.js`, Ajustes → Copia de seguridad y
   exportar): un JSON con posiciones, operaciones, alertas, billeteras, plan,
   historial y ajustes; restaurar reemplaza todo (con confirmación) y recarga.

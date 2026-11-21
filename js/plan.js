@@ -45,7 +45,7 @@ function getPlanPositions() {
 
 /* ── Simulador de Take Profits ── */
 function getTpConfig(rowId) {
-  // Precio del TP en la fila (editor/CSV); % de venta aquí.
+  // Precio del TP en la fila (editor); % de venta aquí.
   const def = { p1: 30, p2: 50, p3: 100 };
   return { ...def, ...((state.plan.tp || {})[rowId] || {}) };
 }
