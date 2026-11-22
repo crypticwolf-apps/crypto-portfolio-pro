@@ -68,6 +68,7 @@ function openAssetDetail(rowId) {
     ? document.activeElement
     : null;
   state.detailRowId = rowId;
+  infoMoneda.descripcionAbierta = false;
   showOverlay(screen);
   document.body.classList.add("detail-open");
   renderAssetDetail();
@@ -120,6 +121,10 @@ function handleDetailAction(action) {
     case "menu":
       openRowMenu(rowId, document.querySelector("#assetDetailScreen [data-detail-action='menu']"));
       break;
+    case "descripcion":
+      infoMoneda.descripcionAbierta = !infoMoneda.descripcionAbierta;
+      repintarFichaInfo();
+      break;
     default:
       break;
   }
@@ -167,6 +172,8 @@ function renderAssetDetail() {
       ${renderDetailPosition(row, metrics)}
       ${renderDetailTargets(row, metrics)}
       ${renderDetailMarket(row)}
+      ${renderDetailSupply(row)}
+      ${renderDetailAbout(row)}
       ${renderDetailNotes(row)}
       ${renderDetailHistory(row)}
 
@@ -409,17 +416,141 @@ function renderDetailMarket(row) {
     </section>`;
 }
 
+function fechaCortaFicha(iso) {
+  const ms = Date.parse(iso || "");
+  return Number.isFinite(ms)
+    ? intlFormatter("date", getUiLocale(), { day: "numeric", month: "short", year: "numeric" }).format(new Date(ms))
+    : "";
+}
+
 function detailMarketBody(row) {
   const price = (value) => (Number.isFinite(value) ? escapeHtml(formatCurrency(value, getPriceDigits(value))) : "--");
+  const info = infoDeMoneda(row);
+  const moneda = state.prefs.currency;
+  const actual = computeRowMetrics(row).currentPrice;
+  // Maximo y minimo historicos, con la distancia desde el precio de ahora.
+  const extremo = (valor, fecha) => {
+    if (!Number.isFinite(valor)) {
+      return null;
+    }
+    const pct = actual > 0 ? (actual / valor - 1) * 100 : null;
+    const detalle = [pct != null ? formatSignedPercent(pct) : "", fechaCortaFicha(fecha)].filter(Boolean).join(" · ");
+    return `${price(valor)}${detalle ? `<small class="ficha-dato-extra">${escapeHtml(detalle)}</small>` : ""}`;
+  };
+  const ath = info ? extremo(info.ath[moneda], info.athFecha[moneda]) : null;
+  const atl = info ? extremo(info.atl[moneda], info.atlFecha[moneda]) : null;
+  const fdv = info && Number.isFinite(info.fdv[moneda]) ? escapeHtml(formatCompactCurrency(info.fdv[moneda])) : null;
   const rows = [
     [t("ficha.capitalizacion"), Number.isFinite(row.marketCap) ? escapeHtml(formatCompactCurrency(row.marketCap)) : "--"],
     [t("detail.ranking"), Number.isFinite(row.marketCapRank) ? `#${row.marketCapRank}` : "--"],
     [t("detail.high24h"), price(row.high24h)],
     [t("detail.low24h"), price(row.low24h)],
     [t("detail.volume24h"), Number.isFinite(row.volume24h) ? escapeHtml(formatCompactCurrency(row.volume24h)) : "--"],
+    ...(ath ? [[t("ficha.ath"), ath]] : []),
+    ...(atl ? [[t("ficha.atl"), atl]] : []),
+    ...(fdv ? [[t("ficha.fdv"), fdv]] : []),
     [t("detail.priceSource"), `${escapeHtml(priceSourceLabel(row))}${row.lastPriceAt ? ` <small>· ${escapeHtml(formatRelativeTime(new Date(row.lastPriceAt).getTime()))}</small>` : ""}`]
   ];
   return `<dl class="ficha-lista">${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${value}</dd></div>`).join("")}</dl>`;
+}
+
+// ── Suministro: en circulacion, total y maximo (con cuanto se ha emitido) ──
+function renderDetailSupply(row) {
+  if (!row.coinId) {
+    return "";
+  }
+  return `
+    <section class="tarjeta ficha-bloque">
+      <h2 class="titulo-tarjeta">${escapeHtml(t("ficha.suministro"))}</h2>
+      <div class="ficha-bloque-cuerpo" data-detail-body="suministro">${detailSupplyBody(row)}</div>
+    </section>`;
+}
+
+function detailSupplyBody(row) {
+  const info = infoDeMoneda(row);
+  if (!info) {
+    return `<p class="ficha-vacio">${escapeHtml(t(isOffline() ? "ficha.sinInfo" : "ficha.cargandoInfo"))}</p>`;
+  }
+  if (!info.circulante && !info.total && !info.maximo) {
+    return `<p class="ficha-vacio">${escapeHtml(t("ficha.sinSuministro"))}</p>`;
+  }
+  const simbolo = row.symbol || "";
+  const cantidad = (v) => `${escapeHtml(formatTokenAmount(v))} ${escapeHtml(simbolo)}`;
+  const emitido = info.circulante && info.maximo ? Math.min(100, (info.circulante / info.maximo) * 100) : null;
+  const filas = [
+    info.circulante ? [t("ficha.circulante"), cantidad(info.circulante)] : null,
+    info.total ? [t("ficha.total"), cantidad(info.total)] : null,
+    [t("ficha.maximo"), info.maximo ? cantidad(info.maximo) : escapeHtml(t("ficha.sinLimite"))]
+  ].filter(Boolean);
+  const textoEmitido = emitido != null ? t("ficha.emitido", { pct: `${emitido.toFixed(1)}%` }) : "";
+  return `
+    ${emitido != null ? `
+      <div class="ficha-emitido">
+        <div class="ficha-emitido-barra" aria-hidden="true"><span style="width:${emitido.toFixed(1)}%"></span></div>
+        <small>${escapeHtml(textoEmitido)}</small>
+      </div>` : ""}
+    <dl class="ficha-lista">${filas.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${value}</dd></div>`).join("")}</dl>`;
+}
+
+// ── Sobre la moneda: categorias, descripcion, datos y enlaces oficiales ──
+function renderDetailAbout(row) {
+  if (!row.coinId) {
+    return "";
+  }
+  return `
+    <section class="tarjeta ficha-bloque">
+      <h2 class="titulo-tarjeta">${escapeHtml(t("ficha.sobre", { nombre: row.resolvedName || assetDisplayName(row) }))}</h2>
+      <div class="ficha-bloque-cuerpo" data-detail-body="sobre">${detailAboutBody(row)}</div>
+    </section>`;
+}
+
+function detailAboutBody(row) {
+  pedirInfoMoneda(row);
+  const info = infoDeMoneda(row);
+  if (!info) {
+    return `<p class="ficha-vacio">${escapeHtml(t(isOffline() ? "ficha.sinInfo" : "ficha.cargandoInfo"))}</p>`;
+  }
+  const larga = info.descripcion.length > 240;
+  const abierta = infoMoneda.descripcionAbierta;
+  const datos = [
+    info.lanzamiento ? [t("ficha.lanzamiento"), escapeHtml(fechaCortaFicha(info.lanzamiento))] : null,
+    info.algoritmo ? [t("ficha.algoritmo"), escapeHtml(info.algoritmo)] : null
+  ].filter(Boolean);
+  const partes = [
+    info.categorias.length
+      ? `<ul class="ficha-categorias" aria-label="${escapeHtml(t("ficha.categorias"))}">${info.categorias.map((c) => `<li>${escapeHtml(c)}</li>`).join("")}</ul>`
+      : "",
+    info.descripcion
+      ? `<div class="ficha-descripcion-caja">
+          <p class="ficha-descripcion${larga && !abierta ? " plegada" : ""}">${escapeHtml(info.descripcion)}</p>
+          <div class="ficha-descripcion-pie">
+            ${info.descripcionEnIngles ? `<small>${escapeHtml(t("ficha.enIngles"))}</small>` : "<span></span>"}
+            ${larga ? `<button class="enlace" type="button" data-detail-action="descripcion" aria-expanded="${abierta ? "true" : "false"}">${escapeHtml(t(abierta ? "ficha.leerMenos" : "ficha.leerMas"))}</button>` : ""}
+          </div>
+        </div>`
+      : "",
+    datos.length ? `<dl class="ficha-lista">${datos.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${value}</dd></div>`).join("")}</dl>` : "",
+    info.enlaces.length
+      ? `<div class="ficha-enlaces">${info.enlaces.map((e) => `<a class="ficha-enlace" href="${escapeHtml(e.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(t(`ficha.enlace.${e.tipo}`))}</a>`).join("")}</div>`
+      : ""
+  ].filter(Boolean);
+  return partes.length ? partes.join("") : `<p class="ficha-vacio">${escapeHtml(t("ficha.sinInfo"))}</p>`;
+}
+
+// Al llegar los datos ampliados (o al abrir y cerrar la descripcion).
+function repintarFichaInfo() {
+  const screen = document.getElementById("assetDetailScreen");
+  const row = getRowById(state.detailRowId);
+  if (!screen || !row || screen.hidden) {
+    return;
+  }
+  const cuerpos = { mercado: detailMarketBody, suministro: detailSupplyBody, sobre: detailAboutBody };
+  Object.entries(cuerpos).forEach(([clave, pintar]) => {
+    const nodo = screen.querySelector(`[data-detail-body="${clave}"]`);
+    if (nodo) {
+      nodo.innerHTML = pintar(row);
+    }
+  });
 }
 
 function renderDetailNotes(row) {

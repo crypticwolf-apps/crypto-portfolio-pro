@@ -257,3 +257,61 @@
   :root[data-ui] .ficha-dato dd { font-size: 0.875rem; }
   :root[data-ui] .ficha-posicion-valor { font-size: 1.5rem; }
 }
+
+/* ── Ficha ampliada (infomoneda.js) ── */
+/* Maximo y minimo historicos: la distancia y la fecha, debajo de la cifra. */
+:root[data-ui] .ficha-lista dd small.ficha-dato-extra { display: block; margin-top: 2px; }
+/* Cuanto se ha emitido del suministro maximo */
+:root[data-ui] .ficha-emitido { display: flex; flex-direction: column; gap: 6px; }
+:root[data-ui] .ficha-emitido-barra {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--c-s3);
+  overflow: hidden;
+}
+:root[data-ui] .ficha-emitido-barra > span { display: block; height: 100%; border-radius: inherit; background: var(--c-ac); }
+:root[data-ui] .ficha-emitido small { font-size: 0.75rem; color: var(--c-t2); }
+/* Categorias */
+:root[data-ui] .ficha-categorias { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+:root[data-ui] .ficha-categorias li {
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--c-s2);
+  color: var(--c-t2);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+/* Descripcion: plegada a 4 lineas con "Leer mas" */
+:root[data-ui] .ficha-descripcion-caja { display: flex; flex-direction: column; gap: 6px; }
+:root[data-ui] .ficha-descripcion {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--c-t1);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+:root[data-ui] .ficha-descripcion.plegada {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+:root[data-ui] .ficha-descripcion-pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+:root[data-ui] .ficha-descripcion-pie small { font-size: 0.75rem; color: var(--c-t3); }
+/* Enlaces oficiales */
+:root[data-ui] .ficha-enlaces { display: flex; flex-wrap: wrap; gap: 8px; }
+:root[data-ui] .ficha-enlace {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  background: var(--c-s2);
+  color: var(--c-t1);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+:root[data-ui] .ficha-enlace::after { content: "↗"; margin-left: 6px; color: var(--c-t3); }
+:root[data-ui] .ficha-enlace:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 2px; }

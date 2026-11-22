@@ -91,6 +91,8 @@ const HISTORIAL_PROXY = typeof location !== "undefined"
 const HIST_SALDO_CACHE_KEY = "crypto-dashboard-saldo-hist-v1";
 // Precios pasados de cada moneda para el grafico de su ficha.
 const HIST_FICHA_CACHE_KEY = "crypto-dashboard-ficha-hist-v1";
+// Datos ampliados de cada moneda para su ficha (infomoneda.js).
+const INFO_MONEDA_CACHE_KEY = "crypto-dashboard-info-moneda-v1";
 const MAX_WALLETS = 20;
 // Clave de CoinStats del usuario (opcional). Va en su PROPIA clave de
 // localStorage, fuera de las preferencias: asi no viaja en ninguna

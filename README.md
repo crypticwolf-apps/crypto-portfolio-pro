@@ -8,6 +8,7 @@ Web: https://cartera.cryptoatalaya.com/
 
 - **Inicio:** saldo total con su cambio en el periodo (1D, 1S, 1M, 3M, 1A, Todo) y un gráfico del saldo reconstruido con los precios pasados de cada moneda y lo que tenías en cada fecha (compras y ventas registradas y fecha de compra). El cambio del periodo no cuenta como ganancia el dinero metido o sacado. Lista de activos, resumen de hoy, reparto y datos de mercado (BTC, ETH, dominancia, miedo y codicia).
 - **Gráficos táctiles:** en el saldo y en la ficha de cada moneda, al tocar y arrastrar (o pasar el ratón) se ven el valor y la fecha de cada momento. La ficha usa precios reales de CoinGecko y pinta la línea en verde o rojo según suba o baje el periodo.
+- **Ficha de cada moneda:** precio y gráfico real, tu posición, objetivos, mercado (con máximo y mínimo históricos), suministro, categorías, descripción y enlaces oficiales.
 - **Precios en vivo** por WebSocket (Binance y otros) y CoinGecko a través de un proxy propio con caché y límite de peticiones.
 - **Billeteras:** importa los tokens de una dirección pública (EVM, Solana, Bitcoin) y los mantiene al día.
 - **Compras y ventas:** registro de operaciones con coste medio y beneficio realizado.
@@ -24,7 +25,7 @@ Web: https://cartera.cryptoatalaya.com/
 
 ## Estructura
 
-- `index.html` y `js/`: la app en 23 scripts clásicos por tema, cargados en orden (`config.js` el primero y `arranque.js` el último). `css/`: estilos (sistema visual, base y una hoja por pantalla). `i18n.js`: textos. `sw.js` y `manifest.webmanifest`: PWA.
+- `index.html` y `js/`: la app en 24 scripts clásicos por tema, cargados en orden (`config.js` el primero y `arranque.js` el último). `css/`: estilos (sistema visual, base y una hoja por pantalla). `i18n.js`: textos. `sw.js` y `manifest.webmanifest`: PWA.
 - `finance.js`: cálculos puros (compras, ventas, coste medio, saldo en el tiempo y rentabilidad del periodo), con pruebas.
 - `wallet-core.js` y `api/wallet.js`: lector de billeteras (lógica en el navegador y servidor en Vercel). Con `COINSTATS_API_KEY` lee todos los tokens en 100+ redes; sin ella, usa Alchemy si hay `ALCHEMY_API_KEY`, y si no, los nodos públicos de cada red y mempool.space.
 - `api/cg.js`: proxy de CoinGecko (clave en `COINGECKO_API_KEY`, solo rutas permitidas, caché). `api/historial.js`: precios pasados de varias monedas en una sola petición, sobre la misma rejilla de tiempo, para el gráfico del saldo.

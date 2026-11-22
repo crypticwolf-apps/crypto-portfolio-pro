@@ -101,6 +101,39 @@ function activosEvm(version) {
   return lista;
 }
 
+// Datos ampliados de Bitcoin (coins/bitcoin) para la ficha. Con trampas: HTML
+// en la descripcion y un enlace javascript: que no debe aparecer.
+const FICHA_BTC = {
+  id: "bitcoin",
+  platforms: {},
+  categories: ["Cryptocurrency", "Layer 1 (L1)", "Proof of Work (PoW)"],
+  description: {
+    en: "Bitcoin is the first <a href=\"https://bitcoin.org\">decentralized</a> digital currency. <script>window.__xssFicha=1</script>" + " It was created in 2009 by Satoshi Nakamoto.".repeat(12),
+    es: ""
+  },
+  links: {
+    homepage: ["javascript:alert(1)", "https://bitcoin.org"],
+    whitepaper: "https://bitcoin.org/bitcoin.pdf",
+    blockchain_site: ["", "https://mempool.space/"],
+    twitter_screen_name: "bitcoin",
+    subreddit_url: "https://www.reddit.com/r/Bitcoin/",
+    repos_url: { github: ["https://github.com/bitcoin/bitcoin"] },
+    telegram_channel_identifier: ""
+  },
+  genesis_date: "2009-01-03",
+  hashing_algorithm: "SHA-256",
+  market_data: {
+    ath: { usd: 120000, eur: 110000 },
+    ath_date: { usd: "2025-10-06T00:00:00.000Z", eur: "2025-10-06T00:00:00.000Z" },
+    atl: { usd: 67.81, eur: 51.3 },
+    atl_date: { usd: "2013-07-06T00:00:00.000Z", eur: "2013-07-06T00:00:00.000Z" },
+    fully_diluted_valuation: { usd: 1.26e12, eur: 1.16e12 },
+    circulating_supply: 19800000,
+    total_supply: 19800000,
+    max_supply: 21000000
+  }
+};
+
 function respuestaCoinGecko(ruta) {
   if (ruta === "coins/markets") return MERCADO;
   if (ruta === "global") return { data: { total_market_cap: { usd: 2.4e12, eur: 2.2e12 }, market_cap_percentage: { btc: 52, eth: 17 }, market_cap_change_percentage_24h_usd: 1.1 } };
@@ -108,6 +141,7 @@ function respuestaCoinGecko(ruta) {
   if (ruta === "simple/price") return { bitcoin: { usd: 60000, eur: 55200 } };
   if (/market_chart/.test(ruta)) return { prices: Array.from({ length: 30 }, (_, j) => [Date.now() - j * 86400000, 100 + j]) };
   if (/\/history$/.test(ruta)) return { market_data: { current_price: { usd: 58000, eur: 53000 } } };
+  if (ruta === "coins/bitcoin") return FICHA_BTC;
   if (/^coins\/[^/]+$/.test(ruta)) return { id: ruta.split("/")[1], platforms: ruta.endsWith("pepe") ? { ethereum: PEPE } : {} };
   return {};
 }
@@ -358,7 +392,9 @@ async function recorridoCompleto(navegador, url, ancho) {
       rangos: [...document.querySelectorAll("#assetDetailScreen [data-detail-range]")].map((b) => b.dataset.detailRange),
       botones: [...document.querySelectorAll("#assetDetailScreen .ficha-pie [data-detail-action]")].map((b) => b.dataset.detailAction).join()
     }));
-    if (r.bloques !== 5 || !/\d/.test(r.precio) || r.rangos.length !== 6 || r.botones !== "sell,buy") throw new Error(JSON.stringify(r));
+    // Precio y grafico arriba; tu posicion, objetivos, mercado, suministro,
+    // sobre la moneda, notas y actividad.
+    if (r.bloques !== 7 || !/\d/.test(r.precio) || r.rangos.length !== 6 || r.botones !== "sell,buy") throw new Error(JSON.stringify(r));
     for (const k of r.rangos) {
       await page.click(`[data-detail-range="${k}"]`); await page.waitForTimeout(150);
       const pulsado = await page.evaluate((x) => document.querySelector(`[data-detail-range="${x}"]`).getAttribute("aria-pressed"), k);
@@ -1046,6 +1082,39 @@ async function casosCopiaHistorial(navegador, url) {
     if (!pedida || !/\+2\d[.,]\d+%/.test(r.chip) || !/1 mes/.test(r.texto) || !r.sube) throw new Error(JSON.stringify({ pedida, ...r }));
     await page.click("#assetDetailScreen [data-detail-close]");
     await page.waitForTimeout(400);
+  });
+  await paso(g, "ficha ampliada: maximos, suministro, descripcion y enlaces seguros", app, async (page) => {
+    await page.click('#portfolioMobileList [data-card-row="r-btc"]');
+    try {
+    await page.waitForFunction(() => /Bitcoin is the first/.test(document.querySelector('[data-detail-body="sobre"]')?.textContent || ""), null, { timeout: 15000 });
+    const r = await page.evaluate(() => {
+      const ficha = document.getElementById("assetDetailScreen");
+      const fila = (texto) => [...ficha.querySelectorAll(".ficha-lista > div")].find((d) => d.querySelector("dt")?.textContent === texto)?.querySelector("dd")?.textContent.trim() || null;
+      const sobre = ficha.querySelector('[data-detail-body="sobre"]');
+      return {
+        ath: fila("Maximo historico"),
+        atl: fila("Minimo historico"),
+        maximo: fila("Maximo"),
+        emitido: ficha.querySelector(".ficha-emitido small")?.textContent || "",
+        categorias: [...sobre.querySelectorAll(".ficha-categorias li")].map((li) => li.textContent),
+        plegada: !!sobre.querySelector(".ficha-descripcion.plegada"),
+        etiquetas: sobre.querySelectorAll(".ficha-descripcion a, .ficha-descripcion script").length,
+        enlaces: [...sobre.querySelectorAll("a.ficha-enlace")].map((a) => a.href),
+        xss: window.__xssFicha || 0
+      };
+    });
+    if (!/120\.000/.test(r.ath || "") || !/-4\d[.,]\d+%/.test(r.ath || "") || !/2025/.test(r.ath || "")) throw new Error("maximo: " + r.ath);
+    if (!/67[.,]81/.test(r.atl || "") || !/21\sM/.test(r.maximo || "") || !/^94[.,]3 ?%/.test(r.emitido)) throw new Error(JSON.stringify(r));
+    if (r.categorias.length !== 3 || !r.plegada) throw new Error(JSON.stringify(r));
+    if (r.etiquetas || r.xss) throw new Error("HTML de la descripcion pintado");
+    if (r.enlaces.some((u) => !u.startsWith("https://")) || r.enlaces[0] !== "https://bitcoin.org/" || r.enlaces.length !== 6) throw new Error("enlaces: " + r.enlaces.join(" "));
+    await page.click('[data-detail-action="descripcion"]');
+    if (await page.evaluate(() => !!document.querySelector(".ficha-descripcion.plegada"))) throw new Error("Leer mas no despliega");
+    } finally {
+      // Pase lo que pase, la ficha se cierra: si no, tapa los pasos siguientes.
+      await page.evaluate(() => closeAssetDetail());
+      await page.waitForTimeout(400);
+    }
   });
   await paso(g, "menu de acciones: Guardar copia y Restaurar copia (sin CSV)", app, async (page) => {
     await page.click("#quickAddBtn");

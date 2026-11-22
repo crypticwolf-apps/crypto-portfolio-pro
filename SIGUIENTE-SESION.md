@@ -10,7 +10,7 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 
 - **Carpeta:** `D:\Mega\Proyectos\Proyecto mixto\Portafolio Crypto`
 - **Qué es:** PWA de cartera de criptomonedas en JavaScript vanilla, **sin build**.
-  Ficheros: `index.html`, la app en **`js/`** (23 scripts por tema: `config.js`
+  Ficheros: `index.html`, la app en **`js/`** (24 scripts por tema: `config.js`
   primero, `arranque.js` el último), **`css/`** (estilos: `tokens.css` sistema visual, `base.css`,
   `componentes.css` y una hoja por pantalla: inicio, ajustes, hojas, detalle,
   analitica, plan, noticias, tablet y escritorio), `i18n.js`, `finance.js`
@@ -23,7 +23,7 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 - **Nombre:** **Crypto Portfolio Pro** en todas partes (manifest, título, PDF);
   bajo el icono, "Crypto Pro".
 - **Scripts clásicos, no módulos ES:** la APK abre la app desde `file://` y ahí
-  `import`/`export` no cargan. Los 23 ficheros comparten el ámbito global y se
+  `import`/`export` no cargan. Los 24 ficheros comparten el ámbito global y se
   ejecutan en el orden de `index.html`. Reglas en la cabecera de `js/config.js`;
   un fichero nuevo va en `index.html` (antes de `arranque.js`) y en `APP_SHELL`
   de `sw.js`.
@@ -121,6 +121,10 @@ Portafolio en el centro del menú inferior.
 - **Ficha de un activo:** gráfico con precios reales de CoinGecko por rango
   (`serieFicha`, mismo `api/historial.js`), línea verde si el periodo sube y
   roja si baja, y el cambio del rango en el chip (1D sigue siendo 24 h).
+  Además (`js/infomoneda.js`, CoinGecko `coins/{id}`, guardado 1 h): máximo y
+  mínimo históricos con su distancia y fecha, valoración diluida, suministro
+  (barra de lo emitido), categorías, descripción (texto plano; en inglés si no
+  hay en español) y enlaces oficiales (solo https).
 - **Acciones rápidas:** Más ⋯ (abre el menú de acciones) · Comprar · Vender ·
   Activo + (en escritorio, "Más acciones").
 - **Menú de acciones:** Añadir alerta · Añadir billetera · Descargar PDF ·
