@@ -308,7 +308,44 @@
   font-family: var(--fuente);
 }
 :root[data-ui][data-theme] .editor-suggestion:hover,
-:root[data-ui][data-theme] .editor-suggestion:focus-visible { background: var(--c-s2); outline: none; }
+:root[data-ui][data-theme] .editor-suggestion:focus-visible,
+:root[data-ui][data-theme] .editor-suggestion.is-active { background: var(--c-s2); outline: none; }
+/* Lo escrito, resaltado en el nombre y el simbolo */
+:root[data-ui][data-theme] .editor-suggestion mark { background: none; color: var(--c-ac); font-weight: 700; }
+:root[data-ui][data-theme] .editor-suggestion-logo {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--c-s3);
+  color: var(--c-t2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.5625rem;
+  font-weight: 700;
+}
+:root[data-ui][data-theme] .editor-sugerencias-titulo,
+:root[data-ui][data-theme] .editor-sugerencias-nota {
+  margin: 0;
+  padding: 8px 12px 6px;
+  font-size: 0.75rem;
+  color: var(--c-t2);
+}
+:root[data-ui][data-theme] .editor-sugerencias-titulo { font-weight: 600; }
+:root[data-ui][data-theme] .editor-sugerencias-nota.buscando::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  vertical-align: -1px;
+  border: 2px solid var(--c-line-2);
+  border-top-color: var(--c-ac);
+  border-radius: 50%;
+  animation: buscadorGira 0.8s linear infinite;
+}
+@keyframes buscadorGira { to { transform: rotate(360deg); } }
 :root[data-ui][data-theme] .editor-suggestion img { width: 28px; height: 28px; }
 :root[data-ui][data-theme] .editor-suggestion strong { font-size: 0.9375rem; font-weight: 600; }
 :root[data-ui][data-theme] .editor-suggestion small,
@@ -323,7 +360,7 @@
   background: transparent;
   gap: 12px;
 }
-:root[data-ui][data-theme] .editor-wallet-btn svg { color: var(--c-ac); }
+:root[data-ui][data-theme] .editor-wallet-btn svg { width: 24px; height: 24px; flex: 0 0 auto; color: var(--c-ac); }
 :root[data-ui][data-theme] .editor-wallet-btn strong { font-size: 0.9375rem; font-weight: 600; }
 :root[data-ui][data-theme] .editor-wallet-btn small { font-size: 0.75rem; color: var(--c-t2); }
 

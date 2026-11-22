@@ -57,6 +57,10 @@ function init() {
     // Billeteras: se releen solas si llevan un rato sin actualizarse.
     syncStaleWallets();
   }, 140);
+
+  // El indice del buscador de monedas, ya cargado cuando se abra el editor
+  // (tras los precios, para no retrasarlos).
+  window.setTimeout(() => cargarIndiceMonedas(), 5000);
 }
 
 // ── Pestañas ──

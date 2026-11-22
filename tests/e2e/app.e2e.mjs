@@ -1193,6 +1193,58 @@ async function casosCopiaHistorial(navegador, url) {
     const oculto = await page.evaluate(() => document.getElementById("avisoCopia").hidden && state.prefs.copiaPospuesta > Date.now());
     if (!oculto) throw new Error("Mas tarde no lo oculta");
   });
+  await paso(g, "buscador: populares, resultados al instante, Enter elige y Escape solo cierra la lista", caido, async (page) => {
+    await page.evaluate(() => handleAddRow());
+    await page.waitForTimeout(600);
+    const campo = '#positionEditorPortal [data-editor-field="crypto"]';
+    const lista = () => page.evaluate(() => [...document.querySelectorAll("#positionEditorPortal [data-editor-coin]")].map((b) => b.dataset.editorCoin));
+    await page.click(campo);
+    // Con el campo vacio, las populares del indice (se carga a los 5 s de abrir).
+    await page.waitForFunction(() => document.querySelectorAll("#positionEditorPortal [data-editor-coin]").length >= 5, null, { timeout: 8000 });
+    await page.type(campo, "eth");
+    const t0 = Date.now();
+    await page.waitForFunction(() => document.querySelector("#positionEditorPortal [data-editor-coin]")?.dataset.editorCoin === "ethereum", null, { timeout: 2000 });
+    if (Date.now() - t0 > 400) throw new Error(`tarda ${Date.now() - t0} ms`);
+    await page.keyboard.press("Escape");
+    const tras = await page.evaluate(() => ({ lista: !document.querySelector("#positionEditorPortal [data-editor-role='suggestions']").hidden, editor: Boolean(state.editorRowId) }));
+    if (tras.lista || !tras.editor) throw new Error("Escape: " + JSON.stringify(tras));
+    await page.fill(campo, "");
+    await page.type(campo, "bit");
+    await page.waitForFunction(() => document.querySelector("#positionEditorPortal [data-editor-coin]")?.dataset.editorCoin === "bitcoin", null, { timeout: 2000 });
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(500);
+    const r = await page.evaluate(() => ({ id: getRowById(state.editorRowId)?.coinId, lista: !document.querySelector("#positionEditorPortal [data-editor-role='suggestions']").hidden }));
+    if (r.id !== "bitcoin" || r.lista) throw new Error("Enter: " + JSON.stringify(r) + " " + (await lista()).join(","));
+    // Fuera la fila de prueba.
+    await page.evaluate(() => { const id = state.editorRowId; closePositionEditor(); state.rows = state.rows.filter((row) => row.id !== id); renderAll(); });
+    await page.waitForTimeout(300);
+  });
+  await paso(g, "iconos: ninguno descomunal en pestanas, editor y hojas", caido, async (page) => {
+    const grandes = [];
+    const revisar = (donde) => page.evaluate((donde) => [...document.querySelectorAll("svg")].filter((svg) => {
+      const r = svg.getBoundingClientRect();
+      return r.width && r.height && !svg.closest(".grafico-saldo, #analyticsDonut, .vista-previa, .tp-line") && (r.width > 48 || r.height > 48);
+    }).map((svg) => `${donde}: ${svg.parentElement.className || svg.parentElement.tagName}`), donde);
+    for (const tab of ["home", "analytics", "plan", "news", "more"]) {
+      await page.click(`#tabBar [data-tab-target="${tab}"]`);
+      await page.waitForTimeout(250);
+      grandes.push(...await revisar(tab));
+    }
+    for (const [nombre, abrir] of [["editor", () => openPositionEditor(state.rows[0].id)], ["menu", () => openFabSheet()], ["comprar", () => openTradeSheet("buy")], ["billetera", () => openWalletSheet()]]) {
+      await page.evaluate(abrir);
+      await page.waitForTimeout(500);
+      grandes.push(...await revisar(nombre));
+      await page.keyboard.press("Escape");
+      await page.evaluate(() => { try { closeFabSheet(); } catch {} });
+      await page.waitForTimeout(350);
+    }
+    // El editor de una posicion nueva lleva el boton de billetera.
+    await page.evaluate(() => handleAddRow());
+    await page.waitForTimeout(500);
+    grandes.push(...await revisar("editor nuevo"));
+    await page.evaluate(() => { const id = state.editorRowId; closePositionEditor(); state.rows = state.rows.filter((row) => row.id !== id); renderAll(); });
+    if (grandes.length) throw new Error(grandes.join(" | "));
+  });
   await caido.ctx.close();
 }
 

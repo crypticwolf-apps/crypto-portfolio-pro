@@ -38,6 +38,31 @@ function bindPositionEditor() {
     }
   });
 
+  // Buscador: flechas, Enter y Escape en el campo de la moneda; al entrar en
+  // el, sugerencias (o las populares); al salir, se recogen.
+  editorPortal.addEventListener("keydown", (event) => {
+    if (event.target.closest("[data-editor-field='crypto']")) {
+      teclaEnBuscador(event);
+    }
+  });
+  editorPortal.addEventListener("focusin", (event) => {
+    const input = event.target.closest("[data-editor-field='crypto']");
+    if (input && !input.readOnly) {
+      window.clearTimeout(editorOcultarTimer);
+      const row = getRowById(state.editorRowId);
+      if (row && !row.coinId) {
+        actualizarSugerenciasEditor(input.value);
+      }
+    }
+  });
+  editorPortal.addEventListener("focusout", (event) => {
+    if (event.target.closest("[data-editor-field='crypto']")) {
+      // Un momento de margen: tocar una sugerencia tambien saca el foco.
+      window.clearTimeout(editorOcultarTimer);
+      editorOcultarTimer = window.setTimeout(() => renderEditorSuggestions([]), 200);
+    }
+  });
+
   editorPortal.addEventListener("input", (event) => {
     const field = event.target.closest("[data-editor-field]");
     if (field) {
@@ -70,6 +95,7 @@ function openPositionEditor(rowId) {
   }
   closeRowMenu();
   state.editorRowId = rowId;
+  cargarIndiceMonedas();
   renderPositionEditor(row);
   showOverlay(editorPortal);
   syncEditorOpenClass();
@@ -87,6 +113,8 @@ function closePositionEditor() {
     return;
   }
   clearTimeout(editorSearchTimer);
+  window.clearTimeout(editorOcultarTimer);
+  editorBusquedaSeq += 1;
   state.editorRowId = null;
   // La ficha que haya debajo se rehace con lo editado (objetivos, notas).
   if (state.detailRowId) {
@@ -127,8 +155,8 @@ function renderPositionEditor(row) {
         </button>` : ""}
         <label class="editor-field">
           <span>${escapeHtml(t("editor.asset"))}</span>
-          <input type="text" data-editor-field="crypto" autocomplete="off" placeholder="${escapeHtml(t("row.assetPlaceholder"))}" value="${escapeHtml(row.crypto)}" ${lockAttr} />
-          <div class="editor-suggestions" data-editor-role="suggestions" hidden></div>
+          <input type="text" data-editor-field="crypto" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="editorSugerencias" placeholder="${escapeHtml(t("row.assetPlaceholder"))}" value="${escapeHtml(row.crypto)}" ${lockAttr} />
+          <div class="editor-suggestions" id="editorSugerencias" role="listbox" data-editor-role="suggestions" hidden></div>
           <small class="editor-hint" data-editor-role="assetHint">${escapeHtml(wallet ? t("wallet.editorHint", { wallet: walletDisplayName(wallet) }) : editorAssetHint(row))}</small>
         </label>
 
@@ -233,12 +261,7 @@ function handleEditorFieldInput(input) {
     row.resolvedName = "";
     row.symbol = "";
     row.priceStatus = value ? "loading" : "idle";
-    clearTimeout(editorSearchTimer);
-    if (value.trim()) {
-      editorSearchTimer = window.setTimeout(() => runEditorSearch(value), SEARCH_DELAY);
-    } else {
-      renderEditorSuggestions([]);
-    }
+    actualizarSugerenciasEditor(value);
     scheduleAutosave();
     return;
   }
@@ -260,41 +283,130 @@ function handleEditorFieldInput(input) {
   scheduleAutosave();
 }
 
-async function runEditorSearch(query) {
+// ── Buscador de monedas del editor (indice y busqueda en buscador.js) ──
+// En cada letra, lo del indice local al instante; un momento despues, lo que
+// anada CoinGecko. Solo cuenta la ultima busqueda (editorBusquedaSeq).
+let editorBusquedaSeq = 0;
+let editorSugerenciaActiva = -1;
+let editorOcultarTimer = null;
+const EDITOR_BUSQUEDA_REMOTA_MS = 220;
+
+function actualizarSugerenciasEditor(texto) {
   const row = getRowById(state.editorRowId);
   if (!row) {
     return;
   }
-  try {
-    const coins = await searchCoins(query);
-    if (state.editorRowId !== row.id) {
+  const seq = ++editorBusquedaSeq;
+  const q = String(texto || "").trim();
+  const locales = buscarLocal(q);
+  const remota = q.length >= 2 && !isOffline();
+  renderEditorSuggestions(locales, { texto: q, populares: !q, buscando: remota });
+  clearTimeout(editorSearchTimer);
+  if (!remota) {
+    return;
+  }
+  editorSearchTimer = window.setTimeout(async () => {
+    let remotas = [];
+    try {
+      remotas = await buscarRemoto(q);
+    } catch {
+      remotas = [];
+    }
+    // Una respuesta que llega tarde (ya se escribio otra cosa) no pinta nada.
+    if (seq !== editorBusquedaSeq || state.editorRowId !== row.id) {
       return;
     }
-    row.suggestions = coins.slice(0, 8);
-    renderEditorSuggestions(row.suggestions);
-  } catch {
-    renderEditorSuggestions([]);
-  }
+    renderEditorSuggestions(mezclarMonedas(q, locales, remotas), { texto: q });
+  }, EDITOR_BUSQUEDA_REMOTA_MS);
 }
 
-function renderEditorSuggestions(coins) {
+function renderEditorSuggestions(coins, { texto = "", populares = false, buscando = false } = {}) {
   const box = editorPortal?.querySelector("[data-editor-role='suggestions']");
+  const input = editorPortal?.querySelector("[data-editor-field='crypto']");
   if (!box) {
     return;
   }
-  if (!coins.length) {
+  const row = getRowById(state.editorRowId);
+  const abierta = Boolean(coins.length || buscando || texto);
+  if (row) {
+    row.suggestions = coins;
+  }
+  editorSugerenciaActiva = coins.length ? 0 : -1;
+  input?.setAttribute("aria-expanded", abierta ? "true" : "false");
+  input?.removeAttribute("aria-activedescendant");
+  if (!abierta || document.activeElement !== input) {
     box.hidden = true;
     box.innerHTML = "";
+    input?.setAttribute("aria-expanded", "false");
     return;
   }
   box.hidden = false;
-  box.innerHTML = coins.map((coin) => `
-    <button type="button" class="editor-suggestion" data-editor-coin="${escapeHtml(coin.id)}">
-      <img src="${escapeHtml(coin.thumb || "")}" alt="" loading="lazy" />
-      <span><strong>${escapeHtml(coin.name)}</strong><small>${escapeHtml(String(coin.symbol || "").toUpperCase())}</small></span>
-      <span class="editor-suggestion-rank">${coin.market_cap_rank ? "#" + coin.market_cap_rank : ""}</span>
-    </button>
-  `).join("");
+  const vacio = !coins.length && !buscando
+    ? `<p class="editor-sugerencias-nota">${escapeHtml(t("editor.sinResultados", { texto }))}</p>`
+    : "";
+  box.innerHTML = `
+    ${populares && coins.length ? `<p class="editor-sugerencias-titulo">${escapeHtml(t("editor.populares"))}</p>` : ""}
+    ${coins.map((coin, i) => `
+      <button type="button" class="editor-suggestion${i === editorSugerenciaActiva ? " is-active" : ""}" id="editorSugerencia${i}" role="option" aria-selected="${i === editorSugerenciaActiva ? "true" : "false"}" data-editor-coin="${escapeHtml(coin.id)}" tabindex="-1">
+        ${coin.thumb ? `<img src="${escapeHtml(coin.thumb)}" alt="" loading="lazy" />` : `<span class="editor-suggestion-logo" aria-hidden="true">${escapeHtml(String(coin.symbol || "?").slice(0, 4).toUpperCase())}</span>`}
+        <span><strong>${resaltarBusqueda(coin.name, texto)}</strong><small>${resaltarBusqueda(String(coin.symbol || "").toUpperCase(), texto)}</small></span>
+        <span class="editor-suggestion-rank">${coin.market_cap_rank ? "#" + coin.market_cap_rank : ""}</span>
+      </button>`).join("")}
+    ${buscando ? `<p class="editor-sugerencias-nota buscando" aria-live="polite">${escapeHtml(t("editor.buscandoMas"))}</p>` : ""}
+    ${vacio}`;
+  if (editorSugerenciaActiva >= 0) {
+    input?.setAttribute("aria-activedescendant", `editorSugerencia${editorSugerenciaActiva}`);
+  }
+}
+
+// Al llegar el indice de monedas con la lista abierta: se rehace con el.
+function refrescarSugerenciasAbiertas() {
+  const input = editorPortal?.querySelector("[data-editor-field='crypto']");
+  const row = getRowById(state.editorRowId);
+  if (input && row && !row.coinId && document.activeElement === input) {
+    actualizarSugerenciasEditor(input.value);
+  }
+}
+
+function marcarSugerenciaActiva(indice) {
+  const box = editorPortal?.querySelector("[data-editor-role='suggestions']");
+  const input = editorPortal?.querySelector("[data-editor-field='crypto']");
+  const opciones = box ? [...box.querySelectorAll("[data-editor-coin]")] : [];
+  if (!opciones.length) {
+    return;
+  }
+  editorSugerenciaActiva = (indice + opciones.length) % opciones.length;
+  opciones.forEach((opcion, i) => {
+    const activa = i === editorSugerenciaActiva;
+    opcion.classList.toggle("is-active", activa);
+    opcion.setAttribute("aria-selected", activa ? "true" : "false");
+  });
+  opciones[editorSugerenciaActiva].scrollIntoView({ block: "nearest" });
+  input?.setAttribute("aria-activedescendant", opciones[editorSugerenciaActiva].id);
+}
+
+// Flechas para moverse, Enter para elegir (la marcada o la primera) y Escape
+// para cerrar la lista sin cerrar el editor.
+function teclaEnBuscador(event) {
+  const box = editorPortal?.querySelector("[data-editor-role='suggestions']");
+  const abierta = box && !box.hidden;
+  if (!abierta) {
+    return;
+  }
+  const opciones = [...box.querySelectorAll("[data-editor-coin]")];
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    marcarSugerenciaActiva(editorSugerenciaActiva + (event.key === "ArrowDown" ? 1 : -1));
+  } else if (event.key === "Enter") {
+    if (opciones.length) {
+      event.preventDefault();
+      selectEditorCoin(opciones[Math.max(0, editorSugerenciaActiva)].dataset.editorCoin);
+    }
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    renderEditorSuggestions([]);
+  }
 }
 
 async function selectEditorCoin(coinId) {
@@ -302,6 +414,9 @@ async function selectEditorCoin(coinId) {
   if (!row) {
     return;
   }
+  // Elegida la moneda, ninguna busqueda pendiente vuelve a abrir la lista.
+  editorBusquedaSeq += 1;
+  clearTimeout(editorSearchTimer);
   const coin = (row.suggestions || []).find((item) => item.id === coinId);
   if (!coin) {
     return;

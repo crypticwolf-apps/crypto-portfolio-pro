@@ -52,7 +52,6 @@ const PREFS_KEY = "crypto-dashboard-prefs-v2";
 const HISTORY_KEY = "crypto-dashboard-history-v2";
 const FX_RATE_CACHE_KEY = "crypto-dashboard-fx-v1";
 const AUTOSAVE_DELAY = 800;
-const SEARCH_DELAY = 280;
 const SEARCH_CACHE_TTL = 5 * 60 * 1000;
 const PRICE_CACHE_TTL = 25 * 1000;
 const FX_RATE_TTL = 12 * 60 * 60 * 1000;
@@ -93,6 +92,8 @@ const HIST_SALDO_CACHE_KEY = "crypto-dashboard-saldo-hist-v1";
 const HIST_FICHA_CACHE_KEY = "crypto-dashboard-ficha-hist-v1";
 // Datos ampliados de cada moneda para su ficha (infomoneda.js).
 const INFO_MONEDA_CACHE_KEY = "crypto-dashboard-info-moneda-v1";
+// Indice de monedas del buscador (las 250 principales, renovado cada dia).
+const BUSCADOR_INDICE_KEY = "crypto-dashboard-indice-monedas-v1";
 const MAX_WALLETS = 20;
 // Clave de CoinStats del usuario (opcional). Va en su PROPIA clave de
 // localStorage, fuera de las preferencias: asi no viaja en ninguna

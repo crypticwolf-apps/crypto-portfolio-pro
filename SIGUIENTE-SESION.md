@@ -10,7 +10,7 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 
 - **Carpeta:** `D:\Mega\Proyectos\Proyecto mixto\Portafolio Crypto`
 - **Qué es:** PWA de cartera de criptomonedas en JavaScript vanilla, **sin build**.
-  Ficheros: `index.html`, la app en **`js/`** (24 scripts por tema: `config.js`
+  Ficheros: `index.html`, la app en **`js/`** (25 scripts por tema: `config.js`
   primero, `arranque.js` el último), **`css/`** (estilos: `tokens.css` sistema visual, `base.css`,
   `componentes.css` y una hoja por pantalla: inicio, ajustes, hojas, detalle,
   analitica, plan, noticias, tablet y escritorio), `i18n.js`, `finance.js`
@@ -23,7 +23,7 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 - **Nombre:** **Crypto Portfolio Pro** en todas partes (manifest, título, PDF);
   bajo el icono, "Crypto Pro".
 - **Scripts clásicos, no módulos ES:** la APK abre la app desde `file://` y ahí
-  `import`/`export` no cargan. Los 24 ficheros comparten el ámbito global y se
+  `import`/`export` no cargan. Los 25 ficheros comparten el ámbito global y se
   ejecutan en el orden de `index.html`. Reglas en la cabecera de `js/config.js`;
   un fichero nuevo va en `index.html` (antes de `arranque.js`) y en `APP_SHELL`
   de `sw.js`.
@@ -125,6 +125,11 @@ Portafolio en el centro del menú inferior.
   mínimo históricos con su distancia y fecha, valoración diluida, suministro
   (barra de lo emitido), categorías, descripción (texto plano; en inglés si no
   hay en español) y enlaces oficiales (solo https).
+- **Buscador de monedas** (`js/buscador.js`, editor de posiciones): resultados en
+  cada letra de un índice local (las 250 principales, renovado cada día y
+  cargado a los 5 s de abrir la app, más las de la cartera); CoinGecko
+  `/search` directo al proxy, fuera de la cola de precios, cancelando la
+  anterior; populares con el campo vacío; flechas, Enter y Escape.
 - **Acciones rápidas:** Más ⋯ (abre el menú de acciones) · Comprar · Vender ·
   Activo + (en escritorio, "Más acciones").
 - **Menú de acciones:** Añadir alerta · Añadir billetera · Descargar PDF ·

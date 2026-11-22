@@ -25,7 +25,7 @@ Web: https://cartera.cryptoatalaya.com/
 
 ## Estructura
 
-- `index.html` y `js/`: la app en 24 scripts clásicos por tema, cargados en orden (`config.js` el primero y `arranque.js` el último). `css/`: estilos (sistema visual, base y una hoja por pantalla). `i18n.js`: textos. `sw.js` y `manifest.webmanifest`: PWA.
+- `index.html` y `js/`: la app en 25 scripts clásicos por tema, cargados en orden (`config.js` el primero y `arranque.js` el último). `css/`: estilos (sistema visual, base y una hoja por pantalla). `i18n.js`: textos. `sw.js` y `manifest.webmanifest`: PWA.
 - `finance.js`: cálculos puros (compras, ventas, coste medio, saldo en el tiempo y rentabilidad del periodo), con pruebas.
 - `wallet-core.js` y `api/wallet.js`: lector de billeteras (lógica en el navegador y servidor en Vercel). Con `COINSTATS_API_KEY` lee todos los tokens en 100+ redes; sin ella, usa Alchemy si hay `ALCHEMY_API_KEY`, y si no, los nodos públicos de cada red y mempool.space.
 - `api/cg.js`: proxy de CoinGecko (clave en `COINGECKO_API_KEY`, solo rutas permitidas, caché). `api/historial.js`: precios pasados de varias monedas en una sola petición, sobre la misma rejilla de tiempo, para el gráfico del saldo.
