@@ -26,6 +26,9 @@
   font-weight: 600;
   letter-spacing: 0.02em;
 }
+:root[data-ui] .inicio-avatar.con-emoji { font-size: 1.375rem; letter-spacing: 0; line-height: 1; }
+:root[data-ui] .inicio-avatar.con-foto { background: var(--c-s2); overflow: hidden; }
+:root[data-ui] .inicio-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 :root[data-ui] .inicio-titulos {
   flex: 1 1 auto;
   min-width: 0;
@@ -445,11 +448,51 @@
   transform: translate(-50%, -50%);
   box-sizing: border-box;
 }
+/* ── Esqueletos de carga ──
+   Siluetas que brillan mientras llegan los primeros precios o el historial
+   (y los datos de mercado). Sin animacion si el sistema pide menos movimiento. */
+:root[data-ui] .esqueleto,
 :root[data-ui] .mercado-cargando {
-  height: 14px;
+  display: block;
   border-radius: 7px;
-  background: var(--c-s2);
+  background: linear-gradient(90deg, var(--c-s2) 25%, var(--c-s3) 50%, var(--c-s2) 75%);
+  background-size: 300% 100%;
+  animation: brilloEsqueleto 1.5s ease-in-out infinite;
 }
+@keyframes brilloEsqueleto {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui] .esqueleto,
+  :root[data-ui] .mercado-cargando { animation: none; }
+}
+:root[data-ui] .mercado-cargando { height: 14px; }
+:root[data-ui] .esqueleto-saldo { width: min(220px, 70%); height: 0.8em; margin-block: 0.12em; border-radius: 10px; }
+:root[data-ui] .esqueleto-chip { display: inline-block; width: 92px; height: 12px; vertical-align: middle; }
+:root[data-ui] .chip-cambio.cargando > svg { visibility: hidden; }
+:root[data-ui] .esqueleto-valor { width: 72px; max-width: 100%; height: 14px; margin-block: 3px; }
+:root[data-ui] .esqueleto-sub { width: 44px; max-width: 100%; height: 10px; margin-block: 3px; }
+:root[data-ui] .fila-activo-cifras .esqueleto { margin-left: auto; }
+:root[data-ui] .stack-cell .esqueleto,
+:root[data-ui] td .esqueleto { margin-left: auto; }
+:root[data-ui] .as-main .esqueleto-saldo { width: 180px; height: 1.6rem; margin-block: 0.3rem; }
+:root[data-ui] .dona-esqueleto {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  -webkit-mask: radial-gradient(circle, transparent 53px, #000 54px);
+  mask: radial-gradient(circle, transparent 53px, #000 54px);
+}
+:root[data-ui] .mapa-esqueleto { position: absolute; inset: 0; border-radius: var(--r-md); }
+:root[data-ui] .grafico-esqueleto {
+  height: 150px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  opacity: 0.7;
+}
+:root[data-ui] .grafico-esqueleto svg { display: block; width: 100%; height: 100%; }
+:root[data-ui] .grafico-esqueleto path { fill: none; stroke: var(--c-t3); stroke-width: 2; opacity: 0.35; vector-effect: non-scaling-stroke; }
 
 /* La tabla de posiciones (seccion-escritorio) solo se ve en la version de
    escritorio, que la lleva a su sitio (escritorio.js / escritorio.css). */
@@ -518,3 +561,41 @@
 :root[data-ui] .grafico-baja .grafico-cursor-punto { fill: var(--c-neg); }
 :root[data-ui] .grafico-baja .grafico-stop-alto,
 :root[data-ui] .grafico-baja .grafico-stop-bajo { stop-color: var(--c-neg); }
+
+/* ── Mini grafico de 7 dias (lista de activos y tabla de escritorio) ── */
+:root[data-ui] .mini-grafico { display: block; flex: 0 0 auto; overflow: visible; }
+:root[data-ui] .mini-grafico polyline { stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+:root[data-ui] .mini-grafico.sube polyline { stroke: var(--c-pos); }
+:root[data-ui] .mini-grafico.baja polyline { stroke: var(--c-neg); }
+:root[data-ui] .fila-activo-mini { width: 56px; height: 26px; }
+/* En pantallas muy estrechas no cabe junto al nombre y las cifras. */
+@media (max-width: 359px) {
+  :root[data-ui] .fila-activo-mini { display: none; }
+}
+
+/* ── Extras del grafico de area: segunda linea, precio medio y operaciones ── */
+:root[data-ui] .grafico-segunda { stroke: var(--c-t2); stroke-width: 1.6; stroke-dasharray: 5 4; stroke-linecap: round; }
+:root[data-ui] .grafico-medio { stroke: var(--c-t3); stroke-width: 1; stroke-dasharray: 4 4; }
+:root[data-ui] .grafico-medio-txt { fill: var(--c-t2); font-family: var(--fuente); font-size: 11px; font-weight: 600; }
+:root[data-ui] .grafico-op { stroke: var(--c-bg); stroke-width: 2.5; }
+:root[data-ui] .grafico-op.compra { fill: var(--c-pos); }
+:root[data-ui] .grafico-op.venta { fill: var(--c-neg); }
+:root[data-ui] .grafico-etiqueta small.grafico-etiqueta-segunda { color: var(--c-t2); font-weight: 600; }
+/* Leyenda bajo el grafico (solo con extras) */
+:root[data-ui] .grafico-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 4px 0;
+  font-size: 0.75rem;
+  color: var(--c-t2);
+}
+:root[data-ui] .grafico-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+:root[data-ui] .grafico-leyenda i { display: inline-block; flex: 0 0 auto; }
+:root[data-ui] .leyenda-op { width: 9px; height: 9px; border-radius: 50%; }
+:root[data-ui] .leyenda-op.compra { background: var(--c-pos); }
+:root[data-ui] .leyenda-op.venta { background: var(--c-neg); }
+:root[data-ui] .leyenda-medio,
+:root[data-ui] .leyenda-segunda { width: 16px; height: 0; border-top: 2px dashed var(--c-t3); }
+:root[data-ui] .leyenda-segunda { border-top-color: var(--c-t2); }
+:root[data-ui] .leyenda-saldo { width: 16px; height: 0; border-top: 2px solid var(--c-ac); }

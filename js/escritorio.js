@@ -8,6 +8,7 @@
 //   posiciones .......... todos los activos (la tabla)
 //   analisis ............ en una linea: distribucion | mejores y peores |
 //                         categorias y comparativa
+//   mapa ................ mapa de la cartera (peso y cambio en 24 h)
 //   operaciones ......... compras y ventas
 //   plan ................ el plan de salida en tabla, una fila por activo
 //   noticias ............ en bloques; las primeras filas y "Ver todas"
@@ -69,6 +70,7 @@ function escPiezas() {
     [panel("insightsRankingsGrid"), "analisis2"],
     [panel("analyticsCategory"), "analisis3"],
     [panel("analyticsCompare"), "analisis3"],
+    [panel("mapaCartera"), "mapa"],
     [panel("analyticsActivityStats"), "operaciones"],
     [document.querySelector('.tab-section[data-tab="plan"]'), "plan"],
     [document.querySelector('.tab-section[data-tab="news"]'), "noticias"]

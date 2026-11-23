@@ -293,9 +293,81 @@
     return { delta, pct: capital > 0 ? (delta / capital) * 100 : null };
   }
 
+  // Dinero invertido (coste) de una posicion en el instante t:
+  //   { inversion (la de hoy), desde (ms o null), costes: [{ at, coste }] }
+  // con coste + en las compras y - (lo que costaba lo vendido) en las ventas.
+  // Lo que no explican las operaciones cuenta desde la fecha de compra.
+  function invertidoEn(pos, t) {
+    const costes = pos.costes || [];
+    let base = toNum(pos.inversion);
+    for (const c of costes) base -= toNum(c.coste);
+    let total = pos.desde != null && t < pos.desde ? 0 : base;
+    for (const c of costes) {
+      if (c.at <= t) total += toNum(c.coste);
+    }
+    return total > 1e-9 ? total : 0;
+  }
+
+  function serieInvertido(posiciones, instantes) {
+    return (instantes || []).map((t) => (posiciones || []).reduce((suma, pos) => suma + invertidoEn(pos, t), 0));
+  }
+
+  // Mapa de la cartera (treemap "squarified"): reparte un rectangulo de
+  // ancho x alto en bloques de area proporcional a cada valor, lo mas
+  // cuadrados posible. Los valores van de mayor a menor; devuelve
+  // [{ x, y, w, h }] en el mismo orden.
+  function mapaRectangulos(valores, ancho, alto) {
+    const lista = (valores || []).map((v) => Math.max(0, toNum(v)));
+    const total = lista.reduce((a, b) => a + b, 0);
+    if (!(total > 0) || !(ancho > 0) || !(alto > 0)) return lista.map(() => ({ x: 0, y: 0, w: 0, h: 0 }));
+    const escala = (ancho * alto) / total;
+    const areas = lista.map((v) => v * escala);
+    const rects = [];
+    let x = 0, y = 0, w = ancho, h = alto;
+    const suma = (fila) => fila.reduce((a, b) => a + b, 0);
+    // Peor proporcion (lado largo / lado corto) de una fila sobre un lado.
+    const peor = (fila, lado) => {
+      const s = suma(fila);
+      if (!(s > 0)) return 1;
+      let max = 0, min = Infinity;
+      for (const a of fila) { if (a > max) max = a; if (a < min) min = a; }
+      if (!(min > 0)) return Infinity;
+      return Math.max((lado * lado * max) / (s * s), (s * s) / (lado * lado * min));
+    };
+    const colocar = (fila) => {
+      const s = suma(fila);
+      if (w >= h) {
+        const cw = h > 0 ? s / h : 0;
+        let cy = y;
+        for (const a of fila) { const ch = cw > 0 ? a / cw : 0; rects.push({ x, y: cy, w: cw, h: ch }); cy += ch; }
+        x += cw; w -= cw;
+      } else {
+        const rh = w > 0 ? s / w : 0;
+        let cx = x;
+        for (const a of fila) { const rw = rh > 0 ? a / rh : 0; rects.push({ x: cx, y, w: rw, h: rh }); cx += rw; }
+        y += rh; h -= rh;
+      }
+    };
+    let fila = [];
+    for (let i = 0; i < areas.length;) {
+      const lado = Math.min(w, h);
+      const a = areas[i];
+      if (!fila.length || peor([...fila, a], lado) <= peor(fila, lado)) {
+        fila.push(a);
+        i += 1;
+      } else {
+        colocar(fila);
+        fila = [];
+      }
+    }
+    if (fila.length) colocar(fila);
+    return rects;
+  }
+
   return {
     round, buy, sell, avgPrice, unrealized, roiPct,
     circulatingSupply, capScenario, capPositionImpact, capNeededForPrice,
-    cantidadEn, serieSaldo, rentabilidadPeriodo
+    cantidadEn, serieSaldo, rentabilidadPeriodo, invertidoEn, serieInvertido,
+    mapaRectangulos
   };
 });

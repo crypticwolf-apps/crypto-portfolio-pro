@@ -286,6 +286,8 @@ function bindEvents() {
   dom.clearBtn.addEventListener("click", handleResetData);
   dom.downloadPdfBtn.addEventListener("click", handleDownloadPdf);
   bindAnalyticsSummary();
+  bindMapaCartera();
+  bindDona();
   bindInsights();
   bindNews();
   dom.portfolioNameInput.addEventListener("input", (event) => {

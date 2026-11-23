@@ -127,7 +127,8 @@
   width: 100%;
   height: 100%;
 }
-:root[data-ui] .esc-saldo .grafico-vacio { height: 100%; }
+:root[data-ui] .esc-saldo .grafico-vacio,
+:root[data-ui] .esc-saldo .grafico-esqueleto { height: 100%; }
 :root[data-ui] .esc-saldo .bloque-grafico .segmentado { align-self: flex-start; width: min(100%, 420px); }
 :root[data-ui] .esc-saldo .grafico-meta { margin: 0; text-align: left; }
 
@@ -186,6 +187,9 @@
 
 /* ── Bandas a todo el ancho ── */
 :root[data-ui] .esc-banda { min-width: 0; display: flex; flex-direction: column; }
+
+/* Mapa de la cartera: a todo el ancho y con altura fija. */
+:root[data-ui] .esc-banda .mapa { aspect-ratio: auto; height: clamp(260px, 22vw, 380px); max-height: none; }
 
 /* Compras y ventas: el grafico y los totales a un lado, las operaciones al otro. */
 :root[data-ui] .esc-banda .panel:has(#analyticsActivityStats) {
@@ -474,6 +478,9 @@
 :root[data-ui] .table-wrap td strong { font-size: 0.9375rem; font-weight: 600; }
 :root[data-ui] .table-wrap td .numeric { font-size: 0.8125rem; font-weight: 500; }
 :root[data-ui] .table-wrap .col-change .numeric { font-size: 0.875rem; font-weight: 600; }
+/* Mini grafico de 7 dias */
+:root[data-ui] .table-wrap .col-week { width: 104px; }
+:root[data-ui] .table-wrap td.col-week .mini-grafico { margin-left: auto; }
 :root[data-ui] .quote-time { font-size: 0.6875rem; color: var(--c-t3); }
 :root[data-ui] .quote-time.is-stale { color: var(--c-warn); }
 :root[data-ui] .peso-celda { display: inline-flex; align-items: center; gap: 10px; }

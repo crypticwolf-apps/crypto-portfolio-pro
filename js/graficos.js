@@ -25,10 +25,11 @@ function downsampleHistoryPoints(points, maxPoints = 480) {
   return sampled;
 }
 
-// Distribucion de Analitica: anillo SVG (renderAnalyticsDonut, en
+// Distribucion de Analitica: anillo SVG y mapa de la cartera (en
 // analitica.js). Chart.js ya solo se carga para el grafico del PDF.
 function updateCharts(snapshot) {
   renderAnalyticsDonut(snapshot);
+  renderMapaCartera(snapshot);
 }
 
 // ── Graficos que se pueden tocar ──
@@ -190,8 +191,12 @@ function mostrarCursorGrafico(box, estado, indice) {
   const span = g.puntos[g.puntos.length - 1].at - primero.at;
   const valor = estado.opciones.valor ? estado.opciones.valor(p) : String(p.value);
   const extra = estado.opciones.extra ? estado.opciones.extra(p, primero) : null;
+  const segunda = g.segunda && estado.opciones.valor2 && Number.isFinite(g.segunda[indice])
+    ? estado.opciones.valor2(g.segunda[indice])
+    : "";
   etiqueta.innerHTML = `
     <strong>${escapeHtml(valor)}${extra ? ` <span class="${escapeHtml(extra.tono || "")}">${escapeHtml(extra.texto)}</span>` : ""}</strong>
+    ${segunda ? `<small class="grafico-etiqueta-segunda">${escapeHtml(segunda)}</small>` : ""}
     <small>${escapeHtml(formatoFechaGrafico(p.at, span))}</small>`;
   // La etiqueta va al lado de la linea (a la derecha en la mitad izquierda y
   // al reves), sin salirse de la caja.
@@ -217,4 +222,36 @@ function ocultarCursorGrafico(box, estado) {
   if (pendiente) {
     pendiente();
   }
+}
+
+// ── Mini grafico de 7 dias (lista de activos y tabla) ──
+// Precios cada hora de CoinGecko reducidos a ~42 puntos (uno cada 4 h) con 6
+// cifras: lo justo para la forma, y poco que guardar.
+function compactarMiniGrafico(precios) {
+  const lista = (Array.isArray(precios) ? precios : []).map(Number).filter((v) => Number.isFinite(v) && v > 0);
+  if (lista.length < 2) {
+    return [];
+  }
+  const paso = Math.max(1, Math.floor(lista.length / 42));
+  const out = lista.filter((_, i) => i % paso === 0);
+  if (out[out.length - 1] !== lista[lista.length - 1]) {
+    out.push(lista[lista.length - 1]);
+  }
+  return out.map((v) => Number(v.toPrecision(6)));
+}
+
+// Linea verde si la semana sube y roja si baja. Sin datos, nada.
+function miniGraficoSvg(valores, { ancho = 56, alto = 26, clase = "" } = {}) {
+  const v = Array.isArray(valores) ? valores.filter((x) => Number.isFinite(x)) : [];
+  if (v.length < 2) {
+    return clase ? `<span class="${clase} mini-grafico-vacio" aria-hidden="true"></span>` : "";
+  }
+  let min = Infinity;
+  let max = -Infinity;
+  v.forEach((x) => { if (x < min) min = x; if (x > max) max = x; });
+  const rango = max - min || Math.abs(max) * 0.01 || 1;
+  const margen = 2;
+  const puntos = v.map((x, i) => `${(margen + (i / (v.length - 1)) * (ancho - margen * 2)).toFixed(1)},${(margen + (1 - (x - min) / rango) * (alto - margen * 2)).toFixed(1)}`).join(" ");
+  const tono = v[v.length - 1] >= v[0] ? "sube" : "baja";
+  return `<svg class="mini-grafico ${tono} ${clase}" viewBox="0 0 ${ancho} ${alto}" width="${ancho}" height="${alto}" aria-hidden="true" focusable="false"><polyline points="${puntos}" fill="none"></polyline></svg>`;
 }

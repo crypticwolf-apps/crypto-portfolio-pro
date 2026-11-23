@@ -323,7 +323,12 @@ const DEFAULT_PREFS = {
   homeBlocks: null,
   // Copia de seguridad: cuando se hizo la ultima y hasta cuando se pospuso el aviso.
   copiaUltima: 0,
-  copiaPospuesta: 0
+  copiaPospuesta: 0,
+  // Imagen de la cabecera: iniciales del nombre, un emoji o una foto (JPEG
+  // de 128 px en data URL; va en la copia de seguridad con los ajustes).
+  avatarTipo: "iniciales",
+  avatarEmoji: "🐺",
+  avatarFoto: ""
 };
 
 // Ajustes guardados por versiones anteriores que ya no se usan.
@@ -337,8 +342,12 @@ const APARIENCIA = {
   metricas: ["24h", "pnl", "precio"],
   rangos: ["1m", "1d", "1s", "3m", "1a", "todo"],
   // Bloques de Inicio en su orden de fabrica.
-  bloques: ["grafico", "acciones", "resumen", "activos", "reparto", "mercado"]
+  bloques: ["grafico", "acciones", "resumen", "activos", "reparto", "mercado"],
+  avatares: ["iniciales", "emoji", "foto"],
+  emojis: ["🐺", "🚀", "💎", "🦊", "🐂", "🐻", "🦁", "🐳", "🔥", "⚡", "🌙", "⭐", "💰", "📈", "🎯", "👑"]
 };
+// Lado (px) de la foto de la cabecera una vez recortada y reducida.
+const AVATAR_FOTO_PX = 128;
 // Ventana de cada rango del grafico de Inicio (ms). "todo" no tiene limite.
 const RANGOS_INICIO = {
   "1d": 24 * 60 * 60 * 1000,
@@ -424,6 +433,7 @@ const TABLE_COLUMNS = [
   { key: "asset", labelKey: "table.columns.asset", sortKey: "asset" },
   { key: "price", labelKey: "table.columns.priceCol", sortKey: "currentPrice" },
   { key: "change", labelKey: "table.columns.change24h", sortKey: "change24h" },
+  { key: "week", labelKey: "table.columns.semana", sortKey: null },
   { key: "invested", labelKey: "table.columns.invested", sortKey: "investment" },
   { key: "value", labelKey: "table.columns.value", sortKey: "currentValue" },
   { key: "pnl", labelKey: "table.columns.gain", sortKey: "pnlUsd" },

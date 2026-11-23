@@ -134,6 +134,8 @@ function pedirHistorialSaldo(range) {
     })
     .catch(() => {
       histSaldo.fallos.set(clave, Date.now());
+      histSaldo.pidiendo.delete(clave);
+      renderHomeChart();
     })
     .finally(() => {
       histSaldo.pidiendo.delete(clave);
@@ -170,8 +172,42 @@ function posicionesParaHistorial(snapshot, precios) {
     .filter(Boolean);
 }
 
+// Coste de cada posicion para la linea de lo invertido: lo de hoy, la fecha
+// de compra y el coste de cada compra (+) y de lo vendido en cada venta (-).
+function costesParaHistorial(snapshot) {
+  const porFila = new Map();
+  state.trades.forEach((trade) => {
+    const at = Number(trade.at);
+    const importe = Number(trade.amount);
+    if (!Number.isFinite(at) || !(importe > 0)) {
+      return;
+    }
+    let coste = importe;
+    if (trade.type === "sell") {
+      // Lo que costaba lo vendido = ingresos - comision - beneficio realizado.
+      const realizado = Number(trade.realized);
+      coste = -(Number.isFinite(realizado) ? importe - (Number(trade.fee) || 0) - realizado : importe);
+    }
+    const lista = porFila.get(trade.rowId) || [];
+    lista.push({ at, coste });
+    porFila.set(trade.rowId, lista);
+  });
+  return snapshot.items
+    .filter(({ metrics, row }) => metrics.investment > 0 || porFila.has(row.id))
+    .map(({ row, metrics }) => ({
+      inversion: metrics.investment,
+      desde: fechaCompraMs(row.purchaseDate),
+      costes: porFila.get(row.id) || []
+    }));
+}
+
 // Serie del saldo para un rango: { puntos: [{ at, value }], flujos }, o null
 // si aun no hay precios pasados (entonces manda el historial guardado).
+// Hay una peticion del saldo pasado en camino (Inicio pinta su esqueleto).
+function historialSaldoCargando() {
+  return histSaldo.pidiendo.size > 0;
+}
+
 function serieSaldoDelRango(range, snapshot) {
   pedirHistorialSaldo(range);
   const hueco = `${state.prefs.currency}|${diasDeRango(range)}`;
@@ -212,6 +248,10 @@ function serieSaldoDelRango(range, snapshot) {
         puntos: puntos.slice(primero),
         flujos: flujos.filter((flujo) => flujo.at > puntos[primero].at)
       };
+  if (serie) {
+    // Lo invertido (coste) en cada instante, para la segunda linea del grafico.
+    serie.invertido = CryptoFinance.serieInvertido(costesParaHistorial(snapshot), serie.puntos.map((p) => p.at));
+  }
   histSaldo.memo.set(snapshot, { clave, serie });
   return serie;
 }

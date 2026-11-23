@@ -465,6 +465,11 @@ function applyMarketDataToRow(row, market) {
   if (row.volume24h == null || !fresherQuote) {
     row.volume24h = finiteOrNull(market.total_volume);
   }
+  // Precio de los ultimos 7 dias (cada hora) para el mini grafico de la lista.
+  const semana = compactarMiniGrafico(market.sparkline_in_7d?.price);
+  if (semana.length) {
+    row.sparkline7d = semana;
+  }
   row.image = market.image || row.image;
   row.symbol = String(market.symbol || row.symbol || "").toUpperCase();
   row.resolvedName = market.name || row.resolvedName;

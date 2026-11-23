@@ -542,6 +542,54 @@ function refitAmounts() {
   fitAmount(analytics, "analitica", analytics?.parentElement);
 }
 
+// ── Cifras animadas ──
+// Al cambiar un importe (el saldo, la barra fija) la cifra cuenta desde lo
+// que se veia hasta el valor nuevo en CIFRA_MS. No se anima la primera vez,
+// con el saldo oculto, al cambiar de moneda o de formato (firma distinta),
+// con la pestana en segundo plano ni si el sistema pide menos movimiento.
+// pintar(valor) escribe el valor en pantalla; se llama en cada fotograma.
+const CIFRA_MS = 650;
+const cifrasAnimadas = new Map(); // clave -> { mostrado, firma, raf }
+const menosMovimiento = typeof window !== "undefined" && window.matchMedia
+  ? window.matchMedia("(prefers-reduced-motion: reduce)")
+  : null;
+
+function firmaCifras() {
+  return `${state.prefs.currency}|${state.prefs.hideBalance ? 1 : 0}|${state.prefs.decimals === false ? 0 : 1}`;
+}
+
+function animarCifra(clave, valor, pintar, firma = firmaCifras()) {
+  const antes = cifrasAnimadas.get(clave);
+  if (antes?.raf) {
+    cancelAnimationFrame(antes.raf);
+  }
+  const quieto = !antes
+    || antes.firma !== firma
+    || !Number.isFinite(antes.mostrado)
+    || !Number.isFinite(valor)
+    || Math.abs(valor - antes.mostrado) < 0.005
+    || state.prefs.hideBalance
+    || menosMovimiento?.matches
+    || document.hidden;
+  if (quieto) {
+    cifrasAnimadas.set(clave, { mostrado: valor, firma, raf: 0 });
+    pintar(valor);
+    return;
+  }
+  const desde = antes.mostrado;
+  const inicio = performance.now();
+  const estado = { mostrado: desde, firma, raf: 0 };
+  cifrasAnimadas.set(clave, estado);
+  const paso = (ahora) => {
+    const k = Math.min(1, Math.max(0, (ahora - inicio) / CIFRA_MS));
+    const suave = 1 - Math.pow(1 - k, 3); // rapido al principio, frena al final
+    estado.mostrado = k < 1 ? desde + (valor - desde) * suave : valor;
+    pintar(estado.mostrado);
+    estado.raf = k < 1 ? requestAnimationFrame(paso) : 0;
+  };
+  estado.raf = requestAnimationFrame(paso);
+}
+
 // Al llegar la letra de la app (Inter) cambian los anchos: se vuelve a medir.
 if (typeof document !== "undefined" && document.fonts?.addEventListener) {
   document.fonts.addEventListener("loadingdone", () => {

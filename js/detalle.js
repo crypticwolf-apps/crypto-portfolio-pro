@@ -162,6 +162,7 @@ function renderAssetDetail() {
 
       <section class="ficha-grafico" aria-label="${escapeHtml(t("detail.evolution"))}">
         <div class="grafico-saldo" data-detail-role="chart"></div>
+        <p class="grafico-leyenda" data-detail-role="leyenda" hidden></p>
         <div class="segmentado" role="group" aria-label="${escapeHtml(t("inicio.rangoAria"))}">
           ${DETAIL_RANGES.map((range) => `
             <button type="button" data-detail-range="${range.key}" aria-pressed="${state.detailRange === range.key ? "true" : "false"}">${escapeHtml(t(range.labelKey))}</button>
@@ -306,7 +307,29 @@ function renderDetailChart(row) {
     return;
   }
   const tono = points[points.length - 1].value >= points[0].value ? "sube" : "baja";
-  dibujarGrafico(box, areaChartSvg(points, chartWidthOf(box), { label: t("detail.evolution"), id: "graficoFicha", tono }), {
+  // Tus compras y ventas de este activo (en su fecha y a su precio) y tu
+  // precio medio. En modo privado, el medio sin cifra.
+  const marcas = state.trades
+    .filter((trade) => trade.rowId === row.id && Number(trade.price) > 0 && Number.isFinite(Number(trade.at)))
+    .map((trade) => ({ at: Number(trade.at), valor: Number(trade.price), tipo: trade.type === "sell" ? "venta" : "compra" }));
+  const medio = computeRowMetrics(row).entryPrice;
+  const medioEtiqueta = medio > 0
+    ? (state.prefs.hideBalance ? t("ficha.precioMedio") : `${t("ficha.precioMedio")} ${formatCurrency(medio, digitosPrecioCorto(medio))}`)
+    : "";
+  const grafico = areaChartSvg(points, chartWidthOf(box), { label: t("detail.evolution"), id: "graficoFicha", tono, marcas, medio: medio > 0 ? medio : null, medioEtiqueta });
+  const leyenda = document.querySelector("#assetDetailScreen [data-detail-role='leyenda']");
+  if (leyenda) {
+    const vistas = points[0].at;
+    const tipos = new Set(marcas.filter((m) => m.at >= vistas).map((m) => m.tipo));
+    const piezas = [
+      tipos.has("compra") ? `<span><i class="leyenda-op compra"></i>${escapeHtml(t("ficha.leyendaCompra"))}</span>` : "",
+      tipos.has("venta") ? `<span><i class="leyenda-op venta"></i>${escapeHtml(t("ficha.leyendaVenta"))}</span>` : "",
+      grafico.html.includes("grafico-medio") ? `<span><i class="leyenda-medio"></i>${escapeHtml(t("ficha.precioMedio"))}</span>` : ""
+    ].filter(Boolean);
+    leyenda.innerHTML = piezas.join("");
+    leyenda.hidden = !piezas.length;
+  }
+  dibujarGrafico(box, grafico, {
     // Precio de mercado: se ve tambien en modo privado.
     valor: (punto) => formatCurrency(punto.value, getPriceDigits(punto.value)),
     extra: (punto, primero) => {

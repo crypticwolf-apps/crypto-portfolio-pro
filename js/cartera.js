@@ -217,7 +217,9 @@ function renderTableBody() {
 // Fila de solo lectura: toda la edición ocurre en el editor-portal.
 function renderRow(row, totalValue = 0) {
   const metrics = computeRowMetrics(row);
-  const rowTone = metrics.pnlUsd > 0 ? "row-profit" : metrics.pnlUsd < 0 ? "row-loss" : "";
+  // Aun sin su primer precio: precio, valor y ganancia en silueta.
+  const espera = metrics.tokens > 0 && esperaPrecio(row);
+  const rowTone = espera ? "" : metrics.pnlUsd > 0 ? "row-profit" : metrics.pnlUsd < 0 ? "row-loss" : "";
   const weight = totalValue > 0 && metrics.currentValue > 0
     ? (metrics.currentValue / totalValue) * 100
     : null;
@@ -242,8 +244,8 @@ function renderRow(row, totalValue = 0) {
 
       <td class="col-price">
         <div class="stack-cell">
-          <strong class="money" data-role="rowPrice">${priceText}</strong>
-          <span class="quote-time ${stale ? "is-stale" : ""}" data-role="rowQuote">${escapeHtml(quoteTimeLabel(row))}</span>
+          <strong class="money" data-role="rowPrice">${espera ? esqueletoHtml("esqueleto-valor") : priceText}</strong>
+          <span class="quote-time ${stale ? "is-stale" : ""}" data-role="rowQuote">${espera ? "" : escapeHtml(quoteTimeLabel(row))}</span>
         </div>
       </td>
 
@@ -251,18 +253,20 @@ function renderRow(row, totalValue = 0) {
         <span class="numeric ${toneClass(row.priceChange24h || 0)}" data-role="rowChange">${changeText}</span>
       </td>
 
+      <td class="col-week">${miniGraficoSvg(row.sparkline7d, { ancho: 88, alto: 28 })}</td>
+
       <td class="col-invested">
         <strong class="money" data-role="rowInvested">${maskedCurrency(metrics.investment)}</strong>
       </td>
 
       <td class="col-value">
-        <strong class="money" data-role="rowValue">${maskedCurrency(metrics.currentValue)}</strong>
+        <strong class="money" data-role="rowValue">${espera ? esqueletoHtml("esqueleto-valor") : maskedCurrency(metrics.currentValue)}</strong>
       </td>
 
       <td class="col-pnl">
         <div class="stack-cell">
-          <strong class="money ${toneClass(metrics.pnlUsd)}" data-role="rowPnlAbs">${maskedSignedCurrency(metrics.pnlUsd)}</strong>
-          <span class="numeric ${toneClass(metrics.pnlPct)}" data-role="rowPnlPct">${formatPercent(metrics.pnlPct)}</span>
+          <strong class="money ${espera ? "" : toneClass(metrics.pnlUsd)}" data-role="rowPnlAbs">${espera ? esqueletoHtml("esqueleto-valor") : maskedSignedCurrency(metrics.pnlUsd)}</strong>
+          <span class="numeric ${espera ? "" : toneClass(metrics.pnlPct)}" data-role="rowPnlPct">${espera ? esqueletoHtml("esqueleto-sub") : formatPercent(metrics.pnlPct)}</span>
         </div>
       </td>
 
@@ -342,10 +346,18 @@ function renderStickyBar(snapshot) {
   if (dom.stickyBarName) {
     dom.stickyBarName.textContent = getPortfolioName();
   }
+  const cargando = saldoCargando(snapshot);
   if (dom.stickyBarValue) {
-    dom.stickyBarValue.textContent = maskedCurrency(snapshot.totals.currentValue);
+    if (cargando) {
+      cifrasAnimadas.delete("barra");
+      setText(dom.stickyBarValue, "--");
+    } else {
+      animarCifra("barra", snapshot.totals.currentValue, (valor) => setText(dom.stickyBarValue, maskedCurrency(valor)));
+    }
   }
-  if (dom.stickyBarPnl) {
+  if (dom.stickyBarPnl && cargando) {
+    dom.stickyBarPnl.textContent = "";
+  } else if (dom.stickyBarPnl) {
     // Solo el porcentaje: la barra es estrecha y el importe ya esta arriba.
     dom.stickyBarPnl.textContent = formatPercent(totalPnlPct);
     dom.stickyBarPnl.className = `sticky-bar-pnl ${toneClass(totalPnl)}`;
@@ -390,17 +402,19 @@ function renderTotalsRow(snapshot) {
 
   // Fila de totales alineada con las columnas de la tabla.
   const change = getPortfolio24hChange(snapshot);
+  const cargando = saldoCargando(snapshot);
   dom.totalsFoot.innerHTML = `
     <tr class="totals-row">
       <td class="totals-label-cell col-asset">${escapeHtml(t("table.totals"))}</td>
       <td class="col-price"></td>
       <td class="col-change"><span class="numeric ${change ? toneClass(change.pct) : ""}">${change ? formatSignedPercent(change.pct) : "--"}</span></td>
+      <td class="col-week"></td>
       <td class="col-invested"><strong class="money">${maskedCurrency(snapshot.totals.investment)}</strong></td>
-      <td class="col-value"><strong class="money">${maskedCurrency(snapshot.totals.currentValue)}</strong></td>
+      <td class="col-value"><strong class="money">${cargando ? esqueletoHtml("esqueleto-valor") : maskedCurrency(snapshot.totals.currentValue)}</strong></td>
       <td class="col-pnl">
         <div class="stack-cell">
-          <strong class="money ${toneClass(totalPnl)}">${maskedSignedCurrency(totalPnl)}</strong>
-          <span class="numeric ${toneClass(totalPnlPct)}">${formatPercent(totalPnlPct)}</span>
+          ${cargando ? esqueletoHtml("esqueleto-valor") : `<strong class="money ${toneClass(totalPnl)}">${maskedSignedCurrency(totalPnl)}</strong>
+          <span class="numeric ${toneClass(totalPnlPct)}">${formatPercent(totalPnlPct)}</span>`}
         </div>
       </td>
       <td class="col-weight"><span class="peso-texto">${snapshot.totals.currentValue > 0 ? "100%" : "--"}</span></td>

@@ -91,8 +91,31 @@ function renderHomeGreeting() {
         : "inicio.buenasNoches";
     dom.inicioSaludo.textContent = t(key);
   }
-  if (dom.inicioAvatar) {
-    dom.inicioAvatar.textContent = portfolioInitials(getPortfolioName());
+  pintarAvatar(dom.inicioAvatar);
+  pintarAvatar(document.getElementById("avatarMuestra"));
+}
+
+// Imagen de la cabecera (y su muestra en Apariencia): iniciales, emoji o
+// foto. Se repinta solo si cambia (se llama en cada repintado del saldo).
+function pintarAvatar(nodo) {
+  if (!nodo) {
+    return;
+  }
+  const prefs = state.prefs;
+  const tipo = prefs.avatarTipo === "foto" && prefs.avatarFoto ? "foto" : prefs.avatarTipo === "emoji" ? "emoji" : "iniciales";
+  const firma = tipo === "foto"
+    ? `foto|${prefs.avatarFoto.length}|${prefs.avatarFoto.slice(-32)}`
+    : tipo === "emoji" ? `emoji|${prefs.avatarEmoji}` : `ini|${portfolioInitials(getPortfolioName())}`;
+  if (nodo.dataset.avatar === firma) {
+    return;
+  }
+  nodo.dataset.avatar = firma;
+  nodo.classList.toggle("con-foto", tipo === "foto");
+  nodo.classList.toggle("con-emoji", tipo === "emoji");
+  if (tipo === "foto") {
+    nodo.innerHTML = `<img src="${escapeHtml(prefs.avatarFoto)}" alt="" />`;
+  } else {
+    nodo.textContent = tipo === "emoji" ? prefs.avatarEmoji : portfolioInitials(getPortfolioName());
   }
 }
 
@@ -153,11 +176,16 @@ function renderMainValueCard(snapshot) {
     return;
   }
   const hidden = state.prefs.hideBalance;
-  const parts = moneyParts(snapshot.totals.currentValue);
-  dom.mainValue.innerHTML = hidden
-    ? '<span class="saldo-entero">••••••</span>'
-    : `<span class="saldo-entero">${escapeHtml(parts.main)}</span><span class="saldo-resto">${escapeHtml(parts.rest)}</span>`;
-  fitAmount(dom.mainValue, "saldo");
+  const cargando = saldoCargando(snapshot);
+  dom.mainValue.setAttribute("aria-busy", cargando ? "true" : "false");
+  if (cargando) {
+    // Silueta hasta el primer precio; luego el saldo sale sin contar desde 0.
+    cifrasAnimadas.delete("saldo");
+    dom.mainValue.innerHTML = esqueletoHtml("esqueleto-saldo");
+  } else {
+    // El saldo cuenta hasta el valor nuevo (utilidades.js, animarCifra).
+    animarCifra("saldo", snapshot.totals.currentValue, pintarSaldo);
+  }
 
   const change = homeRangeChange(snapshot);
   if (dom.saldoCambio && dom.saldoCambioValor) {
@@ -169,10 +197,15 @@ function renderMainValueCard(snapshot) {
       const pct = Number.isFinite(change.pct) ? formatPercent(change.pct) : "";
       text = hidden ? pct || "••••" : [formatSignedCurrency(change.delta), pct].filter(Boolean).join(" · ");
     }
-    dom.saldoCambioValor.textContent = text;
+    dom.saldoCambio.classList.toggle("cargando", cargando);
+    if (cargando) {
+      dom.saldoCambioValor.innerHTML = esqueletoHtml("esqueleto-chip");
+    } else {
+      dom.saldoCambioValor.textContent = text;
+    }
   }
   if (dom.saldoCambioEtiqueta) {
-    dom.saldoCambioEtiqueta.textContent = change.label;
+    dom.saldoCambioEtiqueta.textContent = cargando ? "" : change.label;
   }
   if (dom.mainUpdated) {
     dom.mainUpdated.textContent = mainUpdatedLabel();
@@ -184,18 +217,77 @@ function renderMainValueCard(snapshot) {
   renderHomeGreeting();
 }
 
+// ── Esqueletos de carga ──
+// En el primer arranque (o tras anadir monedas) hay filas que aun esperan su
+// primer precio: en vez de "0,00" o "--" se ve su silueta brillando.
+function esperaPrecio(row) {
+  return Boolean(row.coinId)
+    && !(typeof row.currentPrice === "number")
+    && (row.priceStatus === "loading" || row.priceStatus === "idle")
+    && !isOffline();
+}
+
+// El saldo aun no se sabe: hay monedas y ninguna tiene precio todavia.
+function saldoCargando(snapshot) {
+  return !(snapshot.totals.currentValue > 0)
+    && snapshot.items.some(({ row, metrics }) => metrics.tokens > 0 && esperaPrecio(row));
+}
+
+function esqueletoHtml(clase = "") {
+  return `<span class="esqueleto ${clase}" aria-hidden="true"></span>`;
+}
+
+// Escribe el saldo grande (entero y decimales en dos piezas) y lo encaja.
+function pintarSaldo(valor) {
+  if (!dom.mainValue) {
+    return;
+  }
+  if (state.prefs.hideBalance) {
+    dom.mainValue.innerHTML = '<span class="saldo-entero">••••••</span>';
+  } else {
+    const parts = moneyParts(valor);
+    const entero = dom.mainValue.querySelector(".saldo-entero");
+    const resto = dom.mainValue.querySelector(".saldo-resto");
+    if (entero && resto) {
+      setText(entero, parts.main);
+      setText(resto, parts.rest);
+    } else {
+      dom.mainValue.innerHTML = `<span class="saldo-entero">${escapeHtml(parts.main)}</span><span class="saldo-resto">${escapeHtml(parts.rest)}</span>`;
+    }
+  }
+  fitAmount(dom.mainValue, "saldo");
+}
+
 // ── Grafico de area (SVG propio: ligero y nitido a cualquier ancho) ──
 // points: [{ at, value }] en orden. Se dibuja al ancho real del contenedor.
 // Devuelve el SVG y la geometria (puntos y su posicion) que usa la capa
 // tactil de graficos.js. tono: "sube" | "baja" pinta la linea en verde o rojo
-// (sin tono, el color de acento).
-function areaChartSvg(points, width, { height = 150, label = "", id = "graficoRelleno", tono = "" } = {}) {
+// (sin tono, el color de acento). Extras opcionales:
+//   segunda: otra serie con los mismos instantes (linea discontinua; en
+//            Inicio, lo invertido)
+//   medio:   linea horizontal con su etiqueta (en la ficha, el precio medio)
+//   marcas:  puntos { at, valor, tipo: "compra" | "venta" } (tus operaciones)
+// El medio y las marcas solo amplian la escala si no aplastan la linea; si no
+// caben, el medio no se dibuja y la marca se pone sobre la linea.
+function areaChartSvg(points, width, { height = 150, label = "", id = "graficoRelleno", tono = "", segunda = null, medio = null, medioEtiqueta = "", marcas = [] } = {}) {
   const sampled = downsampleHistoryPoints(points, 140);
+  // La segunda serie se muestrea en los mismos instantes que la principal.
+  const conSegunda = Array.isArray(segunda) && segunda.length === points.length;
+  const indices = conSegunda ? new Map(points.map((p, i) => [p, i])) : null;
+  const segundaMuestra = conSegunda ? sampled.map((p) => segunda[indices.get(p)]) : null;
   const top = 10;
   const bottom = 8;
-  const values = sampled.map((point) => point.value);
+  const values = sampled.map((point) => point.value).concat(segundaMuestra ? segundaMuestra.filter(Number.isFinite) : []);
   let min = Math.min(...values);
   let max = Math.max(...values);
+  const holgura = (max - min) * 0.35 || Math.abs(max) * 0.05;
+  const cabe = (v) => Number.isFinite(v) && v >= min - holgura && v <= max + holgura;
+  const medioVisible = cabe(medio);
+  const opcionales = [...marcas.map((m) => m.valor).filter(cabe), ...(medioVisible ? [medio] : [])];
+  if (opcionales.length) {
+    min = Math.min(min, ...opcionales);
+    max = Math.max(max, ...opcionales);
+  }
   if (max - min < Math.abs(max) * 0.002) {
     // Serie casi plana: se centra la linea en vez de exagerar el ruido.
     const pad = Math.max(Math.abs(max) * 0.01, 1e-9);
@@ -204,13 +296,30 @@ function areaChartSvg(points, width, { height = 150, label = "", id = "graficoRe
   }
   const first = sampled[0].at;
   const span = Math.max(1, sampled[sampled.length - 1].at - first);
-  const xy = sampled.map((point) => [
-    2 + ((point.at - first) / span) * (width - 8),
-    top + (1 - (point.value - min) / (max - min)) * (height - top - bottom)
-  ]);
-  const line = xy.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+  const xDe = (at) => 2 + ((at - first) / span) * (width - 8);
+  const yDe = (v) => top + (1 - (v - min) / (max - min)) * (height - top - bottom);
+  const xy = sampled.map((point) => [xDe(point.at), yDe(point.value)]);
+  const trazo = (pts) => pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+  const line = trazo(xy);
   const end = xy[xy.length - 1];
   const area = `${line} L${end[0].toFixed(1)} ${height} L${xy[0][0].toFixed(1)} ${height} Z`;
+  const lineaSegunda = segundaMuestra
+    ? `<path class="grafico-segunda" d="${trazo(sampled.map((p, i) => [xDe(p.at), yDe(segundaMuestra[i])]).filter((p) => Number.isFinite(p[1])))}" fill="none"></path>`
+    : "";
+  const lineaMedio = medioVisible
+    ? `<line class="grafico-medio" x1="0" x2="${width}" y1="${yDe(medio).toFixed(1)}" y2="${yDe(medio).toFixed(1)}"></line>
+       ${medioEtiqueta ? `<text class="grafico-medio-txt" x="6" y="${(yDe(medio) - 5).toFixed(1)}">${escapeHtml(medioEtiqueta)}</text>` : ""}`
+    : "";
+  // Valor de la linea en un instante (para las marcas que no caben en la escala).
+  const valorEn = (at) => {
+    let mejor = sampled[0];
+    sampled.forEach((p) => { if (Math.abs(p.at - at) < Math.abs(mejor.at - at)) mejor = p; });
+    return mejor.value;
+  };
+  const puntosMarcas = marcas
+    .filter((m) => m.at >= first && m.at <= first + span)
+    .map((m) => `<circle class="grafico-op ${m.tipo === "venta" ? "venta" : "compra"}" cx="${xDe(m.at).toFixed(1)}" cy="${yDe(cabe(m.valor) ? m.valor : valorEn(m.at)).toFixed(1)}" r="4.5"></circle>`)
+    .join("");
   const html = `
     <svg class="${tono ? `grafico-${tono}` : ""}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${escapeHtml(label)}">
       <defs>
@@ -220,10 +329,13 @@ function areaChartSvg(points, width, { height = 150, label = "", id = "graficoRe
         </linearGradient>
       </defs>
       <path class="grafico-area" d="${area}" fill="url(#${id})"></path>
+      ${lineaMedio}
+      ${lineaSegunda}
       <path class="grafico-linea" d="${line}" fill="none"></path>
+      ${puntosMarcas}
       <circle class="grafico-punto" cx="${end[0].toFixed(1)}" cy="${end[1].toFixed(1)}" r="4.5"></circle>
     </svg>`;
-  return { html, puntos: sampled, xy, width, height };
+  return { html, puntos: sampled, xy, width, height, segunda: segundaMuestra };
 }
 
 function chartWidthOf(box) {
@@ -251,16 +363,32 @@ function renderHomeChart(snapshot = null) {
     points.push({ at: Date.now(), value: current });
   }
   if (points.length < 3) {
-    box.innerHTML = `<div class="grafico-vacio">${escapeHtml(t("inicio.graficoVacio"))}</div>`;
+    const leyendaVacia = document.getElementById("leyendaSaldo");
+    if (leyendaVacia) {
+      leyendaVacia.hidden = true;
+    }
+    box.innerHTML = historialSaldoCargando() || saldoCargando(snap)
+      ? `<div class="grafico-esqueleto esqueleto" aria-hidden="true"><svg viewBox="0 0 300 150" preserveAspectRatio="none"><path d="M0 112 C40 104 60 80 96 88 S150 120 186 84 S246 40 300 52" /></svg></div>`
+      : `<div class="grafico-vacio">${escapeHtml(t("inicio.graficoVacio"))}</div>`;
     return;
   }
   // En escritorio el grafico llena el alto de su tarjeta (el ResizeObserver
   // de escritorio.js lo redibuja si cambia); en movil mide 150 px.
   const height = modoEscritorio() ? Math.max(150, Math.round(box.clientHeight)) : 150;
-  dibujarGrafico(box, areaChartSvg(points, chartWidthOf(box), { label: t("inicio.graficoAria"), id: "graficoRelleno", height }), {
+  // Con el saldo reconstruido, tambien lo invertido (linea discontinua).
+  const invertido = serie && Array.isArray(serie.invertido) && serie.invertido.some((v) => v > 0) ? serie.invertido : null;
+  const leyenda = document.getElementById("leyendaSaldo");
+  if (leyenda) {
+    leyenda.innerHTML = invertido
+      ? `<span><i class="leyenda-saldo"></i>${escapeHtml(t("inicio.leyendaSaldo"))}</span><span><i class="leyenda-segunda"></i>${escapeHtml(t("inicio.leyendaInvertido"))}</span>`
+      : "";
+    leyenda.hidden = !invertido;
+  }
+  dibujarGrafico(box, areaChartSvg(points, chartWidthOf(box), { label: t("inicio.graficoAria"), id: "graficoRelleno", height, segunda: invertido }), {
     // El saldo respeta el modo privado; sin % porque el saldo incluye lo que
     // se mete y se saca.
-    valor: (punto) => maskedCurrency(punto.value)
+    valor: (punto) => maskedCurrency(punto.value),
+    valor2: (v) => t("inicio.invertidoEn", { valor: maskedCurrency(v) })
   });
 }
 
@@ -301,13 +429,18 @@ function renderSummary(snapshot) {
     }
   ];
 
-  dom.summaryGrid.innerHTML = cells.map((cell) => `
+  // Sin ningun precio aun, lo que depende de ellos va en silueta.
+  const cargando = saldoCargando(snapshot);
+  dom.summaryGrid.innerHTML = cells.map((cell, indice) => {
+    const silueta = cargando && indice !== 1;
+    return `
     <div class="resumen-celda">
       <span class="resumen-etiqueta">${escapeHtml(cell.label)}</span>
-      <strong class="resumen-valor ${cell.tone}">${escapeHtml(cell.value)}</strong>
-      <span class="resumen-sub">${escapeHtml(cell.sub)}</span>
+      <strong class="resumen-valor ${cell.tone}">${silueta ? esqueletoHtml("esqueleto-valor") : escapeHtml(cell.value)}</strong>
+      <span class="resumen-sub">${silueta ? esqueletoHtml("esqueleto-sub") : escapeHtml(cell.sub)}</span>
     </div>
-  `).join("");
+  `;
+  }).join("");
 
   renderAllocationCard(snapshot);
 }
@@ -438,6 +571,7 @@ function assetRowHtml(row) {
     ? `${state.prefs.hideBalance ? "••••" : formatTokenAmount(metrics.tokens)} ${escapeHtml(row.symbol || "")}`
     : escapeHtml(row.symbol || t("row.noAsset"));
   const name = row.resolvedName || assetDisplayName(row);
+  const cargando = metrics.tokens > 0 && esperaPrecio(row);
   return `
     <div class="fila-activo" role="listitem" data-card-row="${escapeHtml(row.id)}">
       <button class="fila-activo-boton" type="button" data-asset-open="${escapeHtml(row.id)}">
@@ -446,9 +580,10 @@ function assetRowHtml(row) {
           <span class="fila-activo-nombre">${escapeHtml(name)}${row.favorite ? '<span class="favorito" aria-hidden="true">★</span>' : ""}</span>
           <span class="fila-activo-sub">${qty}${walletBadgeHtml(row)}</span>
         </span>
+        ${miniGraficoSvg(row.sparkline7d, { ancho: 56, alto: 26, clase: "fila-activo-mini" })}
         <span class="fila-activo-cifras">
-          <span class="fila-activo-valor" data-role="rowValue">${maskedCurrency(metrics.currentValue)}</span>
-          <span class="fila-activo-cambio ${metric.tone}" data-role="rowMetric">${escapeHtml(metric.text)}</span>
+          <span class="fila-activo-valor" data-role="rowValue">${cargando ? esqueletoHtml("esqueleto-valor") : maskedCurrency(metrics.currentValue)}</span>
+          <span class="fila-activo-cambio ${metric.tone}" data-role="rowMetric">${cargando ? esqueletoHtml("esqueleto-sub") : escapeHtml(metric.text)}</span>
         </span>
       </button>
     </div>

@@ -83,6 +83,15 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
 - **Service worker:** cada fichero nuevo que cargue `index.html` va en
   `APP_SHELL` y hay que subir `VERSION` (la prueba e2e lo comprueba).
   `/api/historial` va siempre a la red (no se cachea ahí).
+- **Cifras animadas:** el saldo (`#mainValue`) y el de la barra fija tardan
+  650 ms en llegar al valor nuevo (`animarCifra` en `js/utilidades.js`). Una
+  prueba que lea el texto justo después de un cambio verá un valor intermedio:
+  esperar o probar `animarCifra` directamente.
+- **Esqueletos de carga:** una fila "espera precio" si tiene `coinId`, aún no
+  tiene precio y su estado es `idle`/`loading` (`esperaPrecio`); el saldo
+  carga si ninguna tiene precio todavía (`saldoCargando`). Lo que se calcule
+  con precios (saldo, resultado, ganancia) debe mirar eso para no enseñar
+  "0,00" o "-100 %" en el primer arranque.
 - **Entorno de vista previa:** el panel del navegador está oculto, así que **las
   transiciones CSS se congelan** y `getComputedStyle` devuelve el valor anterior.
   Para medir colores inyecta antes `*{transition:none !important}`. Las capturas
@@ -149,6 +158,21 @@ Portafolio en el centro del menú inferior.
 - **Analítica:** mejores y peores en un bloque con selector "Desde la compra /
   Últimas 24 h"; si todos ganan, la lista se llama "Los que menos ganan".
   Compras y ventas: solo los meses con actividad, en barras con su importe.
+  El anillo de distribución se toca (o se pasa el ratón): resalta el trozo y el
+  centro dice nombre, % y valor. **Mapa de la cartera** (treemap,
+  `CryptoFinance.mapaRectangulos` + `renderMapaCartera`): 12 monedas como
+  mucho y el resto en "Otros", área = peso, color = cambio en 24 h (gris en 0,
+  más intenso hasta ±8 %); tocar un bloque abre su ficha. En tablet ocupa las
+  dos columnas y en escritorio tiene su banda (`data-esc-hueco="mapa"`).
+- **Mejoras visuales (v35):** mini gráfico de 7 días en cada activo (lista de
+  Inicio desde 360 px y columna "7 d" de la tabla; viene de
+  `sparkline_in_7d` de `coins/markets` y se guarda reducido en la fila);
+  línea discontinua de lo invertido en el gráfico del saldo
+  (`CryptoFinance.serieInvertido`); compras y ventas como puntos y precio
+  medio como línea en el gráfico de la ficha (solo si caben en la escala);
+  saldo que cuenta hasta el valor nuevo; esqueletos en el primer arranque;
+  imagen de perfil en Apariencia: iniciales, emoji o foto (recortada a 128 px
+  en JPEG, en `prefs.avatarFoto`, así que viaja en la copia de seguridad).
 - **Plan (móvil):** cada activo con su logo, cantidad y precio medio cortos, y
   una barra del precio medio al objetivo más alto con el siguiente objetivo.
 - **Noticias:** etiqueta "Impacto alto / medio / bajo" y separadores por día
@@ -179,6 +203,10 @@ Portafolio en el centro del menú inferior.
   y claves privadas se detectan, se borran del campo y se avisa.
 
 ## Pendiente
+
+- **Lo que el usuario NO quiere (no proponerlo):** notificaciones del sistema,
+  botón de deshacer, informe fiscal, sincronizar entre dispositivos y más redes
+  de billetera.
 
 - **Clave de CoinStats DENTRO de la app:** Vercel le pedía plan Pro para las
   variables de entorno, así que el usuario pega su clave en Ajustes →
@@ -218,8 +246,6 @@ Portafolio en el centro del menú inferior.
 - **Billeteras, fase 2:** xpub de Bitcoin (Ledger/Trezor), escanear QR, coste
   estimado por fecha de llegada de cada token, más redes (Tron, TON, Sui).
 
-- **Fase 4 de precios:** ATH, ATL, supply, categorías, descripción y enlaces
-  oficiales de CoinGecko en el detalle del activo.
 - **GitHub Pages:** el workflow ya no existe, pero la copia vieja sigue servida
   hasta poner Settings → Pages → Source en *None*.
 

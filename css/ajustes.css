@@ -110,6 +110,38 @@
   padding: 4px 14px;
 }
 
+/* Imagen de perfil: muestra, tipo y emojis o foto */
+:root[data-ui] .avatar-fila { display: flex; align-items: center; gap: 14px; padding: 10px 0; }
+/* Columnas a la medida de su texto: "Iniciales" cabe aunque no cargue Inter. */
+:root[data-ui] .avatar-fila .segmentado { flex: 1 1 auto; min-width: 0; grid-auto-columns: auto; }
+:root[data-ui] .avatar-muestra { width: 48px; height: 48px; font-size: 1rem; }
+:root[data-ui] .avatar-muestra.con-emoji { font-size: 1.625rem; }
+:root[data-ui] .avatar-emojis {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+  padding: 2px 0 12px;
+}
+:root[data-ui] .avatar-emojis[hidden],
+:root[data-ui] .avatar-foto-acciones[hidden] { display: none; }
+:root[data-ui] .avatar-emojis button {
+  aspect-ratio: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font-size: 1.375rem;
+  line-height: 1;
+  cursor: pointer;
+}
+:root[data-ui] .avatar-emojis button[aria-pressed="true"] { background: var(--c-ac-suave); box-shadow: inset 0 0 0 2px var(--c-ac); }
+:root[data-ui] .avatar-emojis button:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 1px; }
+:root[data-ui] .avatar-foto-acciones { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 0 12px; }
+:root[data-ui] .avatar-foto-acciones .ghost-btn { flex: 1 1 auto; }
+:root[data-ui] .avatar-foto-acciones .apariencia-nota { flex: 1 1 100%; margin: 2px 2px 0; }
+
 /* Vista previa */
 :root[data-ui] .vista-previa {
   display: flex;

@@ -296,6 +296,8 @@ function createRow(partial = {}) {
     high24h: Number.isFinite(partial.high24h) ? partial.high24h : null,
     low24h: Number.isFinite(partial.low24h) ? partial.low24h : null,
     volume24h: Number.isFinite(partial.volume24h) ? partial.volume24h : null,
+    // Precio de la ultima semana (mini grafico de la lista), ~42 puntos.
+    sparkline7d: compactarMiniGrafico(partial.sparkline7d),
     priceSource: partial.priceSource || null,
     // Token DEX: red + contrato, para no confundir simbolos repetidos.
     dexNetwork: partial.dexNetwork || null,
@@ -372,6 +374,8 @@ function applyCurrencyConversionToPortfolio(fromCurrency, toCurrency, conversion
     row.tp2 = convertStoredCurrencyInput(row.tp2, conversionRate);
     row.tp3 = convertStoredCurrencyInput(row.tp3, conversionRate);
 
+    // La semana estaba en la moneda anterior: se convierte con el mismo cambio.
+    row.sparkline7d = (row.sparkline7d || []).map((v) => convertNumericAmount(v, conversionRate));
     if (typeof row.currentPrice === "number") {
       row.currentPrice = convertNumericAmount(row.currentPrice, conversionRate);
     }
@@ -889,6 +893,7 @@ function datosParaGuardar() {
       priceMessage: row.priceMessage,
       lastPriceAt: row.lastPriceAt,
       priceHistory: row.priceHistory,
+      sparkline7d: row.sparkline7d,
       favorite: row.favorite,
       pinned: row.pinned,
       derivedField: row.derivedField,
@@ -948,11 +953,25 @@ function normalizeAppearancePrefs(prefs, hasStoredTheme = true) {
   prefs.hideOnOpen = prefs.hideOnOpen === true;
   prefs.groupSmall = prefs.groupSmall !== false;
   prefs.homeBlocks = normalizeHomeBlocks(prefs.homeBlocks);
+  prefs.avatarTipo = pick(prefs.avatarTipo, APARIENCIA.avatares);
+  prefs.avatarEmoji = pick(prefs.avatarEmoji, APARIENCIA.emojis);
+  prefs.avatarFoto = fotoAvatarValida(prefs.avatarFoto) ? prefs.avatarFoto : "";
+  if (prefs.avatarTipo === "foto" && !prefs.avatarFoto) {
+    prefs.avatarTipo = "iniciales";
+  }
   // Opciones retiradas: el oscuro ya es siempre negro puro y la densidad es
   // siempre la comoda.
   delete prefs.oled;
   delete prefs.spacing;
   return prefs;
+}
+
+// La foto de la cabecera solo se acepta como imagen en base64 y pequena (la
+// app la guarda ya reducida; una copia editada a mano no cuela otra cosa).
+function fotoAvatarValida(valor) {
+  return typeof valor === "string"
+    && valor.length < 200000
+    && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(valor);
 }
 
 // Orden y visibilidad de los bloques de Inicio: [{ id, on }]. Los bloques

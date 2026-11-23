@@ -41,6 +41,9 @@
     break-inside: avoid;
     margin-bottom: 16px;
   }
+  /* El mapa de la cartera, a todo el ancho y mas apaisado. */
+  :root[data-ui] .analytics-view > .mapa-panel { column-span: all; }
+  :root[data-ui] .mapa-panel .mapa { aspect-ratio: 5 / 2; }
 
   /* ── Plan ── */
   :root[data-ui] #planContent {

@@ -93,19 +93,46 @@
   gap: 1px;
   pointer-events: none;
 }
-:root[data-ui] .dona-centro strong { font-size: 1.375rem; font-weight: 600; }
+:root[data-ui] .dona-centro strong { font-size: 1.375rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 :root[data-ui] .dona-centro span { font-size: 0.75rem; color: var(--c-t2); }
+:root[data-ui] .dona-centro .dona-centro-nombre {
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-t1);
+  font-weight: 500;
+}
+:root[data-ui] .dona-centro small { font-size: 0.6875rem; color: var(--c-t2); font-variant-numeric: tabular-nums; }
+/* Trozo elegido: mas grueso; los demas, apagados. */
+:root[data-ui] .dona-seg { cursor: pointer; transition: opacity 0.18s ease, stroke-width 0.18s ease; }
+:root[data-ui] .dona.con-eleccion .dona-seg { opacity: 0.3; }
+:root[data-ui] .dona.con-eleccion .dona-seg.activo { opacity: 1; stroke-width: 20; }
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui] .dona-seg { transition: none; }
+}
 :root[data-ui] .dona-leyenda {
   flex: 1 1 130px;
   min-width: 0;
   list-style: none;
-  margin: 0;
+  margin: 0 -6px;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
 }
-:root[data-ui] .dona-leyenda li {
+:root[data-ui] .dona-item {
+  width: 100%;
+  margin: 0;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--r-sm, 8px);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 0.18s ease, background-color 0.18s ease;
   display: grid;
   grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
@@ -114,9 +141,103 @@
   font-size: 0.8125rem;
 }
 :root[data-ui] .dona-leyenda i { width: 8px; height: 8px; border-radius: 50%; }
+:root[data-ui] .dona.con-eleccion .dona-item { opacity: 0.45; }
+:root[data-ui] .dona.con-eleccion .dona-item.activo { opacity: 1; background: var(--c-s2); }
+:root[data-ui] .dona-item:focus-visible { outline: 2px solid var(--c-ac); outline-offset: 0; }
+@media (hover: hover) {
+  :root[data-ui] .dona-item:hover { background: var(--c-s2); }
+}
 :root[data-ui] .dona-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-t1); }
 :root[data-ui] .dona-leyenda strong { font-weight: 600; }
 :root[data-ui] .dona-leyenda small { grid-column: 2 / 4; min-width: 0; overflow-wrap: anywhere; font-size: 0.75rem; color: var(--c-t2); }
+
+/* ── Mapa de la cartera ──
+   Cada bloque va en su sitio en % (lo calcula analitica.js). El color es el
+   gris del fondo con una capa verde o roja encima, mas opaca cuanto mas se
+   mueve la moneda en 24 h (--mapa-fuerza, de 0 a 1). Entre bloques queda un
+   hueco del color de la tarjeta. */
+:root[data-ui] .mapa {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 420px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+:root[data-ui] .mapa.vacio { aspect-ratio: auto; }
+:root[data-ui] .mapa-bloque {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 1px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--c-s1);
+  border-radius: 7px;
+  background: var(--c-s3);
+  background-clip: padding-box;
+  color: var(--c-t1);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  isolation: isolate;
+}
+:root[data-ui] .mapa-bloque::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: calc(var(--mapa-fuerza, 0) * var(--mapa-tope, 0.62));
+  border-radius: inherit;
+}
+:root[data-ui] .mapa-bloque.sube::before { background: var(--c-pos); }
+:root[data-ui] .mapa-bloque.baja::before { background: var(--c-neg); }
+/* En oscuro el verde es muy claro: con menos capa, el texto blanco se sigue
+   leyendo (contraste de 4.5:1 o mas en el tono mas fuerte). */
+:root[data-ui][data-theme="dark"] .mapa-bloque.sube { --mapa-tope: 0.45; }
+:root[data-ui] button.mapa-bloque { cursor: pointer; }
+:root[data-ui] button.mapa-bloque:hover { box-shadow: inset 0 0 0 2px var(--c-t1); }
+:root[data-ui] button.mapa-bloque:focus-visible { outline: 2px solid var(--c-ac); outline-offset: -3px; }
+:root[data-ui] .mapa-simbolo,
+:root[data-ui] .mapa-cambio,
+:root[data-ui] .mapa-peso {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+:root[data-ui] .mapa-simbolo { font-size: 0.8125rem; font-weight: 600; }
+:root[data-ui] .mapa-cambio { font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+:root[data-ui] .mapa-peso { font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
+:root[data-ui] .mapa-bloque.grande { padding: 10px 12px; }
+:root[data-ui] .mapa-bloque.chico { padding: 4px 6px; }
+:root[data-ui] .mapa-bloque.grande .mapa-simbolo { font-size: 1.0625rem; }
+:root[data-ui] .mapa-bloque.grande .mapa-cambio { font-size: 0.875rem; }
+:root[data-ui] .mapa-bloque.grande .mapa-peso { font-size: 0.75rem; }
+:root[data-ui] .mapa-escala {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 12px;
+  font-size: 0.75rem;
+  color: var(--c-t2);
+}
+:root[data-ui] .mapa-escala[hidden] { display: none; }
+:root[data-ui] .mapa-escala-ayuda { min-width: 0; }
+:root[data-ui] .mapa-escala-barra { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+:root[data-ui] .mapa-escala-barra small { font-size: 0.6875rem; }
+:root[data-ui] .mapa-escala-barra i {
+  width: 96px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--c-neg), var(--c-s3) 50%, var(--c-pos));
+}
 
 /* ── Por categoria ── */
 :root[data-ui] .category-block { display: flex; flex-direction: column; gap: 16px; }

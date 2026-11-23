@@ -93,7 +93,7 @@ async function fetchMarketData(ids, { force = false } = {}) {
   });
 
   if (staleIds.length) {
-    const url = `${COINGECKO_BASE}coins/markets?vs_currency=${encodeURIComponent(currency)}&ids=${encodeURIComponent(staleIds.join(","))}&sparkline=false&price_change_percentage=24h&per_page=250`;
+    const url = `${COINGECKO_BASE}coins/markets?vs_currency=${encodeURIComponent(currency)}&ids=${encodeURIComponent(staleIds.join(","))}&sparkline=true&price_change_percentage=24h&per_page=250`;
     const payload = await fetchJson(url);
     const rows = Array.isArray(payload) ? payload : [];
     const fromSwCache = Boolean(payload?.__swFallback);

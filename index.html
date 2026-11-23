@@ -236,6 +236,7 @@
           <div class="esc-pila esc-pila-2" data-esc-hueco="analisis2"></div>
           <div class="esc-pila esc-pila-3" data-esc-hueco="analisis3"></div>
         </div>
+        <div class="esc-banda" data-esc-hueco="mapa"></div>
         <div class="esc-banda" data-esc-hueco="operaciones"></div>
         <div class="esc-banda" data-esc-hueco="plan"></div>
         <div class="esc-banda" data-esc-hueco="noticias"></div>
@@ -293,6 +294,7 @@
         <div class="inicio-bloques" id="inicioBloques">
           <section class="bloque bloque-grafico" data-bloque="grafico" aria-label="Evolucion del saldo" data-i18n-aria-label="inicio.graficoAria">
             <div class="grafico-saldo" id="graficoSaldo"></div>
+            <p class="grafico-leyenda" id="leyendaSaldo" hidden></p>
             <div class="segmentado" id="rangoSaldo" role="group" aria-label="Periodo del grafico" data-i18n-aria-label="inicio.rangoAria">
               <button type="button" data-rango="1d" aria-pressed="false" data-i18n="inicio.rango1d">1D</button>
               <button type="button" data-rango="1s" aria-pressed="false" data-i18n="inicio.rango1s">1S</button>
@@ -379,6 +381,18 @@
             <h2 class="home-section-title" data-i18n="charts.portfolioDistribution">Distribucion del portafolio</h2>
           </div>
           <div id="analyticsDonut" class="dona"></div>
+        </section>
+
+        <!-- 2b. Mapa de la cartera: area segun el peso, color segun 24 h -->
+        <section class="panel mapa-panel">
+          <div class="panel-heading compact-heading">
+            <h2 class="home-section-title" data-i18n="analitica.mapaTitulo">Mapa de la cartera</h2>
+          </div>
+          <div id="mapaCartera" class="mapa"></div>
+          <div class="mapa-escala" id="mapaCarteraEscala" hidden>
+            <span class="mapa-escala-ayuda" data-i18n="analitica.mapaAyuda">Tamano: peso en la cartera. Color: cambio en 24 h.</span>
+            <span class="mapa-escala-barra" aria-hidden="true"><small>-8%</small><i></i><small>+8%</small></span>
+          </div>
         </section>
 
         <!-- 3. Por categoria -->
@@ -510,6 +524,25 @@
               <span class="vista-previa-boton" data-i18n="quick.buy">Comprar</span>
             </div>
             <svg viewBox="0 0 326 44" preserveAspectRatio="none"><path d="M2 38 L30 32 L58 35 L86 26 L114 29 L142 20 L170 23 L198 14 L226 17 L254 9 L282 11 L310 4 L324 6" fill="none" style="stroke: var(--c-ac)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>
+          </div>
+
+          <h3 class="apariencia-titulo" id="avatarTitulo" data-i18n="apariencia.avatar">Imagen de perfil</h3>
+          <div class="apariencia-grupo avatar-ajuste">
+            <div class="avatar-fila">
+              <span class="inicio-avatar avatar-muestra" id="avatarMuestra" aria-hidden="true"></span>
+              <div class="segmentado en-tarjeta" role="group" aria-labelledby="avatarTitulo">
+                <button type="button" data-avatar-tipo="iniciales" aria-pressed="false" data-i18n="apariencia.avatarIniciales">Iniciales</button>
+                <button type="button" data-avatar-tipo="emoji" aria-pressed="false" data-i18n="apariencia.avatarEmoji">Emoji</button>
+                <button type="button" data-avatar-tipo="foto" aria-pressed="false" data-i18n="apariencia.avatarFoto">Foto</button>
+              </div>
+            </div>
+            <div class="avatar-emojis" id="avatarEmojis" role="group" aria-label="Elige un emoji" data-i18n-aria-label="apariencia.avatarEmojis" hidden></div>
+            <div class="avatar-foto-acciones" id="avatarFotoAcciones" hidden>
+              <button class="ghost-btn" type="button" data-avatar-foto="elegir" data-i18n="apariencia.avatarCambiar">Cambiar foto</button>
+              <button class="ghost-btn" type="button" data-avatar-foto="quitar" data-i18n="apariencia.avatarQuitar">Quitar foto</button>
+              <p class="apariencia-nota" data-i18n="apariencia.avatarNota">Se guarda reducida en este dispositivo y en tus copias de seguridad.</p>
+            </div>
+            <input id="avatarArchivo" type="file" accept="image/*" hidden />
           </div>
 
           <h3 class="apariencia-titulo" data-i18n="apariencia.tema">Tema</h3>

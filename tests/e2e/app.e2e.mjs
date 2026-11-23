@@ -364,6 +364,67 @@ async function recorridoCompleto(navegador, url, ancho) {
     }));
     if (r.segmentos !== r.leyenda || r.leyenda < 2 || Math.abs(r.suma - 100) > 0.6 || r.centro !== "6") throw new Error(JSON.stringify(r));
   });
+  await paso(g, "analitica: el anillo se toca y el centro dice cual", app, async () => {
+    const centro = () => page.evaluate(() => document.querySelector("#analyticsDonut .dona-centro").textContent.replace(/\s+/g, " ").trim());
+    await page.locator("#analyticsDonut .dona-item").nth(1).click(); await page.waitForTimeout(250);
+    const elegido = await centro();
+    const marcados = await page.evaluate(() => [document.querySelectorAll("#analyticsDonut .dona-seg.activo").length, document.querySelectorAll('#analyticsDonut .dona-item[aria-pressed="true"]').length]);
+    await page.locator("#analyticsDonut .dona-item").nth(1).click(); await page.waitForTimeout(250);
+    // Con raton, el trozo bajo el puntero se sigue viendo: se aparta antes de leer.
+    await page.mouse.move(2, 2); await page.waitForTimeout(150);
+    const vuelta = await centro();
+    const sinMarcar = await page.evaluate(() => document.querySelectorAll('#analyticsDonut .dona-item[aria-pressed="true"]').length);
+    if (!/^\d+[.,]\d%/.test(elegido) || !/ETH|Ethereum/.test(elegido) || marcados.join() !== "1,1" || !/^6 /.test(vuelta) || sinMarcar) throw new Error(JSON.stringify({ elegido, marcados, vuelta, sinMarcar }));
+  });
+  await paso(g, "analitica: mapa de la cartera por peso y color de 24 h; un bloque abre su ficha", app, async () => {
+    const r = await page.evaluate(() => {
+      const bloques = [...document.querySelectorAll("#mapaCartera .mapa-bloque")];
+      const area = bloques.reduce((t, b) => t + parseFloat(b.style.width) * parseFloat(b.style.height), 0) / 100;
+      return { n: bloques.length, area, sube: document.querySelectorAll("#mapaCartera .mapa-bloque.sube").length, baja: document.querySelectorAll("#mapaCartera .mapa-bloque.baja").length, primero: bloques[0]?.dataset.assetOpen, escala: !document.getElementById("mapaCarteraEscala").hidden };
+    });
+    if (r.n !== 6 || Math.abs(r.area - 100) > 0.5 || r.sube + r.baja < 1 || r.primero !== "r-btc" || !r.escala) throw new Error(JSON.stringify(r));
+    await page.click("#mapaCartera .mapa-bloque >> nth=0"); await page.waitForTimeout(500);
+    const abierta = await page.evaluate(() => !document.getElementById("assetDetailScreen").hidden && state.detailRowId);
+    await page.evaluate(() => closeAssetDetail()); await page.waitForTimeout(300);
+    if (abierta !== "r-btc") throw new Error("ficha: " + abierta);
+  });
+  await paso(g, "inicio: esqueletos hasta los primeros precios, y el saldo cuenta hasta su valor", app, async () => {
+    await page.click('[data-tab-target="home"]'); await page.waitForTimeout(300);
+    const r = await page.evaluate(async () => {
+      const guardado = state.rows.map((row) => [row.currentPrice, row.priceStatus]);
+      state.rows.forEach((row) => { row.currentPrice = null; row.priceStatus = "loading"; });
+      renderSummary(buildSnapshot());
+      renderPortfolioMobile(state.rows);
+      const cargando = {
+        saldo: !!document.querySelector("#mainValue .esqueleto"),
+        resumen: document.querySelectorAll("#summaryGrid .esqueleto").length,
+        filas: document.querySelectorAll("#portfolioMobileList .fila-activo-cifras .esqueleto").length,
+        cero: /0,00/.test(document.getElementById("mainValue").textContent)
+      };
+      state.rows.forEach((row, i) => { row.currentPrice = guardado[i][0]; row.priceStatus = guardado[i][1]; });
+      renderSummary(buildSnapshot());
+      renderPortfolioMobile(state.rows);
+      const listo = { esqueletos: document.querySelectorAll("#mainValueCard .esqueleto, #summaryGrid .esqueleto, #portfolioMobileList .esqueleto").length, saldo: document.getElementById("mainValue").textContent };
+      // Cifras animadas (sin los precios en vivo de por medio): la primera
+      // vez se pinta tal cual; despues cuenta y acaba en el valor exacto.
+      const vistos = [];
+      animarCifra("e2e", 100, (v) => vistos.push(v));
+      animarCifra("e2e", 200, (v) => vistos.push(v));
+      await new Promise((ok) => setTimeout(ok, 150));
+      const aMitad = vistos[vistos.length - 1];
+      await new Promise((ok) => setTimeout(ok, 900));
+      return { cargando, listo, primero: vistos[0], aMitad, final: vistos[vistos.length - 1], pasos: vistos.length };
+    });
+    if (!r.cargando.saldo || r.cargando.resumen !== 6 || r.cargando.filas < 2 || r.cargando.cero) throw new Error("cargando: " + JSON.stringify(r.cargando));
+    if (r.listo.esqueletos || !/\d/.test(r.listo.saldo)) throw new Error("tras cargar: " + JSON.stringify(r.listo));
+    if (r.primero !== 100 || !(r.aMitad > 100 && r.aMitad < 200) || r.final !== 200 || r.pasos < 4) throw new Error("cifras: " + JSON.stringify(r));
+  });
+  if (ancho >= 360) {
+    await paso(g, "inicio: mini grafico de 7 dias en cada activo", app, async () => {
+      const r = await page.evaluate(() => ({ minis: document.querySelectorAll("#portfolioMobileList .fila-activo-mini polyline").length, filas: document.querySelectorAll("#portfolioMobileList .fila-activo").length }));
+      if (r.minis < 2 || r.minis > r.filas) throw new Error(JSON.stringify(r));
+    });
+  }
   await paso(g, "noticias cargadas", app, async () => {
     await page.click('[data-tab-target="news"]'); await page.waitForTimeout(600);
     const n = await page.evaluate(() => document.querySelectorAll(".news-card").length);
@@ -457,6 +518,21 @@ async function recorridoCompleto(navegador, url, ancho) {
     const guardado = await page.evaluate(() => JSON.parse(localStorage.getItem("crypto-dashboard-prefs-v2")));
     if (guardado.accent !== "esmeralda" || guardado.textSize !== "m") throw new Error("no se guardo: " + JSON.stringify(guardado));
     if (problemas.length) throw new Error("con texto grande: " + problemas.join(" || "));
+  });
+  await paso(g, "apariencia: emoji o foto en lugar de las iniciales", app, async () => {
+    await page.evaluate(() => { document.getElementById("aparienciaPanel").open = true; });
+    await page.click('[data-avatar-tipo="emoji"]'); await page.waitForTimeout(150);
+    await page.click('[data-avatar-emoji="🚀"]'); await page.waitForTimeout(150);
+    const emoji = await page.evaluate(() => document.getElementById("inicioAvatar").textContent);
+    await page.setInputFiles("#avatarArchivo", path.join(RAIZ, "icons/icon-192.png")); await page.waitForTimeout(600);
+    const foto = await page.evaluate(() => ({ ancho: document.querySelector("#inicioAvatar img")?.naturalWidth, kb: state.prefs.avatarFoto.length / 1024, tipo: state.prefs.avatarTipo }));
+    await page.setInputFiles("#avatarArchivo", { name: "x.txt", mimeType: "text/plain", buffer: Buffer.from("hola") }); await page.waitForTimeout(300);
+    const sigue = await page.evaluate(() => state.prefs.avatarTipo);
+    await page.click('[data-avatar-foto="quitar"]'); await page.waitForTimeout(150);
+    const iniciales = await page.evaluate(() => [document.getElementById("inicioAvatar").textContent, state.prefs.avatarFoto]);
+    if (emoji !== "🚀" || foto.ancho !== 128 || !(foto.kb < 40) || foto.tipo !== "foto" || sigue !== "foto" || iniciales[0] !== "MP" || iniciales[1] !== "") {
+      throw new Error(JSON.stringify({ emoji, foto, sigue, iniciales: iniciales[0] }));
+    }
   });
   await paso(g, "apariencia: ocultar y reordenar bloques de inicio", app, async () => {
     await page.click('[data-bloque-switch="mercado"]');
@@ -1041,6 +1117,13 @@ async function casosCopiaHistorial(navegador, url) {
     if (r.flujos !== 2 || !(r.pct > 20 && r.pct < 30)) throw new Error(`flujos ${r.flujos}, rentabilidad ${r.pct}`);
     if (!/%/.test(r.chip)) throw new Error(`cambio: "${r.chip}"`);
   });
+  await paso(g, "historial: linea de lo invertido con su leyenda", app, async (page) => {
+    const r = await page.evaluate(() => ({
+      segunda: !!document.querySelector("#graficoSaldo path.grafico-segunda"),
+      leyenda: !document.getElementById("leyendaSaldo").hidden && document.getElementById("leyendaSaldo").textContent
+    }));
+    if (!r.segunda || !/Saldo/.test(r.leyenda || "") || !/Invertido/.test(r.leyenda || "")) throw new Error(JSON.stringify(r));
+  });
   await paso(g, "historial: cada rango pide sus dias y no se repite", app, async (page) => {
     await page.click('#rangoSaldo [data-rango="1a"]');
     await page.waitForTimeout(500);
@@ -1082,6 +1165,23 @@ async function casosCopiaHistorial(navegador, url) {
     if (!pedida || !/\+2\d[.,]\d+%/.test(r.chip) || !/1 mes/.test(r.texto) || !r.sube) throw new Error(JSON.stringify({ pedida, ...r }));
     await page.click("#assetDetailScreen [data-detail-close]");
     await page.waitForTimeout(400);
+  });
+  await paso(g, "ficha: tus compras sobre el grafico, con su leyenda", app, async (page) => {
+    await page.click('#portfolioMobileList [data-card-row="r-btc"]');
+    await page.waitForTimeout(600);
+    try {
+      await page.click('[data-detail-range="1mo"]');
+      await page.waitForTimeout(600);
+      const r = await page.evaluate(() => ({
+        compras: document.querySelectorAll("#assetDetailScreen circle.grafico-op.compra").length,
+        leyenda: document.querySelector('#assetDetailScreen [data-detail-role="leyenda"]')?.hidden === false ? document.querySelector('#assetDetailScreen [data-detail-role="leyenda"]').textContent : ""
+      }));
+      // La compra de BTC de hace 5 dias cae dentro del mes.
+      if (r.compras !== 1 || !/Tus compras/.test(r.leyenda)) throw new Error(JSON.stringify(r));
+    } finally {
+      await page.evaluate(() => closeAssetDetail());
+      await page.waitForTimeout(400);
+    }
   });
   await paso(g, "ficha ampliada: maximos, suministro, descripcion y enlaces seguros", app, async (page) => {
     await page.click('#portfolioMobileList [data-card-row="r-btc"]');
@@ -1223,7 +1323,7 @@ async function casosCopiaHistorial(navegador, url) {
     const grandes = [];
     const revisar = (donde) => page.evaluate((donde) => [...document.querySelectorAll("svg")].filter((svg) => {
       const r = svg.getBoundingClientRect();
-      return r.width && r.height && !svg.closest(".grafico-saldo, #analyticsDonut, .vista-previa, .tp-line") && (r.width > 48 || r.height > 48);
+      return r.width && r.height && !svg.closest(".grafico-saldo, #analyticsDonut, .vista-previa, .tp-line, .mini-grafico") && (r.width > 48 || r.height > 48);
     }).map((svg) => `${donde}: ${svg.parentElement.className || svg.parentElement.tagName}`), donde);
     for (const tab of ["home", "analytics", "plan", "news", "more"]) {
       await page.click(`#tabBar [data-tab-target="${tab}"]`);

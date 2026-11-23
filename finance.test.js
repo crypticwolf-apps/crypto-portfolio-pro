@@ -256,3 +256,71 @@ describe("saldo en el tiempo", () => {
     expect(CryptoFinance.rentabilidadPeriodo([{ at: 0, value: 1 }], [])).toBe(null);
   });
 });
+
+describe("dinero invertido en el tiempo", () => {
+  const H = 3600 * 1000;
+  it("lo de hoy menos lo comprado despues, mas el coste de lo vendido despues", () => {
+    // Hoy 1000 invertidos: 600 de antes, una compra de 500 a las 2 h y una
+    // venta a las 3 h de algo que costo 100.
+    const pos = { inversion: 1000, desde: null, costes: [{ at: 2 * H, coste: 500 }, { at: 3 * H, coste: -100 }] };
+    expect(CryptoFinance.invertidoEn(pos, H)).toBe(600);
+    expect(CryptoFinance.invertidoEn(pos, 2 * H)).toBe(1100);
+    expect(CryptoFinance.invertidoEn(pos, 4 * H)).toBe(1000);
+  });
+  it("antes de la fecha de compra no hay nada invertido", () => {
+    const pos = { inversion: 300, desde: 2 * H, costes: [] };
+    expect(CryptoFinance.invertidoEn(pos, H)).toBe(0);
+    expect(CryptoFinance.invertidoEn(pos, 2 * H)).toBe(300);
+  });
+  it("la serie suma todas las posiciones en cada instante", () => {
+    const a = { inversion: 100, desde: null, costes: [] };
+    const b = { inversion: 50, desde: 2 * H, costes: [] };
+    expect(CryptoFinance.serieInvertido([a, b], [H, 2 * H, 3 * H])).toEqual([100, 150, 150]);
+  });
+});
+
+describe("mapa de la cartera", () => {
+  const area = (r) => r.w * r.h;
+  it("cada bloque tiene el area de su peso y todo cabe en el rectangulo", () => {
+    const valores = [50, 25, 12, 8, 3, 2];
+    const rects = CryptoFinance.mapaRectangulos(valores, 400, 300);
+    expect(rects).toHaveLength(valores.length);
+    const total = 400 * 300;
+    rects.forEach((r, i) => {
+      expect(area(r)).toBeCloseTo((valores[i] / 100) * total, 6);
+      expect(r.x).toBeGreaterThanOrEqual(-1e-9);
+      expect(r.y).toBeGreaterThanOrEqual(-1e-9);
+      expect(r.x + r.w).toBeLessThanOrEqual(400 + 1e-6);
+      expect(r.y + r.h).toBeLessThanOrEqual(300 + 1e-6);
+    });
+    const suma = rects.reduce((s, r) => s + area(r), 0);
+    expect(suma).toBeCloseTo(total, 6);
+  });
+
+  it("los bloques no se pisan", () => {
+    const rects = CryptoFinance.mapaRectangulos([40, 30, 10, 10, 5, 3, 2], 360, 280);
+    for (let i = 0; i < rects.length; i += 1) {
+      for (let j = i + 1; j < rects.length; j += 1) {
+        const a = rects[i];
+        const b = rects[j];
+        const ancho = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+        const alto = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+        expect(ancho > 1e-6 && alto > 1e-6).toBe(false);
+      }
+    }
+  });
+
+  it("bloques casi cuadrados con pesos parecidos", () => {
+    const rects = CryptoFinance.mapaRectangulos([1, 1, 1, 1], 200, 200);
+    rects.forEach((r) => {
+      expect(r.w).toBeCloseTo(100, 6);
+      expect(r.h).toBeCloseTo(100, 6);
+    });
+  });
+
+  it("sin valores o sin sitio no rompe", () => {
+    expect(CryptoFinance.mapaRectangulos([], 100, 100)).toEqual([]);
+    expect(CryptoFinance.mapaRectangulos([0, 0], 100, 100)).toEqual([{ x: 0, y: 0, w: 0, h: 0 }, { x: 0, y: 0, w: 0, h: 0 }]);
+    expect(CryptoFinance.mapaRectangulos([5], 0, 100)).toEqual([{ x: 0, y: 0, w: 0, h: 0 }]);
+  });
+});

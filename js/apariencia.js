@@ -1,8 +1,8 @@
 // =============================================================================
-// apariencia.js - Ajustes -> Apariencia: tema (claro, oscuro en negro puro,
-// automatico), color de acento, tamano del texto, decimales, privacidad al
-// abrir, saldos pequenos, dato de la lista y los bloques de Inicio (cuales se
-// ven y en que orden).
+// apariencia.js - Ajustes -> Apariencia: imagen de la cabecera (iniciales,
+// emoji o foto), tema (claro, oscuro en negro puro, automatico), color de
+// acento, tamano del texto, decimales, privacidad al abrir, saldos pequenos,
+// dato de la lista y los bloques de Inicio (cuales se ven y en que orden).
 // Los atributos de <html> que lee el CSS los pone applyAppearance(); el
 // script del <head> hace lo mismo antes de pintar para que no parpadee.
 // =============================================================================
@@ -26,13 +26,38 @@ function bindAppearance() {
     return;
   }
   renderAccentOptions();
+  renderAvatarEmojis();
   renderHomeBlocksList();
   renderAppearanceControls();
+  bindAvatarFoto();
 
   panel.addEventListener("click", (event) => {
     const theme = event.target.closest("[data-tema-set]");
     if (theme) {
       setTheme(theme.dataset.temaSet);
+      return;
+    }
+    const avatarTipo = event.target.closest("[data-avatar-tipo]");
+    if (avatarTipo) {
+      elegirTipoAvatar(avatarTipo.dataset.avatarTipo);
+      return;
+    }
+    const avatarEmoji = event.target.closest("[data-avatar-emoji]");
+    if (avatarEmoji && APARIENCIA.emojis.includes(avatarEmoji.dataset.avatarEmoji)) {
+      state.prefs.avatarEmoji = avatarEmoji.dataset.avatarEmoji;
+      state.prefs.avatarTipo = "emoji";
+      guardarAvatar();
+      return;
+    }
+    const avatarFoto = event.target.closest("[data-avatar-foto]");
+    if (avatarFoto) {
+      if (avatarFoto.dataset.avatarFoto === "quitar") {
+        state.prefs.avatarFoto = "";
+        state.prefs.avatarTipo = "iniciales";
+        guardarAvatar();
+      } else {
+        document.getElementById("avatarArchivo")?.click();
+      }
       return;
     }
     const accent = event.target.closest("[data-acento-set]");
@@ -127,6 +152,17 @@ function renderAppearanceControls() {
   pressed("[data-acento-set]", "acentoSet", state.prefs.accent);
   pressed("[data-texto-set]", "textoSet", state.prefs.textSize);
   pressed("[data-metrica-set]", "metricaSet", state.prefs.listMetric);
+  pressed("[data-avatar-tipo]", "avatarTipo", state.prefs.avatarTipo);
+  pressed("[data-avatar-emoji]", "avatarEmoji", state.prefs.avatarTipo === "emoji" ? state.prefs.avatarEmoji : "");
+  const emojis = document.getElementById("avatarEmojis");
+  if (emojis) {
+    emojis.hidden = state.prefs.avatarTipo !== "emoji";
+  }
+  const fotoAcciones = document.getElementById("avatarFotoAcciones");
+  if (fotoAcciones) {
+    fotoAcciones.hidden = state.prefs.avatarTipo !== "foto";
+  }
+  pintarAvatar(document.getElementById("avatarMuestra"));
   panel.querySelectorAll("[data-ajuste]").forEach((button) => {
     button.setAttribute("aria-checked", state.prefs[button.dataset.ajuste] ? "true" : "false");
   });
@@ -158,6 +194,111 @@ function renderAccentOptions() {
       <span>${escapeHtml(t(`apariencia.acento.${id}`))}</span>
     </button>
   `).join("");
+}
+
+// ── Imagen de la cabecera ──
+function renderAvatarEmojis() {
+  const box = document.getElementById("avatarEmojis");
+  if (!box) {
+    return;
+  }
+  box.innerHTML = APARIENCIA.emojis.map((emoji) => `
+    <button type="button" data-avatar-emoji="${emoji}" aria-pressed="false">${emoji}</button>
+  `).join("");
+}
+
+function elegirTipoAvatar(tipo) {
+  if (!APARIENCIA.avatares.includes(tipo)) {
+    return;
+  }
+  // Foto sin foto guardada: primero se elige (si se cancela, nada cambia).
+  if (tipo === "foto" && !state.prefs.avatarFoto) {
+    document.getElementById("avatarArchivo")?.click();
+    return;
+  }
+  if (state.prefs.avatarTipo === tipo) {
+    return;
+  }
+  state.prefs.avatarTipo = tipo;
+  guardarAvatar();
+}
+
+function guardarAvatar() {
+  savePreferences();
+  renderAppearanceControls();
+  pintarAvatar(dom.inicioAvatar);
+}
+
+function bindAvatarFoto() {
+  const input = document.getElementById("avatarArchivo");
+  if (!input) {
+    return;
+  }
+  input.addEventListener("change", async () => {
+    const archivo = input.files?.[0];
+    input.value = "";
+    if (!archivo) {
+      return;
+    }
+    try {
+      state.prefs.avatarFoto = await reducirFotoAvatar(archivo);
+      state.prefs.avatarTipo = "foto";
+      guardarAvatar();
+    } catch (error) {
+      showToast(t("apariencia.avatarError"), t("apariencia.avatarErrorTexto"), "negative");
+    }
+  });
+}
+
+// Recorta la foto al cuadrado del centro y la deja en AVATAR_FOTO_PX px
+// (JPEG): unos pocos KB, que caben en los ajustes y en la copia.
+function reducirFotoAvatar(archivo) {
+  return new Promise((ok, mal) => {
+    if (!archivo || !/^image\//.test(archivo.type || "") || archivo.size > 20 * 1024 * 1024) {
+      mal(new Error("imagen no valida"));
+      return;
+    }
+    const url = URL.createObjectURL(archivo);
+    const imagen = new Image();
+    imagen.onload = () => {
+      try {
+        const corte = Math.min(imagen.naturalWidth, imagen.naturalHeight);
+        if (!(corte > 0)) {
+          throw new Error("imagen vacia");
+        }
+        const lienzo = document.createElement("canvas");
+        lienzo.width = AVATAR_FOTO_PX;
+        lienzo.height = AVATAR_FOTO_PX;
+        const ctx = lienzo.getContext("2d");
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(
+          imagen,
+          (imagen.naturalWidth - corte) / 2,
+          (imagen.naturalHeight - corte) / 2,
+          corte,
+          corte,
+          0,
+          0,
+          AVATAR_FOTO_PX,
+          AVATAR_FOTO_PX
+        );
+        const datos = lienzo.toDataURL("image/jpeg", 0.85);
+        if (!fotoAvatarValida(datos)) {
+          throw new Error("foto no valida");
+        }
+        ok(datos);
+      } catch (error) {
+        mal(error);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    };
+    imagen.onerror = () => {
+      URL.revokeObjectURL(url);
+      mal(new Error("no se pudo leer la imagen"));
+    };
+    imagen.src = url;
+  });
 }
 
 // ── Bloques de Inicio: interruptor y asa para ordenar ──
