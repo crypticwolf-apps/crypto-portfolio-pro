@@ -6,8 +6,8 @@
 //   saldo ............... saldo + grafico | resumen de hoy + rendimiento
 //   mercado ............. BTC, ETH, dominancia y miedo/codicia en una linea
 //   posiciones .......... todos los activos (la tabla)
-//   analisis ............ en una linea: distribucion | mejores y peores |
-//                         categorias y comparativa
+//   analisis ............ distribucion | mejores y peores | comparativa, y
+//                         debajo las categorias a todo el ancho
 //   mapa ................ mapa de la cartera (peso y cambio en 24 h)
 //   operaciones ......... compras y ventas
 //   plan ................ el plan de salida en tabla, una fila por activo
@@ -68,8 +68,8 @@ function escPiezas() {
     [document.querySelector(".seccion-escritorio .table-panel"), "posiciones"],
     [panel("analyticsDonut"), "analisis1"],
     [panel("insightsRankingsGrid"), "analisis2"],
-    [panel("analyticsCategory"), "analisis3"],
     [panel("analyticsCompare"), "analisis3"],
+    [panel("analyticsCategory"), "analisis4"],
     [panel("mapaCartera"), "mapa"],
     [panel("analyticsActivityStats"), "operaciones"],
     [document.querySelector('.tab-section[data-tab="plan"]'), "plan"],
@@ -116,7 +116,10 @@ function bindEscritorio() {
       return;
     }
     window.clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(() => escAjustarNoticias(), 150);
+    resizeTimer = window.setTimeout(() => {
+      escAjustarNoticias();
+      ajustarTablaEscritorio(true);
+    }, 150);
   });
 
   // El grafico del saldo llena el alto de su tarjeta: si cambia, se redibuja.
@@ -126,7 +129,7 @@ function bindEscritorio() {
       const nuevo = Math.round(entrada.contentRect.height);
       if (escEstado.activo && nuevo && Math.abs(nuevo - alto) > 2) {
         alto = nuevo;
-        window.requestAnimationFrame(() => renderHomeChart());
+        window.requestAnimationFrame(() => renderHomeChart(null, { medir: true }));
       }
     });
   }
@@ -235,6 +238,24 @@ function escRepintarPlan() {
   }
   renderPlan();
   escEstado.planPintadoEn = Date.now();
+  escEstimarAltos();
+}
+
+// Altura de reserva de las bandas grandes mientras estan fuera de la pantalla
+// (content-visibility en escritorio.css): estimada por el numero de activos
+// para que la barra de scroll apenas cambie al bajar la primera vez.
+function escEstimarAltos() {
+  const n = state.rows.length;
+  const poner = (hueco, alto) => {
+    const banda = document.querySelector(`[data-esc-hueco="${hueco}"]`);
+    const valor = `auto ${Math.round(alto)}px`;
+    if (banda && banda.style.containIntrinsicSize !== valor) {
+      banda.style.containIntrinsicSize = valor;
+    }
+  };
+  poner("posiciones", 150 + n * 66);
+  poner("plan", 380 + n * 84);
+  poner("operaciones", 200 + Math.min(state.trades.length, 12) * 79);
 }
 
 // Con precios en vivo cambian las distancias a cada TP: el Plan se repinta,

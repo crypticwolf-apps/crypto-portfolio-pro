@@ -869,6 +869,30 @@ async function casosEscritorio(navegador, url) {
     const vuelta = await page.evaluate(() => ({ escritorio: !document.getElementById("escritorio").hidden, saldo: !!document.querySelector(".esc-saldo #mainValueCard"), plan: !!document.querySelector('[data-esc-hueco="plan"] #planContent') }));
     if (!movil.barra || movil.escritorio || !movil.saldo || !movil.acciones || movil.ajustesRapido !== "Mas" || movil.noticiasOcultas || d || !vuelta.escritorio || !vuelta.saldo || !vuelta.plan) throw new Error(JSON.stringify({ movil, d, vuelta }));
   });
+  await paso(g, "las tablas de posiciones y del plan caben enteras de 1100 a 1600 px, tambien con millones y nombres largos", app, async () => {
+    // Una posicion enorme con nombre largo: lo que antes dejaba columnas fuera.
+    await page.evaluate(() => {
+      state.rows.push(createRow({ id: "r-largo", crypto: "bitcoin", coinId: "bitcoin", symbol: "WSTETHLARGO", resolvedName: "Wrapped Liquid Staked Ether 2.0 Super Largo", investment: "1234567", tokens: "25", currentPrice: 98765.43, priceStatus: "success", tp1: "150000", tp2: "200000", tp3: "250000" }));
+      renderAll();
+    });
+    const fuera = [];
+    for (const ancho of [1100, 1280, 1440, 1600]) {
+      await page.setViewportSize({ width: ancho, height: 900 }); await page.waitForTimeout(450);
+      const r = await page.evaluate(() => [".seccion-escritorio .table-wrap, [data-esc-hueco=\"posiciones\"] .table-wrap", ".tp-tabla-wrap"].map((sel) => { const w = document.querySelector(sel); return w ? w.scrollWidth - w.clientWidth : -1; }));
+      if (r.some((x) => x !== 0)) fuera.push(`${ancho}px: ${r.join(" / ")} px de mas`);
+    }
+    await page.evaluate(() => { state.rows = state.rows.filter((row) => row.id !== "r-largo"); renderAll(); });
+    await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(300);
+    if (fuera.length) throw new Error(fuera.join(" | "));
+  });
+  await paso(g, "boton de ver todas las noticias con su texto centrado y aviso de carga abajo", app, async () => {
+    const r = await page.evaluate(() => {
+      const b = document.getElementById("escNoticiasMas"); const cs = getComputedStyle(b);
+      const loader = getComputedStyle(document.getElementById("appLoader"));
+      return { alinea: cs.alignItems, loaderArriba: loader.top, loaderAbajo: loader.bottom };
+    });
+    if (r.alinea !== "center" || r.loaderAbajo === "auto") throw new Error(JSON.stringify(r));
+  });
   await app.ctx.close();
 }
 

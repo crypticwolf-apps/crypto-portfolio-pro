@@ -92,6 +92,27 @@ Continúo el desarrollo de mi app **Crypto Portfolio Pro**.
   carga si ninguna tiene precio todavía (`saldoCargando`). Lo que se calcule
   con precios (saldo, resultado, ganancia) debe mirar eso para no enseñar
   "0,00" o "-100 %" en el primer arranque.
+- **Rendimiento con precios en vivo (cada segundo):** no leer medidas
+  (`clientWidth`, `scrollWidth`...) en lo que se pinta en cada tick: obliga a
+  recalcular el diseño de toda la página. Por eso: `fitAmount` usa un ancho
+  de ventana guardado, el gráfico del saldo y el mapa guardan su medida (se
+  renueva al cambiar de tamaño) y `ajustarTablaEscritorio` mira el plazo
+  antes de medir. Para escribir HTML en cada tick, `pintarHtml(nodo, html)`
+  (utilidades.js): no toca el DOM si no cambia. El gráfico del saldo solo se
+  redibuja si la línea se movería un píxel (`firmaGraficoSaldo`). El saldo
+  solo se anima en saltos de 0,5 % o más (`CIFRA_SALTO_MIN`). El destello de
+  precios cambia el color de golpe (`steps`): un fundido repintaba la tabla en
+  cada fotograma. En escritorio las bandas fuera de la pantalla llevan
+  `content-visibility: auto` (por eso, medidas con la página sin desplazar
+  pueden dar textos "pisados" que no existen: comprobar haciendo scroll).
+  Medir con la CPU frenada ×4 (CDP `Emulation.setCPUThrottlingRate`).
+- **Simulador de WebSocket de Playwright:** guarda los mensajes dentro de la
+  página y la memoria sube sola; para buscar fugas, generar los ticks dentro
+  de la app (`applyLiveTick`).
+- **Tabla de posiciones de escritorio:** escalones por ancho en
+  escritorio.css (1599, 1439, 1279 px) y, si aun no cabe (letra de reserva,
+  cifras enormes), `data-apretada` 1-3 (menos relleno, sin Peso, sin 7 d).
+  La prueba e2e comprueba de 1100 a 1600 px con una posición de millones.
 - **Entorno de vista previa:** el panel del navegador está oculto, así que **las
   transiciones CSS se congelan** y `getComputedStyle` devuelve el valor anterior.
   Para medir colores inyecta antes `*{transition:none !important}`. Las capturas
@@ -179,8 +200,12 @@ Portafolio en el centro del menú inferior.
   (Hoy, Ayer...; en escritorio no).
 - **Escritorio (desde 1100 px):** toda la app en una página, en bandas a todo el
   ancho: cabecera fija · aviso de copia (si toca) · saldo y gráfico | resumen y
-  rendimiento · mercado · posiciones (tabla) · análisis · compras y ventas ·
-  plan (tabla, una fila por activo) · noticias. Ajustes en panel lateral y la
+  rendimiento · mercado · posiciones (tabla) · análisis (distribución | mejores
+  y peores | comparativa, y debajo las categorías en columnas; por debajo de
+  1500 px, comparativa y categorías a todo el ancho) · mapa de la cartera ·
+  compras y ventas (el resumen se queda fijo al bajar por la lista) · plan
+  (tabla, una fila por activo; sus líneas pequeñas se parten por los "·") ·
+  noticias. El aviso "Sincronizando..." sale abajo a la izquierda. Ajustes en panel lateral y la
   ficha de un activo también. Comprobar de 1100 a 2560 px.
 - **Precios en vivo:** WebSocket de Binance (Kraken de reserva), GeckoTerminal
   para tokens DEX por red + contrato, CoinGecko para el resto y para metadatos.

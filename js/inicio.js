@@ -64,7 +64,7 @@ function bindHome() {
   window.addEventListener("resize", () => {
     window.clearTimeout(graficoResizeTimer);
     graficoResizeTimer = window.setTimeout(() => {
-      renderHomeChart();
+      renderHomeChart(null, { medir: true });
       refitAmounts();
     }, 160);
   });
@@ -89,7 +89,7 @@ function renderHomeGreeting() {
     const key = hour >= 6 && hour < 13 ? "inicio.buenosDias"
       : hour >= 13 && hour < 21 ? "inicio.buenasTardes"
         : "inicio.buenasNoches";
-    dom.inicioSaludo.textContent = t(key);
+    setText(dom.inicioSaludo, t(key));
   }
   pintarAvatar(dom.inicioAvatar);
   pintarAvatar(document.getElementById("avatarMuestra"));
@@ -343,7 +343,30 @@ function chartWidthOf(box) {
   return Math.max(120, Math.round(box.clientWidth || Math.min(608, window.innerWidth - 32)));
 }
 
-function renderHomeChart(snapshot = null) {
+// Medida del grafico del saldo: leer el ancho en cada tick obligaba a
+// recalcular el diseno de la pagina. Se mide al arrancar y al cambiar de
+// tamano (ventana o tarjeta: renderHomeChart(null, { medir: true })).
+let graficoMedida = null;
+
+// Huella de lo que se ve: si con el tick nuevo la linea no se moveria ni un
+// pixel, no se vuelve a dibujar.
+function firmaGraficoSaldo(points, invertido, ancho, alto) {
+  let min = Infinity;
+  let max = -Infinity;
+  points.forEach((p) => { if (p.value < min) min = p.value; if (p.value > max) max = p.value; });
+  const paso = (max - min) / alto || Math.abs(max) / alto || 1;
+  const px = (v) => Math.round(v / paso);
+  const n = points.length;
+  const ultimo = points[n - 1];
+  const muestras = [0.25, 0.5, 0.75].map((f) => px(points[Math.floor((n - 1) * f)].value));
+  return [
+    state.prefs.homeRange, state.prefs.currency, state.prefs.hideBalance ? 1 : 0, ancho, alto, n,
+    points[0].at, Math.floor(ultimo.at / 600000), px(min), px(max), px(ultimo.value), ...muestras,
+    invertido ? px(invertido[invertido.length - 1]) + "/" + px(invertido[0]) : ""
+  ].join("|");
+}
+
+function renderHomeChart(snapshot = null, { medir = false } = {}) {
   const box = dom.graficoSaldo;
   if (!box) {
     return;
@@ -367,24 +390,37 @@ function renderHomeChart(snapshot = null) {
     if (leyendaVacia) {
       leyendaVacia.hidden = true;
     }
-    box.innerHTML = historialSaldoCargando() || saldoCargando(snap)
+    delete box.dataset.firma;
+    pintarHtml(box, historialSaldoCargando() || saldoCargando(snap)
       ? `<div class="grafico-esqueleto esqueleto" aria-hidden="true"><svg viewBox="0 0 300 150" preserveAspectRatio="none"><path d="M0 112 C40 104 60 80 96 88 S150 120 186 84 S246 40 300 52" /></svg></div>`
-      : `<div class="grafico-vacio">${escapeHtml(t("inicio.graficoVacio"))}</div>`;
+      : `<div class="grafico-vacio">${escapeHtml(t("inicio.graficoVacio"))}</div>`);
     return;
   }
   // En escritorio el grafico llena el alto de su tarjeta (el ResizeObserver
   // de escritorio.js lo redibuja si cambia); en movil mide 150 px.
-  const height = modoEscritorio() ? Math.max(150, Math.round(box.clientHeight)) : 150;
+  if (medir || !graficoMedida || graficoMedida.escritorio !== modoEscritorio()) {
+    const ancho = box.clientWidth;
+    graficoMedida = ancho > 0
+      ? { ancho: chartWidthOf(box), alto: Math.round(box.clientHeight), escritorio: modoEscritorio() }
+      : null;
+  }
+  const width = graficoMedida ? graficoMedida.ancho : chartWidthOf(box);
+  const height = modoEscritorio() ? Math.max(150, graficoMedida ? graficoMedida.alto : 150) : 150;
   // Con el saldo reconstruido, tambien lo invertido (linea discontinua).
   const invertido = serie && Array.isArray(serie.invertido) && serie.invertido.some((v) => v > 0) ? serie.invertido : null;
   const leyenda = document.getElementById("leyendaSaldo");
   if (leyenda) {
-    leyenda.innerHTML = invertido
+    pintarHtml(leyenda, invertido
       ? `<span><i class="leyenda-saldo"></i>${escapeHtml(t("inicio.leyendaSaldo"))}</span><span><i class="leyenda-segunda"></i>${escapeHtml(t("inicio.leyendaInvertido"))}</span>`
-      : "";
+      : "");
     leyenda.hidden = !invertido;
   }
-  dibujarGrafico(box, areaChartSvg(points, chartWidthOf(box), { label: t("inicio.graficoAria"), id: "graficoRelleno", height, segunda: invertido }), {
+  const firma = firmaGraficoSaldo(points, invertido, width, height);
+  if (box.dataset.firma === firma && box.querySelector("svg")) {
+    return;
+  }
+  box.dataset.firma = firma;
+  dibujarGrafico(box, areaChartSvg(points, width, { label: t("inicio.graficoAria"), id: "graficoRelleno", height, segunda: invertido }), {
     // El saldo respeta el modo privado; sin % porque el saldo incluye lo que
     // se mete y se saca.
     valor: (punto) => maskedCurrency(punto.value),
@@ -393,6 +429,13 @@ function renderHomeChart(snapshot = null) {
 }
 
 // ── Resumen: hoy, invertido, mejor y peor de las ultimas 24 h ──
+// Importes grandes (1.448.098,00 US$) en letra algo menor: caben enteros en
+// su media columna, tambien a 320 px y en el lateral de escritorio.
+function largoCifra(texto) {
+  const n = String(texto || "").length;
+  return n >= 17 ? "muy-largo" : n >= 14 ? "largo" : "";
+}
+
 function renderSummary(snapshot) {
   renderMainValueCard(snapshot);
 
@@ -431,16 +474,16 @@ function renderSummary(snapshot) {
 
   // Sin ningun precio aun, lo que depende de ellos va en silueta.
   const cargando = saldoCargando(snapshot);
-  dom.summaryGrid.innerHTML = cells.map((cell, indice) => {
+  pintarHtml(dom.summaryGrid, cells.map((cell, indice) => {
     const silueta = cargando && indice !== 1;
     return `
     <div class="resumen-celda">
       <span class="resumen-etiqueta">${escapeHtml(cell.label)}</span>
-      <strong class="resumen-valor ${cell.tone}">${silueta ? esqueletoHtml("esqueleto-valor") : escapeHtml(cell.value)}</strong>
+      <strong class="resumen-valor ${cell.tone} ${largoCifra(cell.value)}">${silueta ? esqueletoHtml("esqueleto-valor") : escapeHtml(cell.value)}</strong>
       <span class="resumen-sub">${silueta ? esqueletoHtml("esqueleto-sub") : escapeHtml(cell.sub)}</span>
     </div>
   `;
-  }).join("");
+  }).join(""));
 
   renderAllocationCard(snapshot);
 }
@@ -519,7 +562,7 @@ function renderAllocationCard(snapshot) {
   }
 
   card.hidden = false;
-  card.innerHTML = `
+  pintarHtml(card, `
     <h2 class="titulo-tarjeta">${escapeHtml(t("inicio.reparto"))}</h2>
     <div class="reparto-barra" aria-hidden="true">
       ${parts.map((part) => `<span style="flex-grow:${part.pct.toFixed(3)};background:${part.color}"></span>`).join("")}
@@ -533,7 +576,7 @@ function renderAllocationCard(snapshot) {
         </span>
       `).join("")}
     </div>
-  `;
+  `);
 }
 
 // ── Lista de activos ──
@@ -731,7 +774,7 @@ function renderMarketSection() {
       <span class="mercado-barra miedo" aria-hidden="true"><i style="left:${fngValue}%"></i></span>`}
     </div>`;
 
-  dom.marketGrid.innerHTML = [coin("Bitcoin", market.btc), coin("Ethereum", market.eth), dominanceCell, fngCell].join("");
+  pintarHtml(dom.marketGrid, [coin("Bitcoin", market.btc), coin("Ethereum", market.eth), dominanceCell, fngCell].join(""));
 
   // Tendencia: media de la variacion 24 h de BTC y ETH.
   const trendChip = document.getElementById("marketTrendChip");
@@ -740,7 +783,7 @@ function renderMarketSection() {
     if (changes.length) {
       const average = changes.reduce((total, value) => total + value, 0) / changes.length;
       const tone = average > 1.5 ? "positive" : average < -1.5 ? "negative" : "neutral";
-      trendChip.innerHTML = `${ICONO_FLECHA_CAMBIO}<span>${escapeHtml(t(average > 1.5 ? "market.trendUp" : average < -1.5 ? "market.trendDown" : "market.trendFlat"))}</span>`;
+      pintarHtml(trendChip, `${ICONO_FLECHA_CAMBIO}<span>${escapeHtml(t(average > 1.5 ? "market.trendUp" : average < -1.5 ? "market.trendDown" : "market.trendFlat"))}</span>`);
       trendChip.className = `chip-cambio ${tone}`;
       trendChip.hidden = false;
     } else {

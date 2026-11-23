@@ -24,6 +24,15 @@
 /* Lo que en escritorio no se ve: pestanas, barra inferior, barra fija y lo
    que queda en las pestanas (la lista de activos y el reparto: la tabla y el
    anillo dicen lo mismo). Ajustes solo con su panel abierto. */
+/* El aviso de "Sincronizando..." abajo a la izquierda: arriba tapaba los
+   botones de la cabecera fija. */
+:root[data-ui] body.es-escritorio .app-loader {
+  top: auto;
+  bottom: 24px;
+  left: 24px;
+  transform: translate(0, 12px);
+}
+:root[data-ui] body.es-escritorio .app-loader.is-visible { transform: translate(0, 0); }
 :root[data-ui] body.es-escritorio .barra-inferior,
 :root[data-ui] body.es-escritorio .sticky-bar,
 :root[data-ui] body.es-escritorio .app-shell > .tab-section { display: none; }
@@ -161,32 +170,49 @@
 :root[data-ui] .esc-mercado .mercado-celda:first-child { padding-left: 0; border-left: 0; }
 :root[data-ui] .esc-mercado .mercado-valor { font-size: 1.25rem; }
 
-/* ── Analisis de los activos, en una linea ──
-   Distribucion | mejores y peores (ancho doble) | categorias y comparativa.
-   En pantallas menos anchas, mejores y peores baja a su linea. Si una
-   tarjeta se estira para igualar la fila, su contenido queda centrado. */
+/* ── Analisis de los activos ──
+   Distribucion | mejores y peores (ancho doble) | comparativa, y debajo las
+   categorias a todo el ancho, en columnas (asi ninguna tarjeta se estira
+   para igualar a una lista larga). Si una tarjeta se estira para igualar
+   la fila, su contenido queda centrado. */
 :root[data-ui] .esc-analisis {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
-  grid-template-areas: "a1 a2 a3";
+  grid-template-areas: "a1 a2 a3" "a4 a4 a4";
   gap: var(--esc-hueco);
   align-items: stretch;
 }
 :root[data-ui] .esc-pila-1 { grid-area: a1; }
 :root[data-ui] .esc-pila-2 { grid-area: a2; }
 :root[data-ui] .esc-pila-3 { grid-area: a3; }
+:root[data-ui] .esc-pila-4 { grid-area: a4; }
+:root[data-ui] .esc-pila-4 .category-block {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 18px 40px;
+}
 :root[data-ui] .esc-pila-2 .insights-rankings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 :root[data-ui] .esc-analisis .panel { display: flex; flex-direction: column; }
 :root[data-ui] .esc-analisis .panel > :last-child { margin-block: auto; }
+/* Por debajo de 1500 px: distribucion | mejores y peores, y debajo la
+   comparativa y las categorias, cada una a todo el ancho. */
 @media (max-width: 1499px) {
   :root[data-ui] .esc-analisis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas: "a1 a3" "a2 a2";
+    grid-template-areas: "a1 a2" "a3 a3" "a4 a4";
   }
 }
 
 /* ── Bandas a todo el ancho ── */
 :root[data-ui] .esc-banda { min-width: 0; display: flex; flex-direction: column; }
+/* Rendimiento: lo que esta fuera de la pantalla (posiciones, analisis, mapa,
+   operaciones, plan, noticias) no se recalcula ni se pinta en cada tick de
+   precios hasta que se acerca al hacer scroll. El navegador recuerda el alto
+   de cada banda (auto) para que la barra de scroll no salte. */
+:root[data-ui] body.es-escritorio :is(.esc-analisis, [data-esc-hueco="posiciones"], [data-esc-hueco="mapa"], [data-esc-hueco="operaciones"], [data-esc-hueco="plan"], [data-esc-hueco="noticias"]) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 720px;
+}
 
 /* Mapa de la cartera: a todo el ancho y con altura fija. */
 :root[data-ui] .esc-banda .mapa { aspect-ratio: auto; height: clamp(260px, 22vw, 380px); max-height: none; }
@@ -200,6 +226,9 @@
 }
 :root[data-ui] .esc-banda .panel:has(#analyticsActivityStats) > .panel-heading { grid-column: 1 / -1; }
 :root[data-ui] .esc-banda #tradesLog { margin-top: 0; }
+/* Con muchas operaciones, el resumen y el grafico se quedan a la vista
+   mientras se recorre la lista (debajo de la cabecera fija). */
+:root[data-ui] .esc-banda #analyticsActivityStats { position: sticky; top: 96px; }
 
 /* Bloques de Inicio y pestanas (Plan, Noticias) con aspecto de tarjeta. */
 :root[data-ui] .esc-pila > .bloque:not(.tarjeta),
@@ -261,6 +290,7 @@
 }
 :root[data-ui] .esc-ver-mas {
   align-self: center;
+  align-items: center;
   justify-content: center;
   min-height: 40px;
   padding: 0 22px;
@@ -301,6 +331,11 @@
   background: var(--c-ac-suave);
 }
 :root[data-ui] .tp-tabla td small { font-size: 0.75rem; color: var(--c-t2); }
+/* Las lineas pequenas de cada objetivo pasan a dos lineas si no hay sitio
+   (la tabla nunca se sale por la derecha); las cifras grandes, nunca. */
+:root[data-ui] .tp-tabla td.tp-col-tp small,
+:root[data-ui] .tp-tabla td.tp-col-prog small { white-space: normal; text-align: right; }
+:root[data-ui] .tp-tabla .tp-trozo { white-space: nowrap; }
 :root[data-ui] .tp-tabla td small.positive { color: var(--c-pos); }
 :root[data-ui] .tp-tabla td small.negative { color: var(--c-neg); }
 :root[data-ui] .tp-tabla .es-alcanzado strong { color: var(--c-pos); }
@@ -480,7 +515,44 @@
 :root[data-ui] .table-wrap .col-change .numeric { font-size: 0.875rem; font-weight: 600; }
 /* Mini grafico de 7 dias */
 :root[data-ui] .table-wrap .col-week { width: 104px; }
-:root[data-ui] .table-wrap td.col-week .mini-grafico { margin-left: auto; }
+:root[data-ui] .table-wrap td.col-week .mini-grafico { display: block; width: 88px; height: 28px; margin-left: auto; }
+/* Nombres largos (tokens de billetera): una linea con "..." y el nombre
+   entero al pasar el raton (title de la fila). */
+:root[data-ui] .table-wrap .asset-id { max-width: 220px; }
+:root[data-ui] .table-wrap .asset-id > :is(strong, small) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-ui] .table-wrap .asset-id .wallet-chip { margin-left: 0; max-width: 100%; align-self: flex-start; }
+/* Por debajo de 1600 px la tabla se aprieta para que quepan todas las
+   columnas: menos relleno y el peso solo con su %. Por debajo de 1280 px el
+   peso se quita (esta en el anillo y el mapa de la cartera, justo debajo),
+   el mini grafico es mas corto y las cifras un punto mas pequenas. */
+@media (max-width: 1599px) {
+  :root[data-ui] .table-wrap :is(th, td) { padding-left: 10px; padding-right: 10px; }
+  :root[data-ui] .table-wrap .asset-id { max-width: 180px; }
+  :root[data-ui] .table-wrap .peso-barra { display: none; }
+  :root[data-ui] .table-wrap .col-week { width: 92px; }
+}
+/* Niveles extra (cartera.js, ajustarTablaEscritorio) si aun asi no cabe. */
+:root[data-ui] .table-wrap:is([data-apretada="1"], [data-apretada="2"], [data-apretada="3"]) :is(th, td) { padding-left: 6px; padding-right: 6px; }
+:root[data-ui] .table-wrap:is([data-apretada="1"], [data-apretada="2"], [data-apretada="3"]) .peso-barra { display: none; }
+:root[data-ui] .table-wrap:is([data-apretada="2"], [data-apretada="3"]) .col-weight { display: none; }
+:root[data-ui] .table-wrap:is([data-apretada="2"], [data-apretada="3"]) .asset-id { max-width: 130px; }
+:root[data-ui] .table-wrap[data-apretada="3"] .col-week { display: none; }
+:root[data-ui] .table-wrap[data-apretada="3"] td strong { font-size: 0.8125rem; }
+@media (max-width: 1439px) {
+  :root[data-ui] .table-wrap .asset-id { max-width: 160px; }
+  :root[data-ui] .table-wrap .col-week { width: 84px; }
+  :root[data-ui] .table-wrap td.col-week .mini-grafico { width: 76px; }
+}
+@media (max-width: 1279px) {
+  :root[data-ui] .table-wrap :is(th, td) { padding-left: 8px; padding-right: 8px; }
+  :root[data-ui] .table-wrap .asset-id { max-width: 150px; }
+  :root[data-ui] .table-wrap .col-weight { display: none; }
+  :root[data-ui] .table-wrap .col-week { width: 76px; }
+  :root[data-ui] .table-wrap td.col-week .mini-grafico { width: 64px; }
+  :root[data-ui] .table-wrap td strong { font-size: 0.875rem; }
+  :root[data-ui] .table-wrap .asset-logo .logo-activo { width: 32px; height: 32px; }
+  :root[data-ui] .table-wrap .asset-field { gap: 10px; }
+}
 :root[data-ui] .quote-time { font-size: 0.6875rem; color: var(--c-t3); }
 :root[data-ui] .quote-time.is-stale { color: var(--c-warn); }
 :root[data-ui] .peso-celda { display: inline-flex; align-items: center; gap: 10px; }

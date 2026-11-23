@@ -503,6 +503,9 @@ function renderTpEscritorio(box, positions) {
     tpFilaEditando = null;
   }
 
+  // Una linea "a · b" que, si no cabe, se parte por el separador y nunca
+  // dentro de una cifra (la segunda parte empieza con "·").
+  const trozos = (...partes) => partes.map((parte, i) => `<span class="tp-trozo">${i ? "· " : ""}${parte}</span>`).join(" ");
   const fila = (p) => {
     const sim = computeTpProgressive(p);
     const fullA = computeTpFull(p);
@@ -516,16 +519,16 @@ function renderTpEscritorio(box, positions) {
         : `<small>${dist === null ? "--" : escapeHtml(t("tp.falta", { pct: `${dist >= 0 ? "+" : ""}${dist.toFixed(1)}%` }))}</small>`;
       return `<td class="tp-col-tp${s.reached ? " es-alcanzado" : ""}"><div class="stack-cell">
         <strong>${precio(s.price)}</strong>
-        <small>${escapeHtml(t("tp.vende", { pct: s.pct.toFixed(0) }))} · ${money(s.income)}</small>
-        <small>${escapeHtml(t("tp.todo"))} ${money(f.income)} · <span class="${tono(f.roi)}">${formatPercent(f.roi)}</span></small>
+        <small>${trozos(escapeHtml(t("tp.vende", { pct: s.pct.toFixed(0) })), money(s.income))}</small>
+        <small><span class="tp-trozo">${escapeHtml(t("tp.todo"))}</span> ${trozos(money(f.income), `<span class="${tono(f.roi)}">${formatPercent(f.roi)}</span>`)}</small>
         ${estado}
       </div></td>`;
     };
     const progresiva = sim.hasTp
       ? `<div class="stack-cell">
           <strong>${money(sim.totalOut)}</strong>
-          <small class="${tono(sim.profit)}">${maskedSignedCurrency(sim.profit)} · ${formatPercent(sim.roi)}</small>
-          ${sim.remainingValue > 0 ? `<small>${escapeHtml(t("tp.queda", { valor: money(sim.remainingValue) }))}</small>` : ""}
+          <small class="${tono(sim.profit)}">${trozos(maskedSignedCurrency(sim.profit), formatPercent(sim.roi))}</small>
+          ${sim.remainingValue > 0 ? `<small><span class="tp-trozo">${escapeHtml(t("tp.queda", { valor: money(sim.remainingValue) }))}</span></small>` : ""}
         </div>`
       : vacio;
     const abierta = tpFilaEditando === p.id;
@@ -555,14 +558,14 @@ function renderTpEscritorio(box, positions) {
         const sc = full.find((item) => item.idx === k);
         return `<td class="tp-col-tp"><div class="stack-cell">
           <strong>${money(prog.phases[k])}</strong>
-          <small>${escapeHtml(t("tp.accumulated"))} ${money(prog.phaseAcc[k])}</small>
-          ${sc ? `<small>${escapeHtml(t("tp.todo"))} ${money(sc.total)} · <span class="${tono(sc.roi)}">${formatPercent(sc.roi)}</span></small>` : ""}
+          <small><span class="tp-trozo">${escapeHtml(t("tp.accumulated"))}</span> <span class="tp-trozo">${money(prog.phaseAcc[k])}</span></small>
+          ${sc ? `<small><span class="tp-trozo">${escapeHtml(t("tp.todo"))}</span> ${trozos(money(sc.total), `<span class="${tono(sc.roi)}">${formatPercent(sc.roi)}</span>`)}</small>` : ""}
         </div></td>`;
       }).join("")}
       <td class="tp-col-prog"><div class="stack-cell">
         <strong>${money(prog.totalOut)}</strong>
-        <small class="${tono(prog.profit)}">${maskedSignedCurrency(prog.profit)} · ${formatPercent(prog.roi)}</small>
-        ${prog.remainingValue > 0 ? `<small>${escapeHtml(t("tp.queda", { valor: money(prog.remainingValue) }))}</small>` : ""}
+        <small class="${tono(prog.profit)}">${trozos(maskedSignedCurrency(prog.profit), formatPercent(prog.roi))}</small>
+        ${prog.remainingValue > 0 ? `<small><span class="tp-trozo">${escapeHtml(t("tp.queda", { valor: money(prog.remainingValue) }))}</span></small>` : ""}
       </div></td>
       <td></td>
     </tr>`;

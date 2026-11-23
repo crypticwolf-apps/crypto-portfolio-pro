@@ -20,7 +20,8 @@ Web: https://cartera.cryptoatalaya.com/
 - **PDF** de la cartera con resumen y gráfico, para descargar o compartir.
 - **Apariencia:** imagen de perfil (iniciales, un emoji o una foto), tema claro, oscuro (negro puro) o automático, 6 colores de acento, tamaño de texto y bloques de Inicio ordenables. Moneda base USD o EUR.
 - **Tablet y móvil en horizontal** (700 a 1099 px): la app de móvil a dos columnas.
-- **Versión de escritorio** (desde 1100 px): toda la app en una página, en bandas a todo el ancho (saldo y gráfico, mercado, posiciones, análisis, compras y ventas, el plan en una tabla y noticias), con Ajustes en un panel lateral.
+- **Versión de escritorio** (desde 1100 px): toda la app en una página, en bandas a todo el ancho (saldo y gráfico, mercado, posiciones, análisis, mapa de la cartera, compras y ventas, el plan en una tabla y noticias), con Ajustes en un panel lateral. Las tablas caben enteras de 1100 a 2560 px aunque haya millones o nombres largos (se aprietan solas si hace falta).
+- **Rendimiento:** con precios en vivo solo se repinta lo que cambia, lo que está fuera de la pantalla no se dibuja y nada se anima sin necesidad.
 - Guardado automático en el dispositivo (`localStorage`) y funcionamiento sin conexión (service worker).
 
 ## Estructura

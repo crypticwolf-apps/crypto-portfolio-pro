@@ -185,6 +185,8 @@ body.detail-open { overflow: hidden; }
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 :root[data-ui] .app-loader.is-visible { opacity: 1; transform: translate(-50%, 0); }
+/* Oculto, el indicador no gira (seguia animandose a opacidad 0). */
+:root[data-ui] .app-loader:not(.is-visible) .loader-ring { animation: none; }
 :root[data-ui] .loader-ring {
   width: 16px;
   height: 16px;
@@ -348,7 +350,8 @@ body.detail-open { overflow: hidden; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.wallet-chip svg { width: 10px; height: 10px; }
+.wallet-chip svg { width: 10px; height: 10px; flex: 0 0 auto; }
+.wallet-chip-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @media (max-width: 768px) {
   .editor-panel {
@@ -450,15 +453,21 @@ body.detail-open { overflow: hidden; }
 :root[data-ui] .midiendo > * { flex-shrink: 0 !important; }
 
 /* Destello de un precio en vivo (flashNode): dos animaciones iguales por
-   sentido para que cambiar de una a otra la reinicie sin recalcular nada. */
-:root[data-ui] [data-destello="sube-a"] { animation: destelloSubeA 0.9s ease; }
-:root[data-ui] [data-destello="sube-b"] { animation: destelloSubeB 0.9s ease; }
-:root[data-ui] [data-destello="baja-a"] { animation: destelloBajaA 0.9s ease; }
-:root[data-ui] [data-destello="baja-b"] { animation: destelloBajaB 0.9s ease; }
-@keyframes destelloSubeA { 0% { color: var(--c-pos); } 100% { color: inherit; } }
-@keyframes destelloSubeB { 0% { color: var(--c-pos); } 100% { color: inherit; } }
-@keyframes destelloBajaA { 0% { color: var(--c-neg); } 100% { color: inherit; } }
-@keyframes destelloBajaB { 0% { color: var(--c-neg); } 100% { color: inherit; } }
+   sentido para que cambiar de una a otra la reinicie sin recalcular nada.
+   El color cambia de golpe y vuelve a los 0,6 s (steps): un fundido de color
+   obligaba a repintar la tabla en cada fotograma con 20 precios por segundo;
+   asi solo se pinta dos veces. */
+:root[data-ui] [data-destello="sube-a"] { animation: destelloSubeA 0.6s steps(1, end); }
+:root[data-ui] [data-destello="sube-b"] { animation: destelloSubeB 0.6s steps(1, end); }
+:root[data-ui] [data-destello="baja-a"] { animation: destelloBajaA 0.6s steps(1, end); }
+:root[data-ui] [data-destello="baja-b"] { animation: destelloBajaB 0.6s steps(1, end); }
+@keyframes destelloSubeA { from, to { color: var(--c-pos); } }
+@keyframes destelloSubeB { from, to { color: var(--c-pos); } }
+@keyframes destelloBajaA { from, to { color: var(--c-neg); } }
+@keyframes destelloBajaB { from, to { color: var(--c-neg); } }
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui] [data-destello] { animation: none; }
+}
 
 @keyframes veloEntra { from { opacity: 0; } to { opacity: 1; } }
 @keyframes veloSale { to { opacity: 0; } }

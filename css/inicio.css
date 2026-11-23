@@ -235,8 +235,12 @@
   text-overflow: ellipsis;
 }
 :root[data-ui] .resumen-valor.positive { color: var(--c-pos); }
+:root[data-ui] .resumen-valor.largo { font-size: 0.9375rem; }
+:root[data-ui] .resumen-valor.muy-largo { font-size: 0.8125rem; }
 @media (max-width: 360px) {
   :root[data-ui] .resumen-valor { font-size: 0.9375rem; }
+  :root[data-ui] .resumen-valor.largo { font-size: 0.75rem; }
+  :root[data-ui] .resumen-valor.muy-largo { font-size: 0.6875rem; }
   :root[data-ui] .saldo-valor { font-size: 2.5rem; }
   :root[data-ui] .mercado-valor { font-size: 0.9375rem; }
 }

@@ -65,7 +65,7 @@ function walletBadgeHtml(row) {
     return "";
   }
   return `<span class="wallet-chip" title="${escapeHtml(t("wallet.badgeTitle", { wallet: walletDisplayName(wallet) }))}">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3"/><path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2"/><path d="M21 12h-5a2 2 0 0 0 0 4h5z"/></svg>${escapeHtml(walletDisplayName(wallet))}</span>`;
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3"/><path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2"/><path d="M21 12h-5a2 2 0 0 0 0 4h5z"/></svg><span class="wallet-chip-txt">${escapeHtml(walletDisplayName(wallet))}</span></span>`;
 }
 
 // Al borrar una posicion de billetera se recuerda que no se quiere: la

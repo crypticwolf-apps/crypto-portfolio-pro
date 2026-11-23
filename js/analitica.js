@@ -207,13 +207,13 @@ function renderInsights(insights) {
   const mejores = mode === "24h" ? insights.top24h : insights.topPerformers;
   const peores = mode === "24h" ? insights.worst24h : insights.worstPerformers;
   const opcion = (valor, clave) => `<button type="button" data-insights-modo="${valor}" aria-pressed="${mode === valor ? "true" : "false"}">${escapeHtml(t(clave))}</button>`;
-  dom.insightsRankingsGrid.innerHTML = `
+  pintarHtml(dom.insightsRankingsGrid, `
     <div class="segmentado en-tarjeta insights-modo" role="group" aria-label="${escapeHtml(t("insights.modoAria"))}">
       ${opcion("current", "insights.modoCompra")}${opcion("24h", "insights.modo24h")}
     </div>
     ${renderRankingCard({ title: tituloRanking(mejores, mode, "mejores"), items: mejores, mode })}
     ${renderRankingCard({ title: tituloRanking(peores, mode, "peores"), items: peores, mode })}
-  `;
+  `);
 }
 
 function bindInsights() {
@@ -279,7 +279,7 @@ function renderAnalyticsSummary(snapshot) {
 
   const hasPositions = snapshot.totals.investment > 0 || snapshot.totals.currentValue > 0;
   if (!hasPositions) {
-    box.innerHTML = `<div class="as-empty"><p>${escapeHtml(t("summary.emptyPositions"))}</p></div>`;
+    pintarHtml(box, `<div class="as-empty"><p>${escapeHtml(t("summary.emptyPositions"))}</p></div>`);
     renderAnalyticsExtras(snapshot);
     return;
   }
@@ -334,7 +334,7 @@ function renderAnalyticsSummary(snapshot) {
     secondary.push({ label: t("summary.totalSinceStart"), value: maskedSignedCurrency(netTotal), tone: toneClass(netTotal), muted: true, espera: cargando });
   }
 
-  box.innerHTML = `
+  pintarHtml(box, `
     <div class="as-clean">
       <div class="segmentado en-tarjeta as-period-row" role="group" aria-label="${escapeHtml(t("summary.periodAria"))}">${chips}</div>
       <div class="as-hero">
@@ -345,7 +345,7 @@ function renderAnalyticsSummary(snapshot) {
       <div class="as-secondary">
         ${secondary.map((s) => `<div class="as-sec ${s.muted ? "muted" : ""}"${s.hint ? ` title="${escapeHtml(s.hint)}"` : ""}><span>${escapeHtml(s.label)}</span><b class="${s.espera ? "" : s.tone || ""}">${s.espera ? esqueletoHtml("esqueleto-valor") : escapeHtml(String(s.value))}</b></div>`).join("")}
       </div>
-    </div>`;
+    </div>`);
   const main = box.querySelector(".as-main");
   if (!cargando) {
     fitAmount(main, "analitica", main?.parentElement);
@@ -367,7 +367,7 @@ function renderAnalyticsActivityStats() {
   const box = document.getElementById("analyticsActivityStats");
   if (!box) return;
   if (!state.trades.length) {
-    box.innerHTML = `<p class="movers-empty">${escapeHtml(t("analytics.noTrades"))}</p>`;
+    pintarHtml(box, `<p class="movers-empty">${escapeHtml(t("analytics.noTrades"))}</p>`);
     return;
   }
   // Solo los meses con compras o ventas (los ultimos 6 de un ano), el mas
@@ -376,7 +376,7 @@ function renderAnalyticsActivityStats() {
   const totalBuys = state.trades.reduce((s, tr) => s + (tr.type === "buy" ? tr.amount || 0 : 0), 0);
   const totalSells = state.trades.reduce((s, tr) => s + (tr.type === "sell" ? tr.amount || 0 : 0), 0);
   const maxVal = Math.max(1, ...months.map((m) => Math.max(m.buys, m.sells)));
-  box.innerHTML = `
+  pintarHtml(box, `
     <div class="acts-totals">
       <div><span>${escapeHtml(t("analytics.totalBuys"))}</span><b>${maskedCurrency(totalBuys)}</b></div>
       <div><span>${escapeHtml(t("analytics.totalSells"))}</span><b>${maskedCurrency(totalSells)}</b></div>
@@ -396,7 +396,7 @@ function renderAnalyticsActivityStats() {
         </div>`).join("")}
     </div>` : ""}
     <div class="acts-legend"><span><i class="buy" aria-hidden="true"></i>${escapeHtml(t("analytics.buys"))}</span><span><i class="sell" aria-hidden="true"></i>${escapeHtml(t("analytics.sells"))}</span></div>
-  `;
+  `);
 }
 
 function renderAnalyticsCompare(snapshot) {
@@ -413,7 +413,7 @@ function renderAnalyticsCompare(snapshot) {
   const values = rows.map((r) => Math.abs(r.pct || 0));
   const maxAbs = Math.max(1, ...values);
 
-  box.innerHTML = rows.map((r) => {
+  pintarHtml(box, rows.map((r) => {
     const width = r.pct != null ? (Math.abs(r.pct) / maxAbs) * 100 : 0;
     const tone = r.pct == null ? "" : r.pct >= 0 ? "positive" : "negative";
     return `
@@ -423,7 +423,7 @@ function renderAnalyticsCompare(snapshot) {
         <span class="compare-pct ${tone}">${r.pct != null ? formatSignedPercent(r.pct) : "--"}</span>
       </div>
     `;
-  }).join("");
+  }).join(""));
 }
 
 // Chips de periodo del resumen de rendimiento.
@@ -443,7 +443,7 @@ function renderAnalyticsCategory(snapshot) {
   if (!box) return;
   const total = snapshot.totals.currentValue;
   if (!(total > 0)) {
-    box.innerHTML = `<p class="movers-empty">${escapeHtml(t("home.noData"))}</p>`;
+    pintarHtml(box, `<p class="movers-empty">${escapeHtml(t("home.noData"))}</p>`);
     return;
   }
   // Agrupa el valor actual por sector. Solo se listan los sectores presentes.
@@ -461,11 +461,11 @@ function renderAnalyticsCategory(snapshot) {
     .map((e) => ({ ...e, pct: (e.value / total) * 100 }))
     .sort((a, b) => b.value - a.value);
   if (!rows.length) {
-    box.innerHTML = `<p class="movers-empty">${escapeHtml(t("home.noData"))}</p>`;
+    pintarHtml(box, `<p class="movers-empty">${escapeHtml(t("home.noData"))}</p>`);
     return;
   }
   // Cada fila lleva su nombre escrito: una sola tinta (el acento) basta.
-  box.innerHTML = rows.map((r) => `
+  pintarHtml(box, rows.map((r) => `
     <div class="category-row">
       <div class="category-head">
         <span class="category-label">${escapeHtml(t("sector." + r.key))}</span>
@@ -474,7 +474,7 @@ function renderAnalyticsCategory(snapshot) {
       <div class="category-bar" aria-hidden="true"><span style="width:${r.pct.toFixed(1)}%"></span></div>
       <small class="category-assets">${escapeHtml(r.assets.slice(0, 4).join(" · "))}${r.assets.length > 4 ? " +" + (r.assets.length - 4) : ""}</small>
     </div>
-  `).join("");
+  `).join(""));
 }
 
 // ── Distribucion: anillo SVG propio ──
@@ -499,9 +499,9 @@ function renderAnalyticsDonut(snapshot) {
   const total = items.reduce((sum, { metrics }) => sum + metrics.currentValue, 0);
   if (!(total > 0)) {
     donaPartes = [];
-    box.innerHTML = saldoCargando(snapshot)
+    pintarHtml(box, saldoCargando(snapshot)
       ? `<div class="dona-figura">${esqueletoHtml("dona-esqueleto")}</div>`
-      : `<p class="movers-empty">${escapeHtml(t("charts.insufficientData"))}</p>`;
+      : `<p class="movers-empty">${escapeHtml(t("charts.insufficientData"))}</p>`);
     return;
   }
   const colors = seriesColorMap(snapshot);
@@ -540,7 +540,7 @@ function renderAnalyticsDonut(snapshot) {
     return html;
   }).join("");
 
-  box.innerHTML = `
+  pintarHtml(box, `
     <div class="dona-figura">
       <svg viewBox="0 0 150 150" role="img" aria-label="${escapeHtml(t("charts.portfolioDistribution"))}">
         <circle cx="75" cy="75" r="${radius}" fill="none" stroke-width="16" class="dona-pista"></circle>
@@ -558,19 +558,20 @@ function renderAnalyticsDonut(snapshot) {
             <small>${escapeHtml(maskedCurrency(part.value))}</small>
           </button>
         </li>`).join("")}
-    </ul>`;
+    </ul>`);
   marcarDona(box, donaSeleccion);
 }
 
-// Resalta un trozo (o ninguno, con null) sin volver a pintar el anillo.
+// Resalta un trozo (o ninguno, con null) sin volver a pintar el anillo. El
+// resaltado puede ser solo de vista (raton encima); "pulsado" es siempre lo
+// elegido de verdad (donaSeleccion).
 function marcarDona(box, clave) {
   const parte = donaPartes.find((p) => p.clave === clave) || null;
   box.classList.toggle("con-eleccion", Boolean(parte));
   box.querySelectorAll("[data-dona]").forEach((nodo) => {
-    const activo = Boolean(parte) && nodo.dataset.dona === parte.clave;
-    nodo.classList.toggle("activo", activo);
+    nodo.classList.toggle("activo", Boolean(parte) && nodo.dataset.dona === parte.clave);
     if (nodo.tagName === "BUTTON") {
-      nodo.setAttribute("aria-pressed", activo ? "true" : "false");
+      nodo.setAttribute("aria-pressed", nodo.dataset.dona === donaSeleccion ? "true" : "false");
     }
   });
   const centro = box.querySelector(".dona-centro");
@@ -578,15 +579,15 @@ function marcarDona(box, clave) {
     return;
   }
   if (parte) {
-    centro.innerHTML = `
+    pintarHtml(centro, `
       <strong>${parte.pct.toFixed(1)}%</strong>
       <span class="dona-centro-nombre">${escapeHtml(parte.name)}</span>
-      <small>${escapeHtml(maskedCurrency(parte.value))}</small>`;
+      <small>${escapeHtml(maskedCurrency(parte.value))}</small>`);
   } else {
     const n = Number(centro.dataset.activos) || 0;
-    centro.innerHTML = `
+    pintarHtml(centro, `
       <strong>${n}</strong>
-      <span>${escapeHtml(t(n === 1 ? "analitica.activo" : "analitica.activos"))}</span>`;
+      <span>${escapeHtml(t(n === 1 ? "analitica.activo" : "analitica.activos"))}</span>`);
   }
 }
 
@@ -627,6 +628,9 @@ function bindDona() {
 const MAPA_MAX = 12;
 const MAPA_TOPE_CAMBIO = 8; // % en 24 h con el color mas intenso
 let mapaResizeTimer = null;
+// Tamano medido de la caja del mapa: medirlo en cada tick obligaba al
+// navegador a recalcular el diseno. Se vuelve a medir al cambiar el ancho.
+let mapaTamano = null;
 
 // Intensidad (0 a 1) del color de un cambio en 24 h.
 function intensidadMapa(cambio) {
@@ -681,36 +685,50 @@ function renderMapaCartera(snapshot) {
   const total = bloques.reduce((suma, b) => suma + b.valor, 0);
   if (!(total > 0)) {
     const cargando = saldoCargando(snapshot);
+    if (box.classList.contains("vacio") !== !cargando) {
+      mapaTamano = null;
+    }
     box.classList.toggle("vacio", !cargando);
-    box.innerHTML = cargando
+    pintarHtml(box, cargando
       ? esqueletoHtml("mapa-esqueleto")
-      : `<p class="movers-empty">${escapeHtml(t("charts.insufficientData"))}</p>`;
+      : `<p class="movers-empty">${escapeHtml(t("charts.insufficientData"))}</p>`);
     if (escala) escala.hidden = true;
     return;
   }
-  box.classList.remove("vacio");
+  if (box.classList.contains("vacio")) {
+    box.classList.remove("vacio");
+    mapaTamano = null;
+  }
   if (escala) escala.hidden = false;
   // El tamano real de la caja decide que textos caben en cada bloque. Si
   // aun no se ve (otra pestana), se usa la proporcion que le da el CSS.
-  const ancho = box.clientWidth || 340;
-  const alto = box.clientHeight || Math.round(ancho * 0.75);
+  if (!mapaTamano && box.clientWidth > 0) {
+    mapaTamano = { ancho: box.clientWidth, alto: box.clientHeight || Math.round(box.clientWidth * 0.75) };
+  }
+  const ancho = mapaTamano ? mapaTamano.ancho : 340;
+  const alto = mapaTamano ? mapaTamano.alto : Math.round(ancho * 0.75);
   const rects = CryptoFinance.mapaRectangulos(bloques.map((b) => b.valor), ancho, alto);
-  const pc = (v, base) => `${((v / base) * 100).toFixed(3)}%`;
-  box.innerHTML = bloques.map((b, i) => {
+  // Dos decimales bastan (menos de 1 px): con el goteo de precios el mapa
+  // suele quedar igual y no se repinta.
+  const pc = (v, base) => `${((v / base) * 100).toFixed(2)}%`;
+  pintarHtml(box, bloques.map((b, i) => {
     const r = rects[i];
     const peso = (b.valor / total) * 100;
-    const cambioTxt = b.cambio == null ? "--" : formatSignedPercent(b.cambio);
+    // Un decimal (y el valor en formato corto en la etiqueta): el mapa no
+    // cambia con cada centesima de los precios en vivo y no se repinta.
+    const cambioTxt = b.cambio == null ? "--" : `${b.cambio >= 0 ? "+" : ""}${b.cambio.toFixed(1)}%`;
     const tono = b.cambio == null || intensidadMapa(b.cambio) === 0 ? "" : (b.cambio > 0 ? " sube" : " baja");
     const etiqueta = t("analitica.mapaBloque", {
       nombre: b.nombre,
       peso: `${peso.toFixed(1)}%`,
       cambio: cambioTxt,
-      valor: maskedCurrency(b.valor)
+      valor: state.prefs.hideBalance ? "••••" : formatCompactCurrency(b.valor)
     });
     // Textos segun el sitio: el simbolo; el cambio y el peso si hay hueco
     // (sin hueco no se ponen a medias: el bloque lleva su etiqueta).
-    const cabeSimbolo = r.w >= 40 && r.h >= 24;
-    const cabeCambio = r.w >= 62 && r.h >= 40;
+    // El simbolo entero o nada: "W..." no dice que moneda es.
+    const cabeSimbolo = r.w >= Math.max(40, b.simbolo.length * 8 + 14) && r.h >= 24;
+    const cabeCambio = r.w >= Math.max(62, cambioTxt.length * 8 + 14) && r.h >= 40;
     const cabePeso = r.w >= 72 && r.h >= 58;
     const grande = r.w >= 120 && r.h >= 84 ? " grande" : "";
     const chico = r.w < 72 || r.h < 58 ? " chico" : "";
@@ -723,7 +741,7 @@ function renderMapaCartera(snapshot) {
     return b.id
       ? `<button type="button" class="${clase}" style="${estilo}" data-asset-open="${escapeHtml(b.id)}" aria-label="${escapeHtml(etiqueta)}" title="${escapeHtml(etiqueta)}">${textos}</button>`
       : `<div class="${clase} otros" style="${estilo}" role="img" aria-label="${escapeHtml(etiqueta)}" title="${escapeHtml(etiqueta)}">${textos}</div>`;
-  }).join("");
+  }).join(""));
 }
 
 function bindMapaCartera() {
@@ -741,6 +759,7 @@ function bindMapaCartera() {
   window.addEventListener("resize", () => {
     window.clearTimeout(mapaResizeTimer);
     mapaResizeTimer = window.setTimeout(() => {
+      mapaTamano = null;
       if (box.clientWidth > 0) {
         renderMapaCartera(buildSnapshot());
       }

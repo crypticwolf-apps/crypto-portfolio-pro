@@ -429,12 +429,12 @@ function renderTradesLog() {
     return;
   }
   if (!state.trades.length) {
-    box.innerHTML = "";
+    pintarHtml(box, "");
     return;
   }
 
   const visibles = state.trades.slice(0, tradesLogLimit);
-  box.innerHTML = `
+  pintarHtml(box, `
     <h3 class="trades-log-title">${escapeHtml(t("trades.logTitle"))}</h3>
     <ul class="trades-log-list" role="list">
       ${visibles.map((trade) => tradeLogItemHtml(trade)).join("")}
@@ -442,7 +442,7 @@ function renderTradesLog() {
     ${state.trades.length > visibles.length
       ? `<button class="ghost-btn trades-log-more" type="button" data-trades-more>${escapeHtml(t("trades.showMore"))}</button>`
       : ""}
-  `;
+  `);
 }
 
 function tradeLogItemHtml(trade) {

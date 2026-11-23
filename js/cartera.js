@@ -212,6 +212,32 @@ function renderTableBody() {
   }
 
   dom.tableBody.innerHTML = rows.map((row) => renderRow(row, totalValue)).join("");
+  ajustarTablaEscritorio(true);
+}
+
+// Tabla de escritorio: el CSS la aprieta por anchos de ventana, pero con la
+// letra de reserva (si Inter no carga) o con cifras enormes aun puede no
+// caber. Entonces se aprieta un nivel mas (data-apretada 1 a 3: menos
+// relleno, sin la columna Peso, sin el mini grafico) hasta que cabe. Se mide
+// al pintar la tabla, al cambiar el tamano o al cargar la letra, y como mucho
+// cada 15 s con los precios en vivo (medir obliga a recalcular el diseno).
+let tablaAjustadaEn = 0;
+function ajustarTablaEscritorio(forzar = false) {
+  // Primero el plazo: leer el ancho ya obliga a recalcular el diseno.
+  if (!forzar && Date.now() - tablaAjustadaEn < 15000) {
+    return;
+  }
+  const wrap = dom.tableBody?.closest(".table-wrap");
+  if (!wrap || !wrap.clientWidth) {
+    return;
+  }
+  tablaAjustadaEn = Date.now();
+  let nivel = 0;
+  wrap.dataset.apretada = "0";
+  while (wrap.scrollWidth > wrap.clientWidth + 1 && nivel < 3) {
+    nivel += 1;
+    wrap.dataset.apretada = String(nivel);
+  }
 }
 
 // Fila de solo lectura: toda la edición ocurre en el editor-portal.
@@ -234,7 +260,7 @@ function renderRow(row, totalValue = 0) {
       <td class="col-asset">
         <div class="asset-field">
           <span class="asset-logo" data-role="assetAvatar">${assetLogoHtml(row)}</span>
-          <div class="asset-id">
+          <div class="asset-id" title="${escapeHtml(row.resolvedName || assetDisplayName(row))}">
             <strong data-role="assetName">${escapeHtml(assetDisplayName(row))}</strong>
             <small data-role="assetSub">${escapeHtml(row.resolvedName && row.symbol ? row.resolvedName : t("row.noAsset"))}</small>${walletBadgeHtml(row)}
           </div>
@@ -400,10 +426,11 @@ function renderTotalsRow(snapshot) {
     ? (totalPnl / snapshot.totals.investment) * 100
     : 0;
 
+  ajustarTablaEscritorio();
   // Fila de totales alineada con las columnas de la tabla.
   const change = getPortfolio24hChange(snapshot);
   const cargando = saldoCargando(snapshot);
-  dom.totalsFoot.innerHTML = `
+  pintarHtml(dom.totalsFoot, `
     <tr class="totals-row">
       <td class="totals-label-cell col-asset">${escapeHtml(t("table.totals"))}</td>
       <td class="col-price"></td>
@@ -420,7 +447,7 @@ function renderTotalsRow(snapshot) {
       <td class="col-weight"><span class="peso-texto">${snapshot.totals.currentValue > 0 ? "100%" : "--"}</span></td>
       <td class="col-actions"></td>
     </tr>
-  `;
+  `);
 }
 
 function renderStatusCards() {

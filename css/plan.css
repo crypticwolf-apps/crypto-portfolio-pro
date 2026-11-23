@@ -149,7 +149,9 @@
 }
 :root[data-ui] .tp-table-prog { align-items: flex-start; }
 :root[data-ui] .tp-table-prog .tpg-row {
-  grid-template-columns: 36px repeat(3, minmax(88px, 1fr));
+  /* Cada columna mide al menos su cifra (con millones no se montan). */
+  grid-template-columns: 36px repeat(3, minmax(88px, max-content));
+  column-gap: 16px;
   width: max-content;
   min-width: 100%;
   white-space: nowrap;
@@ -159,7 +161,8 @@
 :root[data-ui] .tp-block-full .tp-table-full { display: none; }
 :root[data-ui] .tp-table-compare { align-items: flex-start; }
 :root[data-ui] .tp-table-compare .tpg-row {
-  grid-template-columns: 56px repeat(calc(var(--tp-cols, 5) - 1), 92px);
+  grid-template-columns: 56px repeat(calc(var(--tp-cols, 5) - 1), minmax(92px, max-content));
+  column-gap: 16px;
   width: max-content;
   min-width: 100%;
   white-space: nowrap;

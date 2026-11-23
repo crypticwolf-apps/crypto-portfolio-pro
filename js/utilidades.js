@@ -506,16 +506,25 @@ function flashNode(node, direction) {
 // ancho, el tamano del texto o la letra cargada; si no, se reaplica lo medido.
 const encajesCifra = new Map();
 let fuentesCargadas = 0;
+// Ancho de la ventana para la clave del encaje. Leer clientWidth en cada
+// llamada obligaba a recalcular el diseno (en cada fotograma de una cifra
+// animada): se guarda y se renueva al cambiar el tamano.
+let anchoEncaje = typeof window !== "undefined" ? window.innerWidth : 0;
+if (typeof window !== "undefined") {
+  window.addEventListener("resize", () => { anchoEncaje = window.innerWidth; });
+}
 // box: la caja cuyo ancho es el sitio disponible (la propia cifra si es un
 // bloque; su contenedor si la cifra comparte fila con otras piezas).
 function fitAmount(node, slot, box = node) {
   if (!node || !box) {
     return;
   }
-  const key = `${node.textContent.length}|${document.documentElement.clientWidth}|${state.prefs.textSize}|${fuentesCargadas}`;
+  const key = `${node.textContent.length}|${anchoEncaje}|${state.prefs.textSize}|${fuentesCargadas}`;
   const cached = encajesCifra.get(slot);
   if (cached && cached.key === key) {
-    node.style.fontSize = cached.size;
+    if (node.style.fontSize !== cached.size) {
+      node.style.fontSize = cached.size;
+    }
     return;
   }
   node.style.removeProperty("font-size");
@@ -536,6 +545,10 @@ function fitAmount(node, slot, box = node) {
 }
 
 function refitAmounts() {
+  // Con la letra ya cargada la tabla de escritorio quiza cabe menos apretada.
+  if (typeof ajustarTablaEscritorio === "function") {
+    ajustarTablaEscritorio(true);
+  }
   fitAmount(document.getElementById("mainValue"), "saldo");
   fitAmount(document.querySelector("#assetDetailScreen [data-detail-role='price']"), "ficha");
   const analytics = document.querySelector("#analyticsSummaryGrid .as-main");
@@ -544,11 +557,15 @@ function refitAmounts() {
 
 // ── Cifras animadas ──
 // Al cambiar un importe (el saldo, la barra fija) la cifra cuenta desde lo
-// que se veia hasta el valor nuevo en CIFRA_MS. No se anima la primera vez,
+// que se veia hasta el valor nuevo en CIFRA_MS si el salto es de al menos
+// CIFRA_SALTO_MIN (una compra, una venta, una subida). No se anima la primera vez,
 // con el saldo oculto, al cambiar de moneda o de formato (firma distinta),
 // con la pestana en segundo plano ni si el sistema pide menos movimiento.
 // pintar(valor) escribe el valor en pantalla; se llama en cada fotograma.
 const CIFRA_MS = 650;
+// Saltos menores que esto (el goteo de los precios en vivo, cada segundo)
+// se escriben sin animar: animar cada tick redisenaba la pagina sin parar.
+const CIFRA_SALTO_MIN = 0.005;
 const cifrasAnimadas = new Map(); // clave -> { mostrado, firma, raf }
 const menosMovimiento = typeof window !== "undefined" && window.matchMedia
   ? window.matchMedia("(prefers-reduced-motion: reduce)")
@@ -567,7 +584,7 @@ function animarCifra(clave, valor, pintar, firma = firmaCifras()) {
     || antes.firma !== firma
     || !Number.isFinite(antes.mostrado)
     || !Number.isFinite(valor)
-    || Math.abs(valor - antes.mostrado) < 0.005
+    || Math.abs(valor - antes.mostrado) < Math.max(0.005, Math.abs(antes.mostrado) * CIFRA_SALTO_MIN)
     || state.prefs.hideBalance
     || menosMovimiento?.matches
     || document.hidden;
@@ -596,6 +613,24 @@ if (typeof document !== "undefined" && document.fonts?.addEventListener) {
     fuentesCargadas += 1;
     refitAmounts();
   });
+}
+
+// Escribe HTML solo si cambia. Con precios en vivo las tarjetas se repintan
+// cada segundo y muchas quedan igual (operaciones, categorias, textos): sin
+// tocar el DOM no hay recalculo de estilos ni de diseno. Si otro codigo
+// cambio el contenido (sus nodos ya no son los que se pintaron), se escribe.
+const htmlPintado = new WeakMap();
+function pintarHtml(nodo, html) {
+  if (!nodo) {
+    return false;
+  }
+  const previo = htmlPintado.get(nodo);
+  if (previo && previo.html === html && previo.primero === nodo.firstChild && previo.ultimo === nodo.lastChild) {
+    return false;
+  }
+  nodo.innerHTML = html;
+  htmlPintado.set(nodo, { html, primero: nodo.firstChild, ultimo: nodo.lastChild });
+  return true;
 }
 
 // Escribe un texto solo si cambia: los ticks repiten muchas cifras iguales.
